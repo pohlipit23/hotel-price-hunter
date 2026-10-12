@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sign in · Poster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800&family=Karla:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;background:#f6e7c1;color:#1c1914;font:16px/1.35 Karla,Helvetica,sans-serif;padding:52px 16px 24px}
+button,a,input{font:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #1c1914;outline-offset:3px}
+.hph-switch{position:fixed;top:0;left:0;right:0;padding:6px 12px;background:#f6e7c1}
+.hph-switch .links{display:flex;gap:4px;overflow-x:auto}
+.hph-switch a{flex:none;min-height:40px;display:grid;place-items:center;padding:0 12px;text-decoration:none;font-weight:700;font-size:13px}
+.hph-switch a[aria-current=page]{background:#1c1914;color:#f6e7c1;border-radius:999px}
+.hero{background:#f0c02e;margin:12px 0 0;padding:12px 14px 0}
+.hero svg{width:100%;height:110px;display:block}
+.hero h1{font-family:"Big Shoulders Display",Impact,sans-serif;font-size:56px;line-height:.8;font-weight:800;margin:4px 0 10px}
+p{font-weight:500;margin:12px 0 16px}
+label{display:block;font-size:13px;font-weight:700;margin:14px 0 6px}
+input{width:100%;min-height:48px;padding:12px;border:3px solid #1c1914;background:#fff6e4}
+button[type=submit]{width:100%;min-height:52px;margin-top:20px;background:#e23a28;color:#fff6e4;border:0;font-family:"Big Shoulders Display",Impact,sans-serif;font-size:24px;font-weight:800}
+.error{background:#e23a28;color:#fff6e4;padding:12px;font-weight:700}
+main{max-width:400px;margin:0 auto}
+</style>
+</head>
+<body>
+<nav class="hph-switch" aria-label="Design versions"><div class="links"><a data-design-link="original">Original</a><a data-design-link="poster" aria-current="page">Poster</a><a data-design-link="found">Found</a><a data-design-link="vista">Vista</a></div></nav>
+<main>
+  <div class="hero">
+    <svg viewBox="0 0 360 110" aria-hidden="true"><rect width="360" height="110" fill="#f0c02e"/><circle cx="300" cy="36" r="28" fill="#e23a28"/><circle cx="300" cy="36" r="16" fill="#f6e7c1"/><path d="M0 78 C50 70 90 90 150 80 C210 70 260 92 360 82 L360 110 L0 110 Z" fill="#1f6b4a"/><rect x="150" y="42" width="52" height="40" fill="#1c1914"/><rect x="156" y="48" width="10" height="10" fill="#f0c02e"/><rect x="170" y="48" width="10" height="10" fill="#e23a28"/><rect x="184" y="48" width="10" height="10" fill="#f6e7c1"/></svg>
+    <h1>PHUKET</h1>
+  </div>
+  <p>Shared username and password. The poster opens the held stay and the three fare drops.</p>
+  <!--LOGIN_ERROR-->
+  <form action="/login" method="post">
+    <input type="hidden" name="next" value="/poster">
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" required maxlength="100" autocapitalize="none">
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="200">
+    <button type="submit">OPEN STAY</button>
+  </form>
+</main>
+<script>
+(function(){const file=/\.html$/i.test((location.pathname.split('/').pop()||''));const hrefs=file?{original:'login-original.html',poster:'login-poster.html',found:'login-found.html',vista:'login-vista.html'}:{original:'/',poster:'/poster',found:'/found',vista:'/vista'};document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]})})();
+</script>
+</body>
+</html>

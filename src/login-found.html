@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sign in · Found</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;background:#fff4c2;color:#241c12;font:16px/1.35 Nunito,Helvetica,sans-serif;padding:52px 16px 24px}
+button,a,input{font:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #241c12;outline-offset:3px}
+.hph-switch{position:fixed;top:0;left:0;right:0;padding:6px 12px;background:#ffbf1f}
+.hph-switch .links{display:flex;gap:4px;overflow-x:auto}
+.hph-switch a{flex:none;min-height:40px;display:grid;place-items:center;padding:0 12px;text-decoration:none;font-weight:800;font-size:13px}
+.hph-switch a[aria-current=page]{background:#241c12;color:#ffbf1f;border-radius:999px}
+main{max-width:400px;margin:12px auto 0}
+.cabinet{background:#241c12;color:#ffbf1f;border-radius:24px;padding:18px 16px;position:relative;overflow:hidden}
+.cabinet:before{content:"";position:absolute;width:48px;height:48px;border-radius:50%;background:#ffbf1f;right:16px;top:16px;animation:spin 6s linear infinite}
+.cabinet:after{content:"";position:absolute;width:24px;height:24px;border-radius:50%;background:#ff3d6e;right:28px;top:28px}
+h1{font-family:"Lilita One",Impact,sans-serif;font-size:42px;line-height:.9;font-weight:400;margin:8px 0;position:relative;z-index:1}
+p{font-weight:800;margin:14px 0}
+label{display:block;font-size:13px;font-weight:800;margin:14px 0 6px}
+input{width:100%;min-height:48px;padding:12px;border:0;border-radius:14px;background:#fffdf6;box-shadow:0 4px 0 #241c12}
+button[type=submit]{width:100%;min-height:52px;margin-top:20px;background:#ff3d6e;color:#fff;border:0;border-radius:999px;font-family:"Lilita One",Impact,sans-serif;font-size:22px;animation:pulse 1.8s ease-in-out infinite}
+.error{background:#ff3d6e;color:#fff;padding:12px;border-radius:14px;font-weight:800}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important}}
+</style>
+</head>
+<body>
+<nav class="hph-switch" aria-label="Design versions"><div class="links"><a data-design-link="original">Original</a><a data-design-link="poster">Poster</a><a data-design-link="found" aria-current="page">Found</a><a data-design-link="vista">Vista</a></div></nav>
+<main>
+  <div class="cabinet">
+    <p style="margin:0;font-size:12px;letter-spacing:.08em">FARE HUNT</p>
+    <h1>Press start. Phuket is live.</h1>
+  </div>
+  <p>Shared username and password to open the hunt. Savings already on the board.</p>
+  <!--LOGIN_ERROR-->
+  <form action="/login" method="post">
+    <input type="hidden" name="next" value="/found">
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" required maxlength="100" autocapitalize="none">
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="200">
+    <button type="submit">START HUNT</button>
+  </form>
+</main>
+<script>
+(function(){const file=/\.html$/i.test((location.pathname.split('/').pop()||''));const hrefs=file?{original:'login-original.html',poster:'login-poster.html',found:'login-found.html',vista:'login-vista.html'}:{original:'/',poster:'/poster',found:'/found',vista:'/vista'};document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]})})();
+</script>
+</body>
+</html>

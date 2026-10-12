@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Phuket · Poster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Karla:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--cream:#f6e7c1;--ink:#1c1914;--red:#e23a28;--sun:#f0c02e;--pine:#1f6b4a;--tap:52px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--cream);color:var(--ink);font:16px/1.35 Karla,Helvetica,sans-serif}
+button,a{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+h1,h2,p{margin:0}
+.hph-switch{position:sticky;top:0;z-index:50;background:var(--cream);padding:6px 10px}
+.hph-switch .links{display:flex;gap:4px;overflow-x:auto}
+.hph-switch a{flex:none;min-height:40px;padding:0 12px;display:grid;place-items:center;text-decoration:none;font-weight:700;font-size:13px}
+.hph-switch a[aria-current=page]{background:var(--ink);color:var(--cream);border-radius:999px}
+.page{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+.poster{background:var(--sun);margin:8px 12px 0;padding:16px 16px 0;position:relative;overflow:hidden}
+.poster svg{width:100%;height:168px;display:block}
+.poster .place{font-family:"Big Shoulders Display",Impact,sans-serif;font-weight:800;font-size:64px;line-height:.8;letter-spacing:-.03em;padding:8px 0 12px}
+.held{background:var(--red);color:#fff6e4;margin:0 12px;padding:14px 16px;display:flex;justify-content:space-between;align-items:end;gap:10px}
+.held b{font-family:"Big Shoulders Display",Impact,sans-serif;font-size:42px;line-height:.9;font-weight:800}
+.held p{font-size:13px;font-weight:700}
+.watch{background:var(--pine);color:#f6e7c1;margin:0 12px 12px;padding:12px 16px;font-size:14px;font-weight:700}
+.band{width:calc(100% - 24px);margin:0 12px 8px;border:0;text-align:left;padding:16px;min-height:92px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.band.a{background:var(--ink);color:var(--sun)}
+.band.b{background:#fff6e4;color:var(--ink)}
+.band.c{background:var(--red);color:#fff6e4}
+.band h2{font-family:"Big Shoulders Display",Impact,sans-serif;font-size:28px;line-height:.95;font-weight:800}
+.band p{font-size:13px;font-weight:700;margin-top:4px;opacity:.85}
+.band .amt{font-family:"Big Shoulders Display",Impact,sans-serif;font-size:40px;font-weight:800;line-height:1}
+.note{margin:8px 16px 0;font-size:12px;font-weight:500}
+.note a{font-weight:700}
+.dock{position:fixed;bottom:0;left:0;right:0;display:flex;gap:10px;align-items:center;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--cream)}
+.dock p{flex:1;font-size:13px;font-weight:700}
+.dock button{flex:none;min-height:var(--tap);padding:0 16px;background:var(--ink);color:var(--sun);border:0;font-family:"Big Shoulders Display",Impact,sans-serif;font-size:20px;font-weight:800}
+dialog{border:0;width:100%;max-height:92dvh;margin:auto 0 0;padding:0;background:var(--cream);overflow:auto}
+dialog::backdrop{background:#1c191466}
+.sheet{padding:12px 12px 8px}
+.close{float:right;width:44px;height:44px;border:0;background:var(--ink);color:var(--cream);font-size:20px}
+.kicker{font-size:12px;font-weight:700}
+#dialogtitle{font-family:"Big Shoulders Display",Impact,sans-serif;font-size:36px;line-height:.9;font-weight:800;margin:8px 0 12px;clear:both}
+.mini{padding:12px;margin-bottom:8px}
+.mini.old{background:var(--ink);color:var(--cream)}
+.mini.new{background:var(--sun)}
+.mini img{width:100%;height:84px;object-fit:cover;margin:8px 0;display:block}
+.mini .label{font-size:11px;font-weight:700}
+.mini h3{font-family:"Big Shoulders Display",Impact,sans-serif;font-size:24px;font-weight:800}
+.mini .price{font-family:"Big Shoulders Display",Impact,sans-serif;font-size:32px;font-weight:800}
+.bill{display:flex;justify-content:space-between;align-items:center;background:var(--pine);color:#f6e7c1;padding:12px 14px;font-weight:700}
+.bill strong{font-family:"Big Shoulders Display",Impact,sans-serif;font-size:36px;font-weight:800}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0;font-weight:500}
+th,td{text-align:left;padding:8px 4px;border-bottom:2px solid var(--ink)}
+.actions{position:sticky;bottom:0;background:var(--cream);padding:8px 0 calc(10px + env(safe-area-inset-bottom))}
+.cta{width:100%;min-height:var(--tap);border:0;background:var(--red);color:#fff6e4;font-family:"Big Shoulders Display",Impact,sans-serif;font-size:22px;font-weight:800}
+.cta:disabled{opacity:.4}
+.secondary{width:100%;min-height:44px;border:0;background:none;font-weight:700}
+.receipt{font-weight:700;margin-top:8px}
+@media(min-width:800px){
+  .page{max-width:420px;margin:0 auto}
+  .dock{left:50%;right:auto;transform:translateX(-50%);width:420px}
+  dialog{max-width:420px;margin-left:auto;margin-right:auto}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<nav class="hph-switch" aria-label="Design versions"><div class="links"><a data-design-link="original">Original</a><a data-design-link="poster" aria-current="page">Poster</a><a data-design-link="found">Found</a><a data-design-link="vista">Vista</a></div></nav>
+<div class="page">
+  <section class="poster" aria-label="Phuket stay poster">
+    <svg viewBox="0 0 360 170" aria-hidden="true">
+      <rect width="360" height="170" fill="#f0c02e"/>
+      <circle cx="292" cy="48" r="40" fill="#e23a28"/>
+      <circle cx="292" cy="48" r="24" fill="#f6e7c1"/>
+      <path d="M0 128 C40 118 70 138 110 128 C150 118 170 140 220 132 C260 126 300 142 360 130 L360 170 L0 170 Z" fill="#1f6b4a"/>
+      <path d="M0 142 C50 134 90 150 140 142 C190 134 240 152 360 144 L360 170 L0 170 Z" fill="#1c1914"/>
+      <rect x="148" y="78" width="72" height="58" fill="#1c1914"/>
+      <rect x="156" y="86" width="14" height="12" fill="#f0c02e"/>
+      <rect x="176" y="86" width="14" height="12" fill="#f0c02e"/>
+      <rect x="196" y="86" width="14" height="12" fill="#e23a28"/>
+      <rect x="156" y="104" width="14" height="12" fill="#f6e7c1"/>
+      <rect x="176" y="104" width="14" height="12" fill="#e23a28"/>
+      <rect x="196" y="104" width="14" height="12" fill="#f0c02e"/>
+      <rect x="174" y="128" width="20" height="8" fill="#f6e7c1"/>
+      <rect x="58" y="70" width="8" height="62" fill="#1c1914"/>
+      <ellipse cx="42" cy="78" rx="28" ry="10" fill="#1f6b4a" transform="rotate(-28 42 78)"/>
+      <ellipse cx="78" cy="72" rx="30" ry="10" fill="#1f6b4a" transform="rotate(24 78 72)"/>
+      <ellipse cx="38" cy="96" rx="26" ry="9" fill="#1c1914" transform="rotate(-12 38 96)"/>
+      <ellipse cx="82" cy="92" rx="24" ry="9" fill="#1f6b4a" transform="rotate(18 82 92)"/>
+    </svg>
+    <p class="place">PHUKET</p>
+  </section>
+  <div class="held"><p>Held · Seabreeze<br>Deluxe twin · 12–15 Nov</p><b>$600</b></div>
+  <p class="watch">Still watching fares until 9 Nov, 6 pm. Four days left. You approve every change.</p>
+  <div id="proposals"></div>
+  <p class="note">All three fit your party and keep the same cancel deadline. USD, taxes in.<br>Illustrative · Photos: <a href="https://www.marriott.com/en-us/hotels/hktmb-phuket-marriott-resort-and-spa-merlin-beach/rooms/premium-rooms/">Marriott</a>, <a href="https://www.thavornpalmbeach.com/gallery-rooms-suites-photo-phuket">Thavorn</a>, <a href="https://www.chanalai.com/en/romantica-resort-gallery.html">Chanalai</a>.</p>
+</div>
+<div class="dock"><p>Biggest fare drop is Palm Garden.</p><button type="button" data-offer="2">OPEN $90</button></div>
+<dialog id="comparison">
+  <div class="sheet">
+    <button class="close" aria-label="Close comparison">×</button>
+    <p class="kicker">Before / after</p>
+    <h2 id="dialogtitle"></h2>
+    <div id="beforeafter"></div>
+    <div class="bill"><span>Net saving<br><small>No cancel penalty</small></span><strong id="netsaving"></strong></div>
+    <table><thead><tr><th>What changes?</th><th>Booked</th><th>Proposed</th></tr></thead><tbody id="comparisonrows"></tbody></table>
+    <div class="actions">
+      <button class="cta" id="select">Approve this change</button>
+      <button class="secondary" id="leave">Leave my booking as it is</button>
+      <p class="receipt" id="receipt" role="status"></p>
+    </div>
+  </div>
+</dialog>
+<script>
+const offers=[{hotel:'Seabreeze Hotel',room:'Deluxe twin',size:'28 m²',price:550,walk:3,image:'https://cache.marriott.com/is/image/marriotts7prod/mc-hktmb-premier-pool-access-26214-48003%3AClassic-Hor?fit=constrain&wid=1200'},{hotel:'Seabreeze Hotel',room:'Family room',size:'38 m²',price:575,walk:3,image:'https://www.thavornpalmbeach.com/upload/gallery-files/1754651277.2564.jpg'},{hotel:'Palm Garden Resort',room:'Family room',size:'38 m²',price:510,walk:8,image:'https://www.chanalai.com/_novaimg/4616061-1421509_0_0_2200_1636_1000_744.jpg'}];
+const $=id=>document.getElementById(id);
+const changes=[{type:'Same hotel · same room',title:'Pay less. Change nothing.',cls:'a'},{type:'Same hotel · other room',title:'More room. Less money.',cls:'b'},{type:'A different hotel',title:'Move hotels. Save more.',cls:'c'}];
+$('proposals').innerHTML=changes.map((c,i)=>'<button class="band '+c.cls+'" data-offer="'+i+'"><span><h2>'+c.title+'</h2><p>'+c.type+'</p></span><span class="amt">$'+(600-offers[i].price)+'</span></button>').join('');
+function compare(i){const o=offers[i];$('dialogtitle').textContent=changes[i].title;$('netsaving').textContent='$'+(600-o.price);$('beforeafter').innerHTML=[{label:'Currently booked',hotel:'Seabreeze Hotel',room:'Deluxe twin · 28 m²',price:600,image:offers[0].image,cls:'old'},{label:'After this change',hotel:o.hotel,room:o.room+' · '+o.size,price:o.price,image:o.image,cls:'new'}].map(p=>'<div class="mini '+p.cls+'"><div class="label">'+p.label+'</div><img src="'+p.image+'" alt="Illustrative room photo"><h3>'+p.hotel+'</h3><p>'+p.room+'</p><div class="price">$'+p.price+'</div></div>').join('');const rows=[['Room size','28 m²',o.size],['Beach walk','3 min',o.walk+' min'],['Breakfast','Included','Included'],['Guests','2 adults + 1 child','2 adults + 1 child'],['Cancel free until','9 Nov, 6 pm','9 Nov, 6 pm']];$('comparisonrows').innerHTML=rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('');$('receipt').textContent='';$('select').disabled=false;$('select').textContent='Approve this change · save $'+(600-o.price);$('select').onclick=()=>{$('receipt').textContent='Saved in the demo. Your original booking has not changed.';$('select').disabled=true};$('comparison').showModal()}
+document.querySelectorAll('[data-offer]').forEach(b=>b.onclick=()=>compare(Number(b.dataset.offer)));
+$('leave').onclick=()=>$('comparison').close();
+document.querySelector('.close').onclick=()=>$('comparison').close();
+(function(){const file=/\.html$/i.test((location.pathname.split('/').pop()||''));const hrefs=file?{original:'pitch.html',poster:'poster.html',found:'found.html',vista:'vista.html'}:{original:'/',poster:'/poster',found:'/found',vista:'/vista'};document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]})})();
+</script>
+</body>
+</html>

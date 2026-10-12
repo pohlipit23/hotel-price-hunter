@@ -1,13 +1,13 @@
 import {readFile,writeFile} from 'node:fs/promises';
 const files={
   original:'src/pitch.html',
-  keep:'src/keep.html',
-  ledger:'src/ledger.html',
-  rooms:'src/rooms.html',
+  poster:'src/poster.html',
+  found:'src/found.html',
+  vista:'src/vista.html',
   loginOriginal:'src/login-original.html',
-  loginKeep:'src/login-keep.html',
-  loginLedger:'src/login-ledger.html',
-  loginRooms:'src/login-rooms.html'
+  loginPoster:'src/login-poster.html',
+  loginFound:'src/login-found.html',
+  loginVista:'src/login-vista.html'
 };
 const pages={};
 for(const [key,path] of Object.entries(files)){

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Phuket · Found</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#fff4c2;--ink:#241c12;--punch:#ff3d6e;--gold:#ffbf1f;--go:#00a56c;--ticket:#fffdf6;--tap:52px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.3 Nunito,Helvetica,sans-serif}
+button,a{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+h1,h2,h3,p{margin:0}
+.hph-switch{position:sticky;top:0;z-index:50;background:var(--gold);padding:6px 10px}
+.hph-switch .links{display:flex;gap:4px;overflow-x:auto}
+.hph-switch a{flex:none;min-height:40px;padding:0 12px;display:grid;place-items:center;text-decoration:none;font-weight:800;font-size:13px}
+.hph-switch a[aria-current=page]{background:var(--ink);color:var(--gold);border-radius:999px}
+.page{padding:10px 12px calc(96px + env(safe-area-inset-bottom))}
+.cabinet{background:var(--ink);color:var(--gold);border-radius:28px 28px 18px 18px;padding:14px 16px 16px;position:relative;overflow:hidden}
+.cabinet:before{content:"";position:absolute;width:56px;height:56px;border-radius:50%;background:var(--gold);right:18px;top:18px;animation:spin 6s linear infinite}
+.cabinet:after{content:"";position:absolute;width:28px;height:28px;border-radius:50%;background:var(--punch);right:32px;top:32px;animation:spin 6s linear infinite reverse}
+.kicker{font-size:12px;font-weight:800;letter-spacing:.08em}
+.cabinet h1{font-family:"Lilita One",Impact,sans-serif;font-size:42px;line-height:.9;font-weight:400;margin:6px 0 8px;position:relative;z-index:1}
+.score{display:flex;justify-content:space-between;align-items:end;position:relative;z-index:1}
+.score b{font-family:"Lilita One",Impact,sans-serif;font-size:56px;line-height:.85;font-weight:400;animation:pop .7s cubic-bezier(.2,1.6,.3,1) both}
+.score span{font-size:13px;font-weight:800;max-width:46%}
+.held{margin:10px 0 12px;background:var(--ticket);border-radius:16px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;background-image:radial-gradient(circle at 0 50%,var(--paper) 8px,transparent 9px),radial-gradient(circle at 100% 50%,var(--paper) 8px,transparent 9px)}
+.held p{font-size:13px;font-weight:800}
+.held strong{font-family:"Lilita One",Impact,sans-serif;font-size:28px;font-weight:400}
+.prize{width:100%;border:0;background:var(--ticket);border-radius:18px;padding:14px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;min-height:88px;box-shadow:0 6px 0 var(--ink);animation:rise .55s ease both;transition:transform .12s ease,box-shadow .12s ease}
+.prize:nth-child(1){animation-delay:.05s}
+.prize:nth-child(2){animation-delay:.14s}
+.prize:nth-child(3){animation-delay:.23s}
+.prize:active{transform:translateY(4px);box-shadow:0 2px 0 var(--ink)}
+.prize h2{font-family:"Lilita One",Impact,sans-serif;font-size:22px;line-height:1;font-weight:400}
+.prize p{font-size:12px;font-weight:800;margin-top:4px;opacity:.75}
+.amt{font-family:"Lilita One",Impact,sans-serif;font-size:36px;color:var(--go);font-weight:400;animation:wiggle 2.4s ease-in-out infinite}
+.note{font-size:12px;font-weight:600;margin-top:8px}
+.note a{font-weight:800}
+.dock{position:fixed;bottom:0;left:0;right:0;display:flex;gap:10px;align-items:center;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--gold)}
+.dock p{flex:1;font-size:13px;font-weight:800}
+.dock button{flex:none;min-height:var(--tap);padding:0 18px;border:0;background:var(--punch);color:#fff;border-radius:999px;font-family:"Lilita One",Impact,sans-serif;font-size:20px;font-weight:400;animation:pulse 1.8s ease-in-out infinite}
+dialog{border:0;width:100%;max-height:92dvh;margin:auto 0 0;padding:0;background:var(--paper);overflow:auto}
+dialog::backdrop{background:#241c1266}
+.sheet{padding:12px}
+.close{float:right;width:44px;height:44px;border:0;background:var(--ink);color:var(--gold);border-radius:22px;font-size:20px}
+#dialogtitle{font-family:"Lilita One",Impact,sans-serif;font-size:32px;line-height:.95;font-weight:400;margin:8px 0 12px;clear:both}
+.mini{padding:12px;margin-bottom:8px;border-radius:16px;background:var(--ticket)}
+.mini.old{background:var(--ink);color:var(--gold)}
+.mini.new{outline:3px dashed var(--go)}
+.mini img{width:100%;height:84px;object-fit:cover;margin:8px 0;display:block;border-radius:10px}
+.mini .label{font-size:11px;font-weight:800}
+.mini h3{font-family:"Lilita One",Impact,sans-serif;font-size:22px;font-weight:400}
+.mini .price{font-family:"Lilita One",Impact,sans-serif;font-size:30px;font-weight:400}
+.bill{display:flex;justify-content:space-between;align-items:center;background:var(--go);color:#fff;padding:12px 14px;border-radius:16px;font-weight:800}
+.bill strong{font-family:"Lilita One",Impact,sans-serif;font-size:36px;font-weight:400}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0;font-weight:600}
+th,td{text-align:left;padding:8px 4px;border-bottom:2px solid var(--ink)}
+.actions{position:sticky;bottom:0;background:var(--paper);padding:8px 0 calc(10px + env(safe-area-inset-bottom))}
+.cta{width:100%;min-height:var(--tap);border:0;background:var(--punch);color:#fff;border-radius:999px;font-family:"Lilita One",Impact,sans-serif;font-size:22px;font-weight:400}
+.cta:disabled{opacity:.4}
+.secondary{width:100%;min-height:44px;border:0;background:none;font-weight:800}
+.receipt{font-weight:800;margin-top:8px;color:var(--go)}
+#celebrate{position:fixed;inset:0;z-index:80;background:#fff4c2f2;display:grid;place-items:center;text-align:center;padding:24px}
+#celebrate[hidden]{display:none}
+.stamp{font-family:"Lilita One",Impact,sans-serif;font-size:72px;line-height:.85;color:var(--punch);transform:rotate(-8deg);animation:slam .55s cubic-bezier(.2,1.4,.3,1) both}
+#foundamt{font-family:"Lilita One",Impact,sans-serif;font-size:48px;color:var(--go);margin:8px 0 16px}
+#burst{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+#burst i{position:absolute;left:50%;top:42%;width:14px;height:14px;margin:-7px;border-radius:50%;background:var(--gold);animation:burst .9s ease-out forwards}
+#burst i:nth-child(odd){background:var(--punch);border-radius:3px;width:10px;height:18px}
+#burst i:nth-child(3n){background:var(--go)}
+.done{min-height:48px;padding:0 20px;border:0;background:var(--ink);color:var(--gold);border-radius:999px;font-weight:800}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes rise{from{transform:translateY(18px);opacity:0}to{transform:none;opacity:1}}
+@keyframes wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-6deg)}75%{transform:rotate(6deg)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+@keyframes slam{0%{transform:scale(2.4) rotate(-18deg);opacity:0}70%{transform:scale(.94) rotate(-4deg);opacity:1}100%{transform:scale(1) rotate(-8deg)}}
+@keyframes burst{to{transform:translate(var(--x),var(--y)) rotate(var(--r));opacity:0}}
+@media(min-width:800px){
+  .page{max-width:420px;margin:0 auto}
+  .dock{left:50%;right:auto;transform:translateX(-50%);width:420px}
+  dialog{max-width:420px;margin-left:auto;margin-right:auto}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<nav class="hph-switch" aria-label="Design versions"><div class="links"><a data-design-link="original">Original</a><a data-design-link="poster">Poster</a><a data-design-link="found" aria-current="page">Found</a><a data-design-link="vista">Vista</a></div></nav>
+<div class="page">
+  <section class="cabinet" aria-label="Savings found">
+    <p class="kicker">Still hunting · 4 days left</p>
+    <h1>Found on the board.</h1>
+    <div class="score"><b id="board">$0</b><span>Biggest drop vs the $600 already held at Seabreeze.</span></div>
+  </section>
+  <div class="held"><p>Held · Deluxe twin<br>12–15 Nov · 2 adults + 1 child</p><strong>$600</strong></div>
+  <div id="proposals"></div>
+  <p class="note">All three fit your party and keep the 9 Nov, 6 pm cancel deadline. USD, taxes in.<br>Illustrative · Photos: <a href="https://www.marriott.com/en-us/hotels/hktmb-phuket-marriott-resort-and-spa-merlin-beach/rooms/premium-rooms/">Marriott</a>, <a href="https://www.thavornpalmbeach.com/gallery-rooms-suites-photo-phuket">Thavorn</a>, <a href="https://www.chanalai.com/en/romantica-resort-gallery.html">Chanalai</a>.</p>
+</div>
+<div class="dock"><p>Palm Garden is the jackpot drop.</p><button type="button" data-offer="2">CLAIM $90</button></div>
+<dialog id="comparison">
+  <div class="sheet">
+    <button class="close" aria-label="Close comparison">×</button>
+    <p class="kicker">Before / after</p>
+    <h2 id="dialogtitle"></h2>
+    <div id="beforeafter"></div>
+    <div class="bill"><span>Net saving<br><small>No cancel penalty</small></span><strong id="netsaving"></strong></div>
+    <table><thead><tr><th>What changes?</th><th>Booked</th><th>Proposed</th></tr></thead><tbody id="comparisonrows"></tbody></table>
+    <div class="actions">
+      <button class="cta" id="select">Approve this change</button>
+      <button class="secondary" id="leave">Leave my booking as it is</button>
+      <p class="receipt" id="receipt" role="status"></p>
+    </div>
+  </div>
+</dialog>
+<div id="celebrate" hidden role="status">
+  <div id="burst" aria-hidden="true"></div>
+  <div>
+    <div class="stamp">FOUND</div>
+    <p id="foundamt"></p>
+    <p style="font-weight:800;margin-bottom:18px">Parked in the demo. Your original booking has not changed.</p>
+    <button class="done" type="button" id="done">Keep looking</button>
+  </div>
+</div>
+<script>
+const offers=[{hotel:'Seabreeze Hotel',room:'Deluxe twin',size:'28 m²',price:550,walk:3,image:'https://cache.marriott.com/is/image/marriotts7prod/mc-hktmb-premier-pool-access-26214-48003%3AClassic-Hor?fit=constrain&wid=1200'},{hotel:'Seabreeze Hotel',room:'Family room',size:'38 m²',price:575,walk:3,image:'https://www.thavornpalmbeach.com/upload/gallery-files/1754651277.2564.jpg'},{hotel:'Palm Garden Resort',room:'Family room',size:'38 m²',price:510,walk:8,image:'https://www.chanalai.com/_novaimg/4616061-1421509_0_0_2200_1636_1000_744.jpg'}];
+const $=id=>document.getElementById(id);
+const changes=[{type:'Same hotel · same room',title:'Pay less. Change nothing.'},{type:'Same hotel · other room',title:'More room. Less money.'},{type:'A different hotel',title:'Move hotels. Save more.'}];
+$('proposals').innerHTML=changes.map((c,i)=>'<button class="prize" data-offer="'+i+'"><span><h2>'+c.title+'</h2><p>'+c.type+'</p></span><span class="amt">$'+(600-offers[i].price)+'</span></button>').join('');
+function countUp(el,to){const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;if(reduce){el.textContent='$'+to;return}const start=performance.now();const tick=now=>{const t=Math.min(1,(now-start)/900);el.textContent='$'+Math.round(to*(1-Math.pow(1-t,3)));if(t<1)requestAnimationFrame(tick)};requestAnimationFrame(tick)}
+countUp($('board'),90);
+function celebrate(amount){
+  $('receipt').textContent='Saved in the demo. Your original booking has not changed.';
+  $('select').disabled=true;
+  $('foundamt').textContent='$'+amount+' back';
+  const stage=$('burst');stage.innerHTML='';
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
+    for(let i=0;i<20;i++){
+      const s=document.createElement('i');
+      const a=(i/20)*Math.PI*2;
+      const d=90+((i*37)%110);
+      s.style.setProperty('--x',Math.cos(a)*d+'px');
+      s.style.setProperty('--y',Math.sin(a)*d+'px');
+      s.style.setProperty('--r',(i*17-90)+'deg');
+      s.style.animationDelay=(i*16)+'ms';
+      stage.appendChild(s);
+    }
+  }
+  $('celebrate').hidden=false;
+}
+function compare(i){const o=offers[i];$('dialogtitle').textContent=changes[i].title;$('netsaving').textContent='$'+(600-o.price);$('beforeafter').innerHTML=[{label:'Currently booked',hotel:'Seabreeze Hotel',room:'Deluxe twin · 28 m²',price:600,image:offers[0].image,cls:'old'},{label:'After this change',hotel:o.hotel,room:o.room+' · '+o.size,price:o.price,image:o.image,cls:'new'}].map(p=>'<div class="mini '+p.cls+'"><div class="label">'+p.label+'</div><img src="'+p.image+'" alt="Illustrative room photo"><h3>'+p.hotel+'</h3><p>'+p.room+'</p><div class="price">$'+p.price+'</div></div>').join('');const rows=[['Room size','28 m²',o.size],['Beach walk','3 min',o.walk+' min'],['Breakfast','Included','Included'],['Guests','2 adults + 1 child','2 adults + 1 child'],['Cancel free until','9 Nov, 6 pm','9 Nov, 6 pm']];$('comparisonrows').innerHTML=rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('');$('receipt').textContent='';$('select').disabled=false;$('select').textContent='Approve this change · save $'+(600-o.price);$('select').onclick=()=>celebrate(600-o.price);$('comparison').showModal()}
+document.querySelectorAll('[data-offer]').forEach(b=>b.onclick=()=>compare(Number(b.dataset.offer)));
+$('leave').onclick=()=>$('comparison').close();
+document.querySelector('.close').onclick=()=>$('comparison').close();
+$('done').onclick=()=>{$('celebrate').hidden=true;$('comparison').close()};
+(function(){const file=/\.html$/i.test((location.pathname.split('/').pop()||''));const hrefs=file?{original:'pitch.html',poster:'poster.html',found:'found.html',vista:'vista.html'}:{original:'/',poster:'/poster',found:'/found',vista:'/vista'};document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]})})();
+</script>
+</body>
+</html>

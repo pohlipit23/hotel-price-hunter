@@ -15,6 +15,6 @@ Full-app restyles live in the Worker, with the original still at `/`:
 | Route | Direction |
 | --- | --- |
 | `/` | Original booking-changes prototype |
-| `/keep` | Quiet concierge |
-| `/ledger` | Savings-first ledger |
-| `/rooms` | Swipeable room cards |
+| `/poster` | Vivid travel-poster |
+| `/found` | Playful hunt with celebration |
+| `/vista` | Cinematic photo reel |

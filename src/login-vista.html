@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sign in · Vista</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Cormorant+Garamond:ital,wght@1,600;1,700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100dvh;background:#0e0c0a;color:#f4ead8;font:16px/1.3 "Barlow Condensed",Helvetica,sans-serif}
+button,a,input{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #f4ead8;outline-offset:3px}
+body{display:flex;flex-direction:column}
+.bg{position:fixed;inset:0}
+.bg img{width:100%;height:100%;object-fit:cover}
+.bg .veil{position:absolute;inset:0;background:linear-gradient(180deg,transparent 20%,#161210f0 62%)}
+.hph-switch{position:fixed;top:0;left:0;right:0;z-index:50;padding:6px 12px;background:#161210cc}
+.hph-switch .links{display:flex;gap:4px;overflow-x:auto}
+.hph-switch a{flex:none;min-height:40px;display:grid;place-items:center;padding:0 12px;text-decoration:none;font-weight:700}
+.hph-switch a[aria-current=page]{background:#f4ead8;color:#161210}
+main{position:relative;z-index:1;margin-top:auto;padding:24px 18px calc(18px + env(safe-area-inset-bottom))}
+.frame{font-size:12px;font-weight:700;letter-spacing:.22em;text-transform:uppercase}
+h1{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:52px;line-height:.9;font-weight:600;margin:8px 0 12px}
+p{font-weight:500;margin:0 0 16px;max-width:320px}
+label{display:block;font-size:13px;font-weight:700;letter-spacing:.08em;margin:12px 0 6px}
+input{width:100%;min-height:48px;padding:12px;border:0;background:#f4ead8;color:#161210}
+button[type=submit]{width:100%;min-height:52px;margin-top:18px;background:#c45c26;color:#f4ead8;border:0;font-weight:800;letter-spacing:.1em}
+.error{background:#c45c26;color:#f4ead8;padding:12px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><img src="https://cache.marriott.com/is/image/marriotts7prod/mc-hktmb-premier-pool-access-26214-48003%3AClassic-Hor?fit=constrain&wid=1200" alt=""><div class="veil"></div></div>
+<nav class="hph-switch" aria-label="Design versions"><div class="links"><a data-design-link="original">Original</a><a data-design-link="poster">Poster</a><a data-design-link="found">Found</a><a data-design-link="vista" aria-current="page">Vista</a></div></nav>
+<main>
+  <p class="frame">Phuket · 12–15 Nov</p>
+  <h1>Enter the stay.</h1>
+  <p>Shared username and password. Four cinematic frames: the room you hold, then the three cheaper cuts.</p>
+  <!--LOGIN_ERROR-->
+  <form action="/login" method="post">
+    <input type="hidden" name="next" value="/vista">
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" required maxlength="100" autocapitalize="none">
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="200">
+    <button type="submit">OPEN THE REEL</button>
+  </form>
+</main>
+<script>
+(function(){const file=/\.html$/i.test((location.pathname.split('/').pop()||''));const hrefs=file?{original:'login-original.html',poster:'login-poster.html',found:'login-found.html',vista:'login-vista.html'}:{original:'/',poster:'/poster',found:'/found',vista:'/vista'};document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]})})();
+</script>
+</body>
+</html>

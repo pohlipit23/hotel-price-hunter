@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Phuket · Vista</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&display=swap" rel="stylesheet">
+<style>
+:root{--cream:#f4ead8;--ink:#161210;--heat:#c45c26;--tap:52px}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0e0c0a;color:var(--cream);font:16px/1.25 "Barlow Condensed",Helvetica,sans-serif}
+button,a{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid var(--cream);outline-offset:3px}
+h1,h2,h3,p{margin:0}
+.hph-switch{position:fixed;top:0;left:0;right:0;z-index:50;background:#161210cc;padding:6px 10px}
+.hph-switch .links{display:flex;gap:4px;overflow-x:auto}
+.hph-switch a{flex:none;min-height:40px;padding:0 12px;display:grid;place-items:center;text-decoration:none;font-weight:700;letter-spacing:.04em}
+.hph-switch a[aria-current=page]{background:var(--cream);color:var(--ink)}
+.film{height:100dvh;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;display:flex;-webkit-overflow-scrolling:touch}
+.slide{flex:0 0 100%;height:100dvh;scroll-snap-align:start;position:relative;isolation:isolate}
+.slide img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.slide .veil{position:absolute;inset:0;background:linear-gradient(180deg,transparent 28%,#161210e8 78%)}
+.copy{position:absolute;left:0;right:0;bottom:calc(88px + env(safe-area-inset-bottom));padding:0 18px 8px;z-index:2}
+.frame{font-size:12px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;opacity:.85}
+.copy h1{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-weight:600;font-size:58px;line-height:.88;letter-spacing:-.03em;margin:6px 0 8px}
+.meta{font-size:16px;font-weight:500;max-width:240px}
+.price{position:absolute;top:64px;right:16px;z-index:2;text-align:right}
+.price b{display:block;font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:48px;line-height:1;font-weight:700}
+.price span{font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.ticks{position:absolute;bottom:calc(96px + env(safe-area-inset-bottom));left:18px;z-index:3;display:flex;gap:6px}
+.ticks i{width:18px;height:3px;background:#f4ead855;display:block}
+.ticks i.on{background:var(--cream);width:28px}
+.dock{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;gap:10px;align-items:center;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:#161210}
+.dock p{flex:1;font-size:15px;font-weight:700;letter-spacing:.02em}
+.dock button{flex:none;min-height:var(--tap);padding:0 18px;border:0;background:var(--heat);color:var(--cream);font-weight:800;letter-spacing:.08em}
+dialog{border:0;width:100%;height:100dvh;max-height:100dvh;margin:0;padding:0;background:#0e0c0a;overflow:auto}
+dialog::backdrop{background:#0008}
+.sheet{min-height:100%;display:flex;flex-direction:column}
+.split{display:grid;grid-template-rows:42dvh 42dvh}
+.panel{position:relative;overflow:hidden}
+.panel img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.panel .cap{position:absolute;left:14px;bottom:12px;right:14px;z-index:1;text-shadow:0 8px 24px #000}
+.panel .cap .label{font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}
+.panel .cap h3{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:28px;font-weight:600;line-height:1}
+.panel .cap .price{position:static;font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:32px}
+.panel.new .cap{color:#ffe7c2}
+.close{position:absolute;top:10px;right:10px;z-index:5;width:44px;height:44px;border:0;background:var(--cream);color:var(--ink);font-size:20px}
+.facts{padding:10px 16px 8px;background:#161210}
+.facts h2{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:28px;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:14px;font-weight:500;margin:6px 0}
+th,td{text-align:left;padding:6px 4px;border-bottom:1px solid #f4ead822}
+.actions{position:sticky;bottom:0;background:#161210;padding:8px 16px calc(10px + env(safe-area-inset-bottom))}
+.bill{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-weight:700}
+.bill strong{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:36px;color:#e8c36a}
+.cta{width:100%;min-height:var(--tap);border:0;background:var(--heat);color:var(--cream);font-weight:800;letter-spacing:.08em}
+.cta:disabled{opacity:.4}
+.secondary{width:100%;min-height:44px;border:0;background:none;font-weight:700}
+.receipt{font-weight:700;margin-top:8px;color:#e8c36a}
+.legal{position:absolute;left:18px;bottom:calc(64px + env(safe-area-inset-bottom));z-index:2;font-size:11px;opacity:.7;max-width:70%}
+.legal a{font-weight:700}
+@media(min-width:800px){
+  .slide,.film{max-width:430px;margin:0 auto}
+  .dock,dialog,.hph-switch{max-width:430px;left:50%;right:auto;transform:translateX(-50%);width:430px}
+  dialog{transform:none;left:50%;margin-left:-215px}
+}
+@media(prefers-reduced-motion:reduce){
+  .film{scroll-behavior:auto}
+  *{animation:none!important}
+}
+</style>
+</head>
+<body>
+<nav class="hph-switch" aria-label="Design versions"><div class="links"><a data-design-link="original">Original</a><a data-design-link="poster">Poster</a><a data-design-link="found">Found</a><a data-design-link="vista" aria-current="page">Vista</a></div></nav>
+<div class="film" id="film" aria-label="Stay frames">
+  <section class="slide" data-frame="0">
+    <img src="https://cache.marriott.com/is/image/marriotts7prod/mc-hktmb-premier-pool-access-26214-48003%3AClassic-Hor?fit=constrain&wid=1200" alt="Illustrative room photo">
+    <div class="veil"></div>
+    <div class="price"><b>$600</b><span>Held</span></div>
+    <div class="copy">
+      <p class="frame">Frame 01 · Already yours</p>
+      <h1>Seabreeze, still watching.</h1>
+      <p class="meta">Deluxe twin · 12–15 Nov · 2 adults + 1 child. Checks end 9 Nov, 6 pm.</p>
+    </div>
+  </section>
+  <section class="slide" data-frame="1">
+    <img src="https://cache.marriott.com/is/image/marriotts7prod/mc-hktmb-premier-pool-access-26214-48003%3AClassic-Hor?fit=constrain&wid=1200" alt="Illustrative room photo">
+    <div class="veil"></div>
+    <div class="price"><b>$550</b><span>Save $50</span></div>
+    <div class="copy">
+      <p class="frame">Frame 02 · Same room</p>
+      <h1>Pay less. Change nothing.</h1>
+      <p class="meta">The Deluxe twin, breakfast and cancel-by stay put. Only the fare moved.</p>
+    </div>
+  </section>
+  <section class="slide" data-frame="2">
+    <img src="https://www.thavornpalmbeach.com/upload/gallery-files/1754651277.2564.jpg" alt="Illustrative room photo">
+    <div class="veil"></div>
+    <div class="price"><b>$575</b><span>Save $25</span></div>
+    <div class="copy">
+      <p class="frame">Frame 03 · Same hotel</p>
+      <h1>More room. Less money.</h1>
+      <p class="meta">Family room at Seabreeze. Ten square metres more, twenty-five dollars less.</p>
+    </div>
+  </section>
+  <section class="slide" data-frame="3">
+    <img src="https://www.chanalai.com/_novaimg/4616061-1421509_0_0_2200_1636_1000_744.jpg" alt="Illustrative room photo">
+    <div class="veil"></div>
+    <div class="price"><b>$510</b><span>Save $90</span></div>
+    <div class="copy">
+      <p class="frame">Frame 04 · Other hotel</p>
+      <h1>Move hotels. Save more.</h1>
+      <p class="meta">Palm Garden family room. Eight minutes to the sand instead of three.</p>
+    </div>
+  </section>
+</div>
+<div class="ticks" id="ticks" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i></div>
+<div class="dock">
+  <p id="dockcopy">Swipe the stay. Four frames, one booking.</p>
+  <button type="button" id="dockbtn" data-offer="2">OPEN $90</button>
+</div>
+<p class="legal">Illustrative · Photos: <a href="https://www.marriott.com/en-us/hotels/hktmb-phuket-marriott-resort-and-spa-merlin-beach/rooms/premium-rooms/">Marriott</a>, <a href="https://www.thavornpalmbeach.com/gallery-rooms-suites-photo-phuket">Thavorn</a>, <a href="https://www.chanalai.com/en/romantica-resort-gallery.html">Chanalai</a>.</p>
+<dialog id="comparison">
+  <div class="sheet">
+    <button class="close" aria-label="Close comparison">×</button>
+    <div class="split" id="beforeafter"></div>
+    <div class="facts">
+      <h2 id="dialogtitle"></h2>
+      <table><thead><tr><th>What changes?</th><th>Booked</th><th>Proposed</th></tr></thead><tbody id="comparisonrows"></tbody></table>
+    </div>
+    <div class="actions">
+      <div class="bill"><span>Net saving · no cancel penalty</span><strong id="netsaving"></strong></div>
+      <button class="cta" id="select">Approve this change</button>
+      <button class="secondary" id="leave">Leave my booking as it is</button>
+      <p class="receipt" id="receipt" role="status"></p>
+    </div>
+  </div>
+</dialog>
+<script>
+const offers=[{hotel:'Seabreeze Hotel',room:'Deluxe twin',size:'28 m²',price:550,walk:3,image:'https://cache.marriott.com/is/image/marriotts7prod/mc-hktmb-premier-pool-access-26214-48003%3AClassic-Hor?fit=constrain&wid=1200'},{hotel:'Seabreeze Hotel',room:'Family room',size:'38 m²',price:575,walk:3,image:'https://www.thavornpalmbeach.com/upload/gallery-files/1754651277.2564.jpg'},{hotel:'Palm Garden Resort',room:'Family room',size:'38 m²',price:510,walk:8,image:'https://www.chanalai.com/_novaimg/4616061-1421509_0_0_2200_1636_1000_744.jpg'}];
+const $=id=>document.getElementById(id);
+const changes=[{title:'Pay less. Change nothing.'},{title:'More room. Less money.'},{title:'Move hotels. Save more.'}];
+const film=$('film');
+const lines=['Held at $600. Swipe for the drops.','Same Deluxe twin. Fifty back.','Family room, still Seabreeze.','Palm Garden. The $90 frame.'];
+function frameOf(){return Math.round(film.scrollLeft/film.clientWidth)}
+function sync(){
+  const f=frameOf();
+  [...$('ticks').children].forEach((d,i)=>d.classList.toggle('on',i===f));
+  $('dockcopy').textContent=lines[f]||lines[0];
+  const offer=Math.max(0,f-1);
+  const save=f===0?90:(600-offers[offer].price);
+  $('dockbtn').dataset.offer=f===0?2:offer;
+  $('dockbtn').textContent=f===0?'OPEN $90':'COMPARE $'+save;
+}
+film.addEventListener('scroll',sync,{passive:true});
+function compare(i){const o=offers[i];$('dialogtitle').textContent=changes[i].title;$('netsaving').textContent='$'+(600-o.price);$('beforeafter').innerHTML=[{label:'Currently booked',hotel:'Seabreeze Hotel',room:'Deluxe twin · 28 m²',price:600,image:offers[0].image,cls:'old'},{label:'After this change',hotel:o.hotel,room:o.room+' · '+o.size,price:o.price,image:o.image,cls:'new'}].map(p=>'<div class="panel '+p.cls+'"><img src="'+p.image+'" alt="Illustrative room photo"><div class="cap"><div class="label">'+p.label+'</div><h3>'+p.hotel+'</h3><p>'+p.room+'</p><div class="price">$'+p.price+'</div></div></div>').join('');const rows=[['Room size','28 m²',o.size],['Beach walk','3 min',o.walk+' min'],['Breakfast','Included','Included'],['Guests','2 adults + 1 child','2 adults + 1 child'],['Cancel free until','9 Nov, 6 pm','9 Nov, 6 pm']];$('comparisonrows').innerHTML=rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('');$('receipt').textContent='';$('select').disabled=false;$('select').textContent='Approve this change · save $'+(600-o.price);$('select').onclick=()=>{$('receipt').textContent='Saved in the demo. Your original booking has not changed.';$('select').disabled=true};$('comparison').showModal()}
+$('dockbtn').onclick=()=>compare(Number($('dockbtn').dataset.offer));
+$('leave').onclick=()=>$('comparison').close();
+document.querySelector('.close').onclick=()=>$('comparison').close();
+(function(){const file=/\.html$/i.test((location.pathname.split('/').pop()||''));const hrefs=file?{original:'pitch.html',poster:'poster.html',found:'found.html',vista:'vista.html'}:{original:'/',poster:'/poster',found:'/found',vista:'/vista'};document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]})})();
+</script>
+</body>
+</html>
