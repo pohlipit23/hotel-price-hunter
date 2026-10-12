@@ -20,37 +20,40 @@ h1,h2,h3,p{margin:0}
 .hph-switch a[aria-current=page]{background:var(--cream);color:var(--ink)}
 .film{height:100dvh;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;display:flex;-webkit-overflow-scrolling:touch}
 .slide{flex:0 0 100%;height:100dvh;scroll-snap-align:start;position:relative;isolation:isolate}
-.slide img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.slide img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:drift 22s ease-in-out infinite alternate}
 .slide .veil{position:absolute;inset:0;background:linear-gradient(180deg,transparent 28%,#161210e8 78%)}
-.copy{position:absolute;left:0;right:0;bottom:calc(88px + env(safe-area-inset-bottom));padding:0 18px 8px;z-index:2}
+.copy{position:absolute;left:0;right:0;bottom:calc(108px + env(safe-area-inset-bottom));padding:0 18px 8px;z-index:2}
 .frame{font-size:12px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;opacity:.85}
 .copy h1{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-weight:600;font-size:58px;line-height:.88;letter-spacing:-.03em;margin:6px 0 8px}
 .meta{font-size:16px;font-weight:500;max-width:240px}
 .price{position:absolute;top:64px;right:16px;z-index:2;text-align:right}
 .price b{display:block;font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:48px;line-height:1;font-weight:700}
 .price span{font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
-.ticks{position:absolute;bottom:calc(96px + env(safe-area-inset-bottom));left:18px;z-index:3;display:flex;gap:6px}
-.ticks i{width:18px;height:3px;background:#f4ead855;display:block}
-.ticks i.on{background:var(--cream);width:28px}
-.dock{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;gap:10px;align-items:center;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:#161210}
+.ticks{display:flex;gap:5px;margin-bottom:6px}
+.ticks i{width:16px;height:3px;background:#f4ead844;display:block}
+.ticks i.on{background:var(--cream);width:26px}
+.dock{position:fixed;bottom:0;left:0;right:0;z-index:40;padding:8px 14px calc(10px + env(safe-area-inset-bottom));background:#161210}
+.dock .row{display:flex;gap:10px;align-items:center}
 .dock p{flex:1;font-size:15px;font-weight:700;letter-spacing:.02em}
 .dock button{flex:none;min-height:var(--tap);padding:0 18px;border:0;background:var(--heat);color:var(--cream);font-weight:800;letter-spacing:.08em}
+.credit{font-size:11px;opacity:.55;margin-top:8px}
 dialog{border:0;width:100%;height:100dvh;max-height:100dvh;margin:0;padding:0;background:#0e0c0a;overflow:auto}
 dialog::backdrop{background:#0008}
 .sheet{min-height:100%;display:flex;flex-direction:column}
-.split{display:grid;grid-template-rows:42dvh 42dvh}
+.split{display:grid;grid-template-rows:28dvh 28dvh}
 .panel{position:relative;overflow:hidden}
 .panel img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.panel .cap{position:absolute;left:14px;bottom:12px;right:14px;z-index:1;text-shadow:0 8px 24px #000}
+.panel:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 35%,#161210d0 100%)}
+.panel .cap{position:absolute;left:14px;bottom:12px;right:14px;z-index:1}
 .panel .cap .label{font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}
 .panel .cap h3{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:28px;font-weight:600;line-height:1}
 .panel .cap .price{position:static;font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:32px}
 .panel.new .cap{color:#ffe7c2}
 .close{position:absolute;top:10px;right:10px;z-index:5;width:44px;height:44px;border:0;background:var(--cream);color:var(--ink);font-size:20px}
-.facts{padding:10px 16px 8px;background:#161210}
-.facts h2{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:28px;font-weight:600}
-table{width:100%;border-collapse:collapse;font-size:14px;font-weight:500;margin:6px 0}
-th,td{text-align:left;padding:6px 4px;border-bottom:1px solid #f4ead822}
+.facts{padding:8px 16px 4px;background:#161210}
+.facts h2{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:26px;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13px;font-weight:500;margin:4px 0}
+th,td{text-align:left;padding:5px 4px;border-bottom:1px solid #f4ead822}
 .actions{position:sticky;bottom:0;background:#161210;padding:8px 16px calc(10px + env(safe-area-inset-bottom))}
 .bill{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-weight:700}
 .bill strong{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:36px;color:#e8c36a}
@@ -58,15 +61,16 @@ th,td{text-align:left;padding:6px 4px;border-bottom:1px solid #f4ead822}
 .cta:disabled{opacity:.4}
 .secondary{width:100%;min-height:44px;border:0;background:none;font-weight:700}
 .receipt{font-weight:700;margin-top:8px;color:#e8c36a}
-.legal{position:absolute;left:18px;bottom:calc(64px + env(safe-area-inset-bottom));z-index:2;font-size:11px;opacity:.7;max-width:70%}
-.legal a{font-weight:700}
+.legal{display:none}
 @media(min-width:800px){
   .slide,.film{max-width:430px;margin:0 auto}
   .dock,dialog,.hph-switch{max-width:430px;left:50%;right:auto;transform:translateX(-50%);width:430px}
   dialog{transform:none;left:50%;margin-left:-215px}
 }
+@keyframes drift{from{transform:scale(1)}to{transform:scale(1.08)}}
 @media(prefers-reduced-motion:reduce){
   .film{scroll-behavior:auto}
+  .slide img{animation:none}
   *{animation:none!important}
 }
 </style>
@@ -115,12 +119,13 @@ th,td{text-align:left;padding:6px 4px;border-bottom:1px solid #f4ead822}
     </div>
   </section>
 </div>
-<div class="ticks" id="ticks" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i></div>
 <div class="dock">
-  <p id="dockcopy">Swipe the stay. Four frames, one booking.</p>
-  <button type="button" id="dockbtn" data-offer="2">OPEN $90</button>
+  <div class="ticks" id="ticks" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i></div>
+  <div class="row">
+    <p id="dockcopy">Swipe the stay. Four frames, one booking.</p>
+    <button type="button" id="dockbtn" data-offer="2">OPEN $90</button>
+  </div>
 </div>
-<p class="legal">Illustrative · Photos: <a href="https://www.marriott.com/en-us/hotels/hktmb-phuket-marriott-resort-and-spa-merlin-beach/rooms/premium-rooms/">Marriott</a>, <a href="https://www.thavornpalmbeach.com/gallery-rooms-suites-photo-phuket">Thavorn</a>, <a href="https://www.chanalai.com/en/romantica-resort-gallery.html">Chanalai</a>.</p>
 <dialog id="comparison">
   <div class="sheet">
     <button class="close" aria-label="Close comparison">×</button>
@@ -134,6 +139,7 @@ th,td{text-align:left;padding:6px 4px;border-bottom:1px solid #f4ead822}
       <button class="cta" id="select">Approve this change</button>
       <button class="secondary" id="leave">Leave my booking as it is</button>
       <p class="receipt" id="receipt" role="status"></p>
+      <p class="credit">Illustrative photos: Marriott, Thavorn, Chanalai.</p>
     </div>
   </div>
 </dialog>

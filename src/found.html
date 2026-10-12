@@ -30,10 +30,11 @@ h1,h2,h3,p{margin:0}
 .held{margin:10px 0 12px;background:var(--ticket);border-radius:16px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;background-image:radial-gradient(circle at 0 50%,var(--paper) 8px,transparent 9px),radial-gradient(circle at 100% 50%,var(--paper) 8px,transparent 9px)}
 .held p{font-size:13px;font-weight:800}
 .held strong{font-family:"Lilita One",Impact,sans-serif;font-size:28px;font-weight:400}
-.prize{width:100%;border:0;background:var(--ticket);border-radius:18px;padding:14px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;min-height:88px;box-shadow:0 6px 0 var(--ink);animation:rise .55s ease both;transition:transform .12s ease,box-shadow .12s ease}
-.prize:nth-child(1){animation-delay:.05s}
-.prize:nth-child(2){animation-delay:.14s}
-.prize:nth-child(3){animation-delay:.23s}
+.prize{width:100%;border:0;border-radius:18px;padding:14px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;min-height:88px;box-shadow:0 6px 0 var(--ink);animation:rise .55s ease both;transition:transform .12s ease,box-shadow .12s ease}
+.prize.a{background:var(--gold);animation-delay:.05s}
+.prize.b{background:var(--ticket);animation-delay:.14s}
+.prize.c{background:var(--punch);color:#fff;animation-delay:.23s}
+.prize.c .amt{color:#fff4c2}
 .prize:active{transform:translateY(4px);box-shadow:0 2px 0 var(--ink)}
 .prize h2{font-family:"Lilita One",Impact,sans-serif;font-size:22px;line-height:1;font-weight:400}
 .prize p{font-size:12px;font-weight:800;margin-top:4px;opacity:.75}
@@ -131,12 +132,11 @@ th,td{text-align:left;padding:8px 4px;border-bottom:2px solid var(--ink)}
 const offers=[{hotel:'Seabreeze Hotel',room:'Deluxe twin',size:'28 m²',price:550,walk:3,image:'https://cache.marriott.com/is/image/marriotts7prod/mc-hktmb-premier-pool-access-26214-48003%3AClassic-Hor?fit=constrain&wid=1200'},{hotel:'Seabreeze Hotel',room:'Family room',size:'38 m²',price:575,walk:3,image:'https://www.thavornpalmbeach.com/upload/gallery-files/1754651277.2564.jpg'},{hotel:'Palm Garden Resort',room:'Family room',size:'38 m²',price:510,walk:8,image:'https://www.chanalai.com/_novaimg/4616061-1421509_0_0_2200_1636_1000_744.jpg'}];
 const $=id=>document.getElementById(id);
 const changes=[{type:'Same hotel · same room',title:'Pay less. Change nothing.'},{type:'Same hotel · other room',title:'More room. Less money.'},{type:'A different hotel',title:'Move hotels. Save more.'}];
-$('proposals').innerHTML=changes.map((c,i)=>'<button class="prize" data-offer="'+i+'"><span><h2>'+c.title+'</h2><p>'+c.type+'</p></span><span class="amt">$'+(600-offers[i].price)+'</span></button>').join('');
+$('proposals').innerHTML=changes.map((c,i)=>'<button class="prize '+['a','b','c'][i]+'" data-offer="'+i+'"><span><h2>'+c.title+'</h2><p>'+c.type+'</p></span><span class="amt">$'+(600-offers[i].price)+'</span></button>').join('');
 function countUp(el,to){const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;if(reduce){el.textContent='$'+to;return}const start=performance.now();const tick=now=>{const t=Math.min(1,(now-start)/900);el.textContent='$'+Math.round(to*(1-Math.pow(1-t,3)));if(t<1)requestAnimationFrame(tick)};requestAnimationFrame(tick)}
 countUp($('board'),90);
 function celebrate(amount){
-  $('receipt').textContent='Saved in the demo. Your original booking has not changed.';
-  $('select').disabled=true;
+  $('comparison').close();
   $('foundamt').textContent='$'+amount+' back';
   const stage=$('burst');stage.innerHTML='';
   if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
@@ -157,7 +157,7 @@ function compare(i){const o=offers[i];$('dialogtitle').textContent=changes[i].ti
 document.querySelectorAll('[data-offer]').forEach(b=>b.onclick=()=>compare(Number(b.dataset.offer)));
 $('leave').onclick=()=>$('comparison').close();
 document.querySelector('.close').onclick=()=>$('comparison').close();
-$('done').onclick=()=>{$('celebrate').hidden=true;$('comparison').close()};
+$('done').onclick=()=>{$('celebrate').hidden=true};
 (function(){const file=/\.html$/i.test((location.pathname.split('/').pop()||''));const hrefs=file?{original:'pitch.html',poster:'poster.html',found:'found.html',vista:'vista.html'}:{original:'/',poster:'/poster',found:'/found',vista:'/vista'};document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]})})();
 </script>
 </body>
