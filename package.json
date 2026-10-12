@@ -3,9 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": { "node": ">=22" },
+  "packageManager": "npm@11.6.2",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "dev": "npx wrangler dev",
-    "deploy": "npm run build && npx wrangler deploy"
+    "start": "node --env-file-if-exists=.env app/server.mjs",
+    "dev": "node --env-file-if-exists=.env --watch app/server.mjs",
+    "dev:pitch": "npx wrangler dev",
+    "deploy:pitch": "npm run build && npx wrangler deploy",
+    "test": "node --test tests/*.test.mjs",
+    "test:runtime": "node --test tests/server.test.mjs tests/storage.test.mjs tests/gemini.test.mjs",
+    "test:firestore": "node --env-file-if-exists=.env --test tests/storage.test.mjs",
+    "emulator": "gcloud emulators firestore start --host-port=127.0.0.1:8081"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "9.3.1",
+    "@google/genai": "2.28.0"
   }
 }

@@ -1,0 +1,250 @@
+import http from 'node:http';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { resolve, extname, sep } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { evaluateOffer, validatePreferences } from './domain/decision.mjs';
+import { createStorage } from './storage.mjs';
+import { createGeminiAdvisor } from './gemini.mjs';
+
+const PUBLIC_ROOT = resolve(fileURLToPath(new URL('./public/', import.meta.url)));
+const COOKIE_NAME = 'hph_visitor';
+const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+const BODY_LIMIT = 16 * 1024;
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon' };
+
+class RequestError extends Error {
+  constructor(status, code, message, details) { super(message); Object.assign(this, { status, code, details }); }
+}
+function fail(status, code, message, details) { throw new RequestError(status, code, message, details); }
+function sendJson(response, status, value) {
+  response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  response.end(JSON.stringify(value));
+}
+function object(value, allowed, name) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !allowed.includes(key))) {
+    fail(422, 'VALIDATION_ERROR', `Invalid ${name}.`);
+  }
+}
+function safeEqual(left, right) {
+  return /^[a-f0-9]{64}$/.test(left || '') && /^[a-f0-9]{64}$/.test(right || '')
+    && timingSafeEqual(Buffer.from(left), Buffer.from(right));
+}
+function cookieId(request) {
+  const pairs = (request.headers.cookie || '').split(';').map(value => value.trim());
+  const value = pairs.find(pair => pair.startsWith(`${COOKIE_NAME}=`))?.slice(COOKIE_NAME.length + 1);
+  return /^[a-f0-9]{64}$/.test(value || '') ? value : null;
+}
+function readJson(request) {
+  if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] || '')) fail(415, 'JSON_REQUIRED', 'Send a JSON request.');
+  if (Number(request.headers['content-length'] || 0) > BODY_LIMIT) fail(413, 'BODY_TOO_LARGE', 'Request exceeds the 16 KiB limit.');
+  return new Promise((accept, reject) => {
+    let length = 0;
+    const chunks = [];
+    request.on('data', chunk => {
+      length += chunk.length;
+      if (length > BODY_LIMIT) {
+        chunks.length = 0;
+        reject(new RequestError(413, 'BODY_TOO_LARGE', 'Request exceeds the 16 KiB limit.'));
+      } else chunks.push(chunk);
+    });
+    request.on('end', () => {
+      if (length > BODY_LIMIT) return;
+      try { accept(JSON.parse(Buffer.concat(chunks).toString('utf8'))); }
+      catch { reject(new RequestError(400, 'INVALID_JSON', 'Request contains invalid JSON.')); }
+    });
+    request.on('error', () => reject(new RequestError(400, 'INVALID_REQUEST', 'Unable to read request.')));
+  });
+}
+async function stored(operation) {
+  try { return await operation(); }
+  catch (error) {
+    if (error instanceof RequestError || error.code === 'INVALID_PREFERENCES') throw error;
+    fail(503, 'STORAGE_UNAVAILABLE', 'Persistent storage is unavailable. Please retry.');
+  }
+}
+
+/** Dependencies are injectable for tests; executable startup always uses Firestore. */
+export function createAppServer({ storage, advisor, fixture, origin, now = () => new Date(), adviceLimit = 8 } = {}) {
+  if (!storage || !advisor || !fixture) throw new Error('Storage, advisor and allowlisted jury fixture are required.');
+  if (fixture.scenarioId !== 'jury-booking') throw new Error('Only the anonymised jury-booking scenario is allowlisted.');
+  const demoNow = fixture.demoNow;
+  if (!demoNow || !Number.isFinite(Date.parse(demoNow))) throw new Error('The jury fixture requires an explicit fictional demoNow.');
+  if (origin) {
+    const address = new URL(origin);
+    if (address.origin !== origin || (address.protocol !== 'https:' && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin))) throw new Error('APP_ORIGIN must be an HTTPS origin, or loopback HTTP for local development.');
+  }
+  const defaults = validatePreferences(fixture.preferences, { booking: fixture.booking, agencyMinimumSavingMinor: fixture.agencyMinimumSavingMinor });
+  function expectedOrigin(request) {
+    if (origin) return origin;
+    if (!/^(localhost|127\.0\.0\.1):\d+$/.test(request.headers.host || '')) fail(403, 'ORIGIN_REJECTED', 'Use the configured application origin.');
+    return `http://${request.headers.host}`;
+  }
+  function decisions(state) {
+    const record = state.permissionRecord;
+    const hasStandingPermission = record?.confirmed === true && record.scope === 'equivalent-only'
+      && record.bookingVersion === fixture.booking.version && record.preferenceVersion === state.preferences.version;
+    const effectivePreferences = { ...state.preferences, automaticEquivalentSwitches: state.preferences.automaticEquivalentSwitches && hasStandingPermission };
+    const standingApproval = hasStandingPermission ? [{
+      type: 'standing', scope: 'equivalent-only', permissionVersion: record.version,
+      bookingId: fixture.booking.bookingId, bookingVersion: record.bookingVersion,
+      preferenceVersion: record.preferenceVersion, confirmed: true,
+      confirmedAt: record.confirmedAt, revokedAt: null,
+    }] : [];
+    return fixture.offers.map(offer => ({
+      ...offer,
+      decision: evaluateOffer({ booking: fixture.booking, offer, preferences: effectivePreferences, agencyMinimumSavingMinor: fixture.agencyMinimumSavingMinor, approvals: standingApproval, now: state.demoNow }),
+    }));
+  }
+  function publicState(state) {
+    // All source facts are the checked-in anonymised fixture. No arbitrary retrieval exists.
+    return {
+      schemaVersion: 1, scenarioId: state.scenarioId,
+      mode: 'public-jury', transactionMode: 'not-implemented',
+      demoNow: state.demoNow, clockMode: 'fictional-demo', provenance: fixture.provenance,
+      booking: fixture.booking, offers: decisions(state), currency: fixture.currency,
+      agencyMinimumSavingMinor: fixture.agencyMinimumSavingMinor,
+      preferences: state.preferences, permissionRecord: state.permissionRecord,
+      enrolled: state.enrolled, selectedOfferId: state.selectedOfferId,
+      approvals: [], revision: state.revision, csrfToken: state.csrfToken,
+      model: { available: advisor.available, status: advisor.status },
+    };
+  }
+  async function visitor(request, response, create = false) {
+    let id = cookieId(request);
+    let state = id ? await stored(() => storage.get(id)) : null;
+    if (state && Date.parse(state.expiresAt) <= now().getTime()) state = null;
+    if (!state && !create) fail(401, 'SESSION_REQUIRED', 'Load the booking page before making changes.');
+    if (!state) {
+      const secure = expectedOrigin(request).startsWith('https:');
+      id = randomBytes(32).toString('hex');
+      state = {
+        schemaVersion: 1, scenarioId: fixture.scenarioId, demoNow,
+        enrolled: false, preferences: defaults, permissionRecord: null, selectedOfferId: null,
+        revision: 0, csrfToken: randomBytes(32).toString('hex'),
+        createdAt: now().toISOString(), expiresAt: new Date(now().getTime() + SESSION_MS).toISOString(),
+        adviceWindowStartedAt: null, adviceRequestCount: 0,
+      };
+      await stored(() => storage.create(id, state));
+      response.setHeader('Set-Cookie', `${COOKIE_NAME}=${id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MS / 1000}${secure ? '; Secure' : ''}`);
+    }
+    return { id, state };
+  }
+  function bookingVersion(value) {
+    if (value !== fixture.booking.version) fail(409, 'BOOKING_VERSION_CHANGED', 'Reload the booking before continuing.');
+  }
+  function selectedOffer(offerId) {
+    const offer = fixture.offers.find(item => item.offerId === offerId);
+    if (!offer) fail(404, 'OFFER_NOT_FOUND', 'This offer is not in the public jury scenario.');
+    return offer;
+  }
+  const server = http.createServer(async (request, response) => {
+    response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Referrer-Policy', 'no-referrer');
+    response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; img-src 'self' https: data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'");
+    response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    try {
+      const url = new URL(request.url, 'http://local.invalid');
+      if (request.method === 'GET' && url.pathname === '/healthz') return sendJson(response, 200, { status: 'ok', storage: storage.mode, model: advisor.status });
+      if (request.method === 'GET' && url.pathname === '/api/bootstrap') {
+        if ([...url.searchParams.keys()].some(key => key !== 'scenario') || (url.searchParams.get('scenario') || 'jury-booking') !== 'jury-booking') fail(404, 'SCENARIO_NOT_FOUND', 'Only the anonymised jury scenario is available.');
+        if (request.headers['sec-fetch-site'] === 'cross-site') fail(403, 'ORIGIN_REJECTED', 'Load the application directly.');
+        const { state } = await visitor(request, response, true);
+        return sendJson(response, 200, publicState(state));
+      }
+      const routes = ['/api/enrolment', '/api/selection', '/api/advice'];
+      if (request.method === 'POST' && routes.includes(url.pathname)) {
+        if (request.headers.origin !== expectedOrigin(request) || request.headers['sec-fetch-site'] === 'cross-site') fail(403, 'ORIGIN_REJECTED', 'Request origin was rejected.');
+        const body = await readJson(request);
+        const { id, state } = await visitor(request, response);
+        if (!safeEqual(request.headers['x-csrf-token'], state.csrfToken)) fail(403, 'CSRF_REJECTED', 'Reload the page before making changes.');
+        if (url.pathname === '/api/enrolment') {
+          object(body, ['bookingVersion', 'preferences', 'permissionConfirmation'], 'enrolment');
+          bookingVersion(body.bookingVersion);
+          object(body.preferences, ['version', 'essentialRequirements', 'automaticEquivalentSwitches', 'minimumSavingMinor', 'notificationFrequency', 'continueMonitoring'], 'preferences');
+          const result = await stored(() => storage.update(id, current => {
+            if (!Number.isSafeInteger(body.preferences.version) || body.preferences.version < 1) fail(422, 'VALIDATION_ERROR', 'Send the current positive preference version.');
+            if (body.preferences.version !== current.preferences.version) fail(409, 'PREFERENCES_VERSION_CHANGED', 'Preferences changed. Reload and review them before confirming again.');
+            const preferences = validatePreferences({ ...body.preferences, version: current.preferences.version + 1 }, { booking: fixture.booking, agencyMinimumSavingMinor: fixture.agencyMinimumSavingMinor });
+            let permissionRecord = null;
+            if (preferences.automaticEquivalentSwitches) {
+              object(body.permissionConfirmation, ['confirmed', 'version', 'bookingVersion', 'preferenceVersion', 'scope'], 'permission confirmation');
+              const confirmation = body.permissionConfirmation;
+              if (confirmation.confirmed !== true || confirmation.version !== 1 || confirmation.bookingVersion !== fixture.booking.version || confirmation.scope !== 'equivalent-only') fail(422, 'PERMISSION_CONFIRMATION_REQUIRED', 'Separately confirm permission for equivalent switches on this booking.');
+              if (!Number.isSafeInteger(confirmation.preferenceVersion) || confirmation.preferenceVersion < 1) fail(422, 'PERMISSION_CONFIRMATION_REQUIRED', 'Confirm permission against the current preference version.');
+              if (confirmation.preferenceVersion !== current.preferences.version) fail(409, 'PREFERENCES_VERSION_CHANGED', 'Preferences changed. Reload and review them before confirming again.');
+              permissionRecord = { ...confirmation, sourcePreferenceVersion: confirmation.preferenceVersion, preferenceVersion: preferences.version, confirmedAt: current.demoNow, recordedAt: now().toISOString(), clockMode: 'fictional-demo' };
+            } else if (body.permissionConfirmation !== undefined && body.permissionConfirmation !== null) {
+              fail(422, 'VALIDATION_ERROR', 'Permission confirmation applies only when equivalent switches are enabled.');
+            }
+            return { ...current, enrolled: true, preferences, permissionRecord, revision: current.revision + 1, updatedAt: now().toISOString() };
+          }));
+          return sendJson(response, 200, publicState(result));
+        }
+        object(body, url.pathname === '/api/selection' ? ['offerId', 'bookingVersion'] : ['offerId', 'bookingVersion', 'message'], 'comparison request');
+        bookingVersion(body.bookingVersion);
+        const offer = selectedOffer(body.offerId);
+        if (url.pathname === '/api/selection') {
+          const result = await stored(() => storage.update(id, current => ({ ...current, selectedOfferId: offer.offerId, revision: current.revision + 1, updatedAt: now().toISOString() })));
+          return sendJson(response, 200, publicState(result));
+        }
+        if (typeof body.message !== 'string' || !body.message.trim() || body.message.length > 1200) fail(422, 'VALIDATION_ERROR', 'Question must contain 1–1200 characters.');
+        const current = await stored(() => storage.update(id, value => {
+          const started = Date.parse(value.adviceWindowStartedAt);
+          const reset = !Number.isFinite(started) || now().getTime() - started >= 60 * 1000;
+          const count = reset ? 0 : value.adviceRequestCount;
+          if (count >= adviceLimit) fail(429, 'ADVICE_RATE_LIMIT', 'Please wait a minute before requesting more advice.');
+          return { ...value, selectedOfferId: offer.offerId, adviceWindowStartedAt: reset ? now().toISOString() : value.adviceWindowStartedAt, adviceRequestCount: count + 1 };
+        }));
+        const decision = decisions(current).find(item => item.offerId === offer.offerId).decision;
+        const advice = await advisor.advise({ booking: fixture.booking, offer, preferences: current.preferences, decision, message: body.message });
+        return sendJson(response, 200, { advice, decision, offerId: offer.offerId, source: 'vertex-gemini', permissionsChanged: false });
+      }
+      if (url.pathname.startsWith('/api/')) fail(404, 'ROUTE_NOT_FOUND', 'This public route is unavailable.');
+      if (request.method === 'GET' && url.pathname === '/favicon.ico') { response.writeHead(204); return response.end(); }
+      if (request.method !== 'GET' && request.method !== 'HEAD') fail(405, 'METHOD_NOT_ALLOWED', 'Method is not supported.');
+      const pathname = url.pathname === '/' ? '/booking.html' : decodeURIComponent(url.pathname);
+      const extension = extname(pathname);
+      const filename = resolve(PUBLIC_ROOT, `.${pathname}`);
+      if (!/^\/[a-zA-Z0-9/_\-.]+$/.test(pathname) || pathname.split('/').includes('..') || !MIME[extension] || !filename.startsWith(PUBLIC_ROOT + sep)) fail(404, 'NOT_FOUND', 'Page not found.');
+      let content;
+      try { content = await readFile(filename); }
+      catch { fail(404, 'NOT_FOUND', 'Page not found.'); }
+      response.writeHead(200, { 'Content-Type': MIME[extension] });
+      response.end(request.method === 'HEAD' ? undefined : content);
+    } catch (error) {
+      if (response.headersSent) return response.end();
+      if (error.code === 'INVALID_PREFERENCES') return sendJson(response, 422, { error: { code: error.code, message: 'Check your preferences.', details: error.details } });
+      if (error.code === 'ADVICE_UNAVAILABLE') return sendJson(response, 503, { error: { code: error.code, message: error.message } });
+      const known = error instanceof RequestError;
+      sendJson(response, known ? error.status : 500, { error: { code: known ? error.code : 'INTERNAL_ERROR', message: known ? error.message : 'Unable to complete this request.', ...(error.details ? { details: error.details } : {}) } });
+    }
+  });
+  server.requestTimeout = 15000;
+  server.headersTimeout = 10000;
+  return server;
+}
+
+export async function startServer(environment = process.env) {
+  const port = Number(environment.PORT || 8080);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be an integer between 1 and 65535.');
+  if ((environment.K_SERVICE || environment.NODE_ENV === 'production') && !environment.APP_ORIGIN) throw new Error('APP_ORIGIN is required in production.');
+  const origin = environment.APP_ORIGIN || `http://localhost:${port}`;
+  const fixture = JSON.parse(await readFile(new URL('../fixtures/jury-booking.json', import.meta.url), 'utf8'));
+  const storage = await createStorage(environment);
+  const advisor = await createGeminiAdvisor({ environment });
+  const server = createAppServer({ storage, advisor, fixture, origin });
+  server.listen(port, '0.0.0.0', () => console.log(`Hotel Price Hunter listening on port ${port}; ${storage.mode}; Gemini ${advisor.status}.`));
+  const stop = () => server.close(async () => { await storage.close(); process.exit(0); });
+  process.once('SIGTERM', stop);
+  process.once('SIGINT', stop);
+  return { server, storage };
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  startServer().catch(() => {
+    console.error('Startup failed. Check Firestore project, local emulator, APP_ORIGIN and runtime configuration.');
+    process.exitCode = 1;
+  });
+}
