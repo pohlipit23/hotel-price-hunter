@@ -1,6 +1,6 @@
 # Hotel Price Hunter: proposed starting plan
 
-Status: approved by the user; first milestone implementation in progress on `codex/customer-flow`.
+Status: approved; first milestone implemented and verified locally on `codex/customer-flow`. Live Altovo/Gemini acceptance and the later milestones remain outstanding.
 Reviewed: 12 October 2026, Asia/Kuala_Lumpur.
 
 ## Recommendation
@@ -68,4 +68,6 @@ Proposed demonstration assumption: use one explicit currency and an agency minim
 
 ## Next concrete action
 
-Complete Task 1: a compact data/decision contract grounded in the available references, with a fixture and examples of automatic eligibility, approval required and blocked execution. Then attempt Task 2's authorised read-only probes. This resolves the most expensive assumptions before adding a chat interface or background infrastructure.
+The contract, decision core, Firestore-backed runtime and customer UI are implemented. The full local suite passed 53/53 with zero skips against the Firestore emulator; three independent reviews resolved their findings, and the mobile/browser flow passed. The final container builds and serves its liveness endpoint and UI in production mode; no deployed database/model reachability is claimed.
+
+Next: resolve the user's requested fresh-project/free-credit setup and obtain the intended GCP project ID, then verify live Vertex advice with anonymised facts. Current account metadata cannot prove trial eligibility. Establish authorised Altovo tenant/booking access before live retrieval/search probes; stateful prebook remains outside read-only scope. The first milestone's live acceptance stays open. Simulated switching, scheduled monitoring/notifications, private retrieval, deployment and submission artifacts remain later work. See `tasks/todo.md` and the three `docs/review-*.md` reports for exact coverage.
