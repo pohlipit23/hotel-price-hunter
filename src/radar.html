@@ -123,8 +123,8 @@ h1,h2,h3,p,ul{margin:0}
 footer{border-top:3px solid var(--navy);padding-top:12px;line-height:1.6}
 footer a{color:var(--blue)}
 dialog{
-  position:fixed;inset:auto;top:4vh;bottom:auto;margin:0 auto;
-  border:4px solid var(--navy);border-radius:20px;padding:0;max-width:640px;width:calc(100% - 20px);
+  position:fixed;inset:unset;top:auto;bottom:0;left:0;right:0;width:auto;height:auto;margin:0 auto;transform:none;
+  border:4px solid var(--navy);border-radius:20px 20px 0 0;padding:0;max-width:640px;width:calc(100% - 16px);
   max-height:92dvh;overflow:auto;background:#fff8ea;box-shadow:8px 8px 0 var(--navy);
 }
 dialog::backdrop{background:#1b274466}
@@ -164,7 +164,7 @@ th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted
   .board{grid-template-columns:repeat(3,minmax(0,1fr))}
   .mission-top{grid-template-columns:1fr}
   .mission img{height:130px;border-right:0;border-bottom:3px solid var(--navy)}
-  dialog{top:4vh}
+  dialog{top:56px;bottom:auto;max-height:calc(100dvh - 68px);border-radius:20px}
 }
 @media(max-width:420px){
   .radar-wrap,.lock-card,.mission-top{grid-template-columns:1fr}

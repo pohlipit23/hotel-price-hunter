@@ -116,14 +116,15 @@ img{display:block;max-width:100%}
 .colophon{margin-top:28px;padding-top:16px;border-top:1px solid var(--rule);font-size:12px;color:var(--muted);line-height:1.7}
 .colophon a{color:var(--oxblood)}
 dialog{
-  position:fixed;inset:auto;top:4vh;bottom:auto;margin:0 auto;border:0;padding:0;
-  max-width:720px;width:calc(100% - 24px);max-height:92dvh;overflow:auto;
+  position:fixed;inset:unset;top:auto;bottom:0;left:0;right:0;width:auto;height:auto;margin:0 auto;border:0;padding:0;
+  max-width:720px;width:calc(100% - 16px);max-height:92dvh;overflow:auto;transform:none;
   background:var(--paper);color:var(--ink);box-shadow:0 30px 80px #1a120c33;
 }
 dialog::backdrop{background:#1a120c66}
 .sheet{padding:16px 20px 18px}
 .close{
-  float:right;width:36px;height:36px;border:1px solid var(--ink);background:var(--cream);border-radius:0;
+  float:right;width:36px;height:36px;
+  border:1px solid var(--ink);background:var(--cream);border-radius:0;
 }
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
 .mini{background:var(--cream);border:1px solid var(--rule);padding:12px}
@@ -148,7 +149,7 @@ th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted
   .spread{grid-template-columns:1.1fr .9fr;gap:36px}
   .story{grid-template-columns:280px 1fr;align-items:center;gap:28px}
   .plate img{height:240px}
-  dialog{border-radius:0}
+  dialog{top:56px;bottom:auto;max-height:calc(100dvh - 68px);border-radius:0}
 }
 @media(max-width:620px){
   .folio{flex-direction:column;gap:4px;text-align:left}
