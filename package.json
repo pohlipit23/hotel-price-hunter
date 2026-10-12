@@ -1,0 +1,11 @@
+{
+  "name": "hotel-price-hunter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "npx wrangler dev",
+    "deploy": "npm run build && npx wrangler deploy"
+  }
+}
