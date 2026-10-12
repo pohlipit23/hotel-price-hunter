@@ -1,0 +1,716 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "jury-booking",
+  "demoNow": "2026-10-12T03:00:00Z",
+  "isFictional": true,
+  "mode": "public-jury",
+  "description": "All hotel names, identifiers, prices and verified facts are fictional. Booking/cancellation/refund settlement is simulated.",
+  "currency": {
+    "code": "USD",
+    "minorUnit": 2
+  },
+  "agencyMinimumSavingMinor": 2500,
+  "agencyMinimumSource": "Configurable fictional demo setting only; not an agreed production minimum.",
+  "booking": {
+    "bookingId": "DEMO_BOOKING_001",
+    "version": 1,
+    "scope": "standalone-hotel",
+    "roomCount": 1,
+    "hotel": {
+      "id": "DEMO_HOTEL_A",
+      "name": "Example Harbour Hotel"
+    },
+    "stay": {
+      "checkin": "2026-11-12",
+      "checkout": "2026-11-15",
+      "timeZone": "Asia/Kuala_Lumpur"
+    },
+    "occupancy": {
+      "adults": 2,
+      "childAges": [
+        8
+      ],
+      "infantAges": []
+    },
+    "room": {
+      "name": "Deluxe King, city view",
+      "conditions": {
+        "boardBasis": "BREAKFAST",
+        "bedType": "KING",
+        "nonSmoking": true,
+        "accessible": false,
+        "view": "CITY",
+        "roomSizeSqm": 32
+      }
+    },
+    "retail": {
+      "totalMinor": 60000,
+      "currency": "USD",
+      "taxesMinor": 0,
+      "feesMinor": 0,
+      "includedInTotal": true
+    },
+    "supplierCost": {
+      "totalMinor": 45000,
+      "currency": "USD"
+    },
+    "cancellation": {
+      "refundability": "refundable",
+      "freeUntil": "2026-11-10T10:00:00Z",
+      "timeZone": "Asia/Kuala_Lumpur",
+      "schedule": [
+        {
+          "from": "2026-10-12T00:00:00Z",
+          "to": "2026-11-10T10:00:00Z",
+          "penaltyMinor": 0,
+          "currency": "USD"
+        },
+        {
+          "from": "2026-11-10T10:00:00Z",
+          "to": "2026-11-15T04:00:00Z",
+          "penaltyMinor": 60000,
+          "currency": "USD"
+        }
+      ]
+    },
+    "source": {
+      "kind": "fictional-demo",
+      "reference": "jury-booking-v1"
+    },
+    "fulfilment": {
+      "status": "simulated-fulfilled",
+      "liveVerified": false
+    }
+  },
+  "offers": [
+    {
+      "offerId": "DEMO_EQUIVALENT",
+      "version": 1,
+      "bookingVersion": 1,
+      "category": "equivalent",
+      "hotel": {
+        "id": "DEMO_HOTEL_A",
+        "name": "Example Harbour Hotel"
+      },
+      "stay": {
+        "checkin": "2026-11-12",
+        "checkout": "2026-11-15",
+        "timeZone": "Asia/Kuala_Lumpur"
+      },
+      "occupancy": {
+        "adults": 2,
+        "childAges": [
+          8
+        ],
+        "infantAges": []
+      },
+      "room": {
+        "name": "Deluxe King, city view",
+        "conditions": {
+          "boardBasis": "BREAKFAST",
+          "bedType": "KING",
+          "nonSmoking": true,
+          "accessible": false,
+          "view": "CITY",
+          "roomSizeSqm": 32
+        }
+      },
+      "equivalence": "verified",
+      "identity": {
+        "searchId": "DEMO_SEARCH_001",
+        "hotelId": "DEMO_HOTEL_A",
+        "offerToken": "DEMO_FULL_DEMO_EQUIVALENT_TOKEN",
+        "supplierCode": "DEMO_SUPPLIER",
+        "sourceId": "DEMO_SOURCE",
+        "contractId": "DEMO_CONTRACT_001",
+        "roomIndex": 1,
+        "roomTypeId": "DEMO_ROOM_DEMO_EQUIVALENT",
+        "shoppingId": null,
+        "prebookId": null
+      },
+      "retail": {
+        "totalMinor": 54000,
+        "currency": "USD",
+        "taxesMinor": 0,
+        "feesMinor": 0,
+        "includedInTotal": true
+      },
+      "supplierCost": {
+        "totalMinor": 42000,
+        "currency": "USD"
+      },
+      "cancellation": {
+        "refundability": "refundable",
+        "freeUntil": "2026-11-10T10:00:00Z",
+        "timeZone": "Asia/Kuala_Lumpur",
+        "schedule": [
+          {
+            "from": "2026-10-12T00:00:00Z",
+            "to": "2026-11-10T10:00:00Z",
+            "penaltyMinor": 0,
+            "currency": "USD"
+          },
+          {
+            "from": "2026-11-10T10:00:00Z",
+            "to": "2026-11-15T04:00:00Z",
+            "penaltyMinor": 54000,
+            "currency": "USD"
+          }
+        ]
+      },
+      "checkedAt": "2026-10-12T02:00:00Z",
+      "expiresAt": "2026-10-13T02:00:00Z",
+      "checkKind": "simulated-rate-check",
+      "refundQuote": {
+        "status": "verified",
+        "basis": "retail-difference",
+        "originalRetailMinor": 60000,
+        "replacementRetailMinor": 54000,
+        "originalCancellationMinor": 0,
+        "switchFeesMinor": 500,
+        "refundProcessingMinor": 0,
+        "netSavingMinor": 5500,
+        "currency": "USD",
+        "source": "fictional-agency-demo-policy-v1"
+      }
+    },
+    {
+      "offerId": "DEMO_DIFFERENT_ROOM",
+      "version": 1,
+      "bookingVersion": 1,
+      "category": "different-room",
+      "hotel": {
+        "id": "DEMO_HOTEL_A",
+        "name": "Example Harbour Hotel"
+      },
+      "stay": {
+        "checkin": "2026-11-12",
+        "checkout": "2026-11-15",
+        "timeZone": "Asia/Kuala_Lumpur"
+      },
+      "occupancy": {
+        "adults": 2,
+        "childAges": [
+          8
+        ],
+        "infantAges": []
+      },
+      "room": {
+        "name": "Premier King, city view",
+        "conditions": {
+          "boardBasis": "BREAKFAST",
+          "bedType": "KING",
+          "nonSmoking": true,
+          "accessible": false,
+          "view": "CITY",
+          "roomSizeSqm": 38
+        }
+      },
+      "equivalence": "different",
+      "identity": {
+        "searchId": "DEMO_SEARCH_001",
+        "hotelId": "DEMO_HOTEL_A",
+        "offerToken": "DEMO_FULL_DEMO_DIFFERENT_ROOM_TOKEN",
+        "supplierCode": "DEMO_SUPPLIER",
+        "sourceId": "DEMO_SOURCE",
+        "contractId": "DEMO_CONTRACT_001",
+        "roomIndex": 1,
+        "roomTypeId": "DEMO_ROOM_DEMO_DIFFERENT_ROOM",
+        "shoppingId": null,
+        "prebookId": null
+      },
+      "retail": {
+        "totalMinor": 52000,
+        "currency": "USD",
+        "taxesMinor": 0,
+        "feesMinor": 0,
+        "includedInTotal": true
+      },
+      "supplierCost": {
+        "totalMinor": 40000,
+        "currency": "USD"
+      },
+      "cancellation": {
+        "refundability": "refundable",
+        "freeUntil": "2026-11-10T10:00:00Z",
+        "timeZone": "Asia/Kuala_Lumpur",
+        "schedule": [
+          {
+            "from": "2026-10-12T00:00:00Z",
+            "to": "2026-11-10T10:00:00Z",
+            "penaltyMinor": 0,
+            "currency": "USD"
+          },
+          {
+            "from": "2026-11-10T10:00:00Z",
+            "to": "2026-11-15T04:00:00Z",
+            "penaltyMinor": 52000,
+            "currency": "USD"
+          }
+        ]
+      },
+      "checkedAt": "2026-10-12T02:00:00Z",
+      "expiresAt": "2026-10-13T02:00:00Z",
+      "checkKind": "simulated-rate-check",
+      "refundQuote": {
+        "status": "verified",
+        "basis": "retail-difference",
+        "originalRetailMinor": 60000,
+        "replacementRetailMinor": 52000,
+        "originalCancellationMinor": 0,
+        "switchFeesMinor": 500,
+        "refundProcessingMinor": 0,
+        "netSavingMinor": 7500,
+        "currency": "USD",
+        "source": "fictional-agency-demo-policy-v1"
+      }
+    },
+    {
+      "offerId": "DEMO_DIFFERENT_HOTEL",
+      "version": 1,
+      "bookingVersion": 1,
+      "category": "different-hotel",
+      "hotel": {
+        "id": "DEMO_HOTEL_B",
+        "name": "Example Garden Hotel"
+      },
+      "stay": {
+        "checkin": "2026-11-12",
+        "checkout": "2026-11-15",
+        "timeZone": "Asia/Kuala_Lumpur"
+      },
+      "occupancy": {
+        "adults": 2,
+        "childAges": [
+          8
+        ],
+        "infantAges": []
+      },
+      "room": {
+        "name": "Deluxe King, city view",
+        "conditions": {
+          "boardBasis": "BREAKFAST",
+          "bedType": "KING",
+          "nonSmoking": true,
+          "accessible": false,
+          "view": "CITY",
+          "roomSizeSqm": 32
+        }
+      },
+      "equivalence": "different",
+      "identity": {
+        "searchId": "DEMO_SEARCH_001",
+        "hotelId": "DEMO_HOTEL_B",
+        "offerToken": "DEMO_FULL_DEMO_DIFFERENT_HOTEL_TOKEN",
+        "supplierCode": "DEMO_SUPPLIER",
+        "sourceId": "DEMO_SOURCE",
+        "contractId": "DEMO_CONTRACT_001",
+        "roomIndex": 1,
+        "roomTypeId": "DEMO_ROOM_DEMO_DIFFERENT_HOTEL",
+        "shoppingId": null,
+        "prebookId": null
+      },
+      "retail": {
+        "totalMinor": 51000,
+        "currency": "USD",
+        "taxesMinor": 0,
+        "feesMinor": 0,
+        "includedInTotal": true
+      },
+      "supplierCost": {
+        "totalMinor": 39000,
+        "currency": "USD"
+      },
+      "cancellation": {
+        "refundability": "refundable",
+        "freeUntil": "2026-11-10T10:00:00Z",
+        "timeZone": "Asia/Kuala_Lumpur",
+        "schedule": [
+          {
+            "from": "2026-10-12T00:00:00Z",
+            "to": "2026-11-10T10:00:00Z",
+            "penaltyMinor": 0,
+            "currency": "USD"
+          },
+          {
+            "from": "2026-11-10T10:00:00Z",
+            "to": "2026-11-15T04:00:00Z",
+            "penaltyMinor": 51000,
+            "currency": "USD"
+          }
+        ]
+      },
+      "checkedAt": "2026-10-12T02:00:00Z",
+      "expiresAt": "2026-10-13T02:00:00Z",
+      "checkKind": "simulated-rate-check",
+      "refundQuote": {
+        "status": "verified",
+        "basis": "retail-difference",
+        "originalRetailMinor": 60000,
+        "replacementRetailMinor": 51000,
+        "originalCancellationMinor": 0,
+        "switchFeesMinor": 500,
+        "refundProcessingMinor": 0,
+        "netSavingMinor": 8500,
+        "currency": "USD",
+        "source": "fictional-agency-demo-policy-v1"
+      }
+    },
+    {
+      "offerId": "DEMO_NON_REFUNDABLE",
+      "version": 1,
+      "bookingVersion": 1,
+      "category": "equivalent",
+      "hotel": {
+        "id": "DEMO_HOTEL_A",
+        "name": "Example Harbour Hotel"
+      },
+      "stay": {
+        "checkin": "2026-11-12",
+        "checkout": "2026-11-15",
+        "timeZone": "Asia/Kuala_Lumpur"
+      },
+      "occupancy": {
+        "adults": 2,
+        "childAges": [
+          8
+        ],
+        "infantAges": []
+      },
+      "room": {
+        "name": "Deluxe King, city view",
+        "conditions": {
+          "boardBasis": "BREAKFAST",
+          "bedType": "KING",
+          "nonSmoking": true,
+          "accessible": false,
+          "view": "CITY",
+          "roomSizeSqm": 32
+        }
+      },
+      "equivalence": "verified",
+      "identity": {
+        "searchId": "DEMO_SEARCH_001",
+        "hotelId": "DEMO_HOTEL_A",
+        "offerToken": "DEMO_FULL_DEMO_NON_REFUNDABLE_TOKEN",
+        "supplierCode": "DEMO_SUPPLIER",
+        "sourceId": "DEMO_SOURCE",
+        "contractId": "DEMO_CONTRACT_001",
+        "roomIndex": 1,
+        "roomTypeId": "DEMO_ROOM_DEMO_NON_REFUNDABLE",
+        "shoppingId": null,
+        "prebookId": null
+      },
+      "retail": {
+        "totalMinor": 48000,
+        "currency": "USD",
+        "taxesMinor": 0,
+        "feesMinor": 0,
+        "includedInTotal": true
+      },
+      "supplierCost": {
+        "totalMinor": 36000,
+        "currency": "USD"
+      },
+      "cancellation": {
+        "refundability": "non-refundable",
+        "freeUntil": null,
+        "timeZone": "Asia/Kuala_Lumpur",
+        "schedule": [
+          {
+            "from": "2026-10-12T00:00:00Z",
+            "to": "2026-11-15T04:00:00Z",
+            "penaltyMinor": 48000,
+            "currency": "USD"
+          }
+        ]
+      },
+      "checkedAt": "2026-10-12T02:00:00Z",
+      "expiresAt": "2026-10-13T02:00:00Z",
+      "checkKind": "simulated-rate-check",
+      "refundQuote": {
+        "status": "verified",
+        "basis": "retail-difference",
+        "originalRetailMinor": 60000,
+        "replacementRetailMinor": 48000,
+        "originalCancellationMinor": 0,
+        "switchFeesMinor": 500,
+        "refundProcessingMinor": 0,
+        "netSavingMinor": 11500,
+        "currency": "USD",
+        "source": "fictional-agency-demo-policy-v1"
+      }
+    },
+    {
+      "offerId": "DEMO_REVALIDATION_CHANGE",
+      "version": 1,
+      "bookingVersion": 1,
+      "category": "different-room",
+      "hotel": {
+        "id": "DEMO_HOTEL_A",
+        "name": "Example Harbour Hotel"
+      },
+      "stay": {
+        "checkin": "2026-11-12",
+        "checkout": "2026-11-15",
+        "timeZone": "Asia/Kuala_Lumpur"
+      },
+      "occupancy": {
+        "adults": 2,
+        "childAges": [
+          8
+        ],
+        "infantAges": []
+      },
+      "room": {
+        "name": "Premier King, city view",
+        "conditions": {
+          "boardBasis": "BREAKFAST",
+          "bedType": "KING",
+          "nonSmoking": true,
+          "accessible": false,
+          "view": "CITY",
+          "roomSizeSqm": 38
+        }
+      },
+      "equivalence": "different",
+      "identity": {
+        "searchId": "DEMO_SEARCH_001",
+        "hotelId": "DEMO_HOTEL_A",
+        "offerToken": "DEMO_FULL_DEMO_REVALIDATION_CHANGE_TOKEN",
+        "supplierCode": "DEMO_SUPPLIER",
+        "sourceId": "DEMO_SOURCE",
+        "contractId": "DEMO_CONTRACT_001",
+        "roomIndex": 1,
+        "roomTypeId": "DEMO_ROOM_DEMO_REVALIDATION_CHANGE",
+        "shoppingId": null,
+        "prebookId": null
+      },
+      "retail": {
+        "totalMinor": 52000,
+        "currency": "USD",
+        "taxesMinor": 0,
+        "feesMinor": 0,
+        "includedInTotal": true
+      },
+      "supplierCost": {
+        "totalMinor": 40000,
+        "currency": "USD"
+      },
+      "cancellation": {
+        "refundability": "refundable",
+        "freeUntil": "2026-11-10T10:00:00Z",
+        "timeZone": "Asia/Kuala_Lumpur",
+        "schedule": [
+          {
+            "from": "2026-10-12T00:00:00Z",
+            "to": "2026-11-10T10:00:00Z",
+            "penaltyMinor": 0,
+            "currency": "USD"
+          },
+          {
+            "from": "2026-11-10T10:00:00Z",
+            "to": "2026-11-15T04:00:00Z",
+            "penaltyMinor": 52000,
+            "currency": "USD"
+          }
+        ]
+      },
+      "checkedAt": "2026-10-12T02:00:00Z",
+      "expiresAt": "2026-10-13T02:00:00Z",
+      "checkKind": "simulated-rate-check",
+      "refundQuote": {
+        "status": "verified",
+        "basis": "retail-difference",
+        "originalRetailMinor": 60000,
+        "replacementRetailMinor": 52000,
+        "originalCancellationMinor": 0,
+        "switchFeesMinor": 500,
+        "refundProcessingMinor": 0,
+        "netSavingMinor": 7500,
+        "currency": "USD",
+        "source": "fictional-agency-demo-policy-v1"
+      }
+    },
+    {
+      "offerId": "DEMO_UNKNOWN_CONDITION",
+      "version": 1,
+      "bookingVersion": 1,
+      "category": "equivalent",
+      "hotel": {
+        "id": "DEMO_HOTEL_A",
+        "name": "Example Harbour Hotel"
+      },
+      "stay": {
+        "checkin": "2026-11-12",
+        "checkout": "2026-11-15",
+        "timeZone": "Asia/Kuala_Lumpur"
+      },
+      "occupancy": {
+        "adults": 2,
+        "childAges": [
+          8
+        ],
+        "infantAges": []
+      },
+      "room": {
+        "name": "Deluxe King",
+        "conditions": {
+          "boardBasis": "BREAKFAST",
+          "bedType": null,
+          "nonSmoking": true,
+          "accessible": false,
+          "view": "CITY",
+          "roomSizeSqm": 32
+        }
+      },
+      "equivalence": "unknown",
+      "identity": {
+        "searchId": "DEMO_SEARCH_001",
+        "hotelId": "DEMO_HOTEL_A",
+        "offerToken": "DEMO_FULL_DEMO_UNKNOWN_CONDITION_TOKEN",
+        "supplierCode": "DEMO_SUPPLIER",
+        "sourceId": "DEMO_SOURCE",
+        "contractId": "DEMO_CONTRACT_001",
+        "roomIndex": 1,
+        "roomTypeId": "DEMO_ROOM_DEMO_UNKNOWN_CONDITION",
+        "shoppingId": null,
+        "prebookId": null
+      },
+      "retail": {
+        "totalMinor": 50000,
+        "currency": "USD",
+        "taxesMinor": 0,
+        "feesMinor": 0,
+        "includedInTotal": true
+      },
+      "supplierCost": {
+        "totalMinor": 38000,
+        "currency": "USD"
+      },
+      "cancellation": {
+        "refundability": "refundable",
+        "freeUntil": "2026-11-10T10:00:00Z",
+        "timeZone": "Asia/Kuala_Lumpur",
+        "schedule": [
+          {
+            "from": "2026-10-12T00:00:00Z",
+            "to": "2026-11-10T10:00:00Z",
+            "penaltyMinor": 0,
+            "currency": "USD"
+          },
+          {
+            "from": "2026-11-10T10:00:00Z",
+            "to": "2026-11-15T04:00:00Z",
+            "penaltyMinor": 50000,
+            "currency": "USD"
+          }
+        ]
+      },
+      "checkedAt": "2026-10-12T02:00:00Z",
+      "expiresAt": "2026-10-13T02:00:00Z",
+      "checkKind": "simulated-rate-check",
+      "refundQuote": {
+        "status": "verified",
+        "basis": "retail-difference",
+        "originalRetailMinor": 60000,
+        "replacementRetailMinor": 50000,
+        "originalCancellationMinor": 0,
+        "switchFeesMinor": 500,
+        "refundProcessingMinor": 0,
+        "netSavingMinor": 9500,
+        "currency": "USD",
+        "source": "fictional-agency-demo-policy-v1"
+      }
+    }
+  ],
+  "preferences": {
+    "version": 1,
+    "essentialRequirements": {
+      "boardBasis": "BREAKFAST",
+      "bedType": "KING",
+      "nonSmoking": true
+    },
+    "automaticEquivalentSwitches": false,
+    "minimumSavingMinor": 2500,
+    "notificationFrequency": "weekly",
+    "continueMonitoring": true
+  },
+  "approvals": [],
+  "scenarios": [
+    {
+      "id": "equivalent-saving",
+      "offerId": "DEMO_EQUIVALENT",
+      "expectedWithoutPermission": "approval-required",
+      "expectedWithStandingPermission": "automatic",
+      "netSavingMinor": 5500
+    },
+    {
+      "id": "different-room",
+      "offerId": "DEMO_DIFFERENT_ROOM",
+      "expectedWithoutSpecificApproval": "approval-required",
+      "netSavingMinor": 7500
+    },
+    {
+      "id": "different-hotel",
+      "offerId": "DEMO_DIFFERENT_HOTEL",
+      "expectedWithoutSpecificApproval": "approval-required",
+      "netSavingMinor": 8500
+    },
+    {
+      "id": "non-refundable",
+      "offerId": "DEMO_NON_REFUNDABLE",
+      "expectedWithoutSpecificApproval": "approval-required",
+      "monitoringAfterApprovedReplacement": false,
+      "netSavingMinor": 11500
+    },
+    {
+      "id": "revalidation-change",
+      "offerId": "DEMO_REVALIDATION_CHANGE",
+      "revalidatedVersion": 2,
+      "replacementRetailMinor": 54500,
+      "revalidatedNetSavingMinor": 5000,
+      "expectedWithOldApproval": "approval-required"
+    },
+    {
+      "id": "unknown-condition",
+      "offerId": "DEMO_UNKNOWN_CONDITION",
+      "expected": "blocked",
+      "reason": "UNKNOWN_ESSENTIAL_CONDITION"
+    },
+    {
+      "id": "uncertain-cancellation",
+      "offerId": "DEMO_EQUIVALENT",
+      "simulatedOutcome": "agency-exception",
+      "savingSecured": false,
+      "refundCompleted": false
+    }
+  ],
+  "provenance": {
+    "default": {
+      "kind": "fictional-demo",
+      "reference": "jury-booking-v1",
+      "liveVerified": false
+    },
+    "demoNow": {"kind": "fictional-demo-clock", "reference": "Frozen fictional clock for public jury decisions only; private checks use real time."},
+    "schema": {
+      "kind": "application-contract",
+      "reference": "docs/data-contract.md"
+    },
+    "policy": {
+      "kind": "agreed-product-plan",
+      "sections": [
+        2,
+        3,
+        5,
+        6,
+        8,
+        9
+      ]
+    },
+    "liveMappings": {
+      "kind": "unresolved",
+      "reference": "docs/data-contract.md#field-provenance-and-live-gates"
+    }
+  }
+}
