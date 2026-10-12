@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Atelier Issue · Hotel Price Hunter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f4ead8;
+  --cream:#fbf6ea;
+  --ink:#1a120c;
+  --muted:#5a5147;
+  --oxblood:#7a2a28;
+  --gold:#8a6a34;
+  --sage:#2f5a40;
+  --rule:rgba(26,18,12,.22);
+  --shadow:#1a120c14;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 Figtree,Helvetica,sans-serif}
+body{
+  background-image:
+    radial-gradient(rgba(26,18,12,.035) 0.7px, transparent 0.8px),
+    linear-gradient(180deg,#f7efdf 0%, var(--paper) 180px);
+  background-size:18px 18px, auto;
+}
+button,a{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+h1,h2,h3,p,figure,ul{margin:0}
+img{display:block;max-width:100%}
+.hph-switch{
+  position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  justify-content:space-between;padding:10px 22px;background:#efe4cdcc;backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--rule);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+}
+.hph-switch .links{display:flex;gap:6px;flex-wrap:wrap}
+.hph-switch a{
+  text-decoration:none;padding:7px 11px;border:1px solid transparent;color:var(--muted);
+}
+.hph-switch a[aria-current=page]{border-color:var(--ink);color:var(--ink);background:var(--cream)}
+.wrap{max-width:1080px;margin:0 auto;padding:18px 22px 56px}
+.masthead{text-align:center;padding:28px 0 18px;border-bottom:3px double var(--ink)}
+.folio{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:18px}
+.nameplate{
+  font-family:Fraunces,Georgia,serif;font-size:clamp(34px,7vw,68px);font-weight:600;
+  letter-spacing:-.03em;line-height:.9;font-variation-settings:"opsz" 80;
+}
+.issue{margin-top:12px;font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--oxblood)}
+.lead{margin:28px 0 8px}
+.lead figure{background:var(--cream);padding:10px 10px 14px;box-shadow:0 18px 40px var(--shadow)}
+.lead img{width:100%;height:clamp(220px,38vw,420px);object-fit:cover;filter:saturate(.86) contrast(1.05)}
+.lead figcaption{
+  font-family:Fraunces,Georgia,serif;font-style:italic;font-size:14px;padding:12px 8px 2px;color:var(--muted);
+}
+.kicker{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--oxblood);font-weight:700}
+.headline{
+  font-family:Fraunces,Georgia,serif;font-weight:600;font-size:clamp(32px,5vw,52px);
+  line-height:1.05;letter-spacing:-.03em;margin:8px 0 10px;font-variation-settings:"opsz" 60;
+}
+.dek{font-size:18px;max-width:40rem;color:var(--muted)}
+.spread{display:grid;gap:28px;margin:34px 0;align-items:start}
+.dispatch,.reservation{
+  background:var(--cream);border:1px solid var(--rule);padding:22px 22px 18px;
+}
+.dispatch h2,.reservation h2{
+  font-family:Fraunces,Georgia,serif;font-size:26px;font-weight:600;margin:6px 0 14px;
+}
+.log{list-style:none;padding:0}
+.log li{display:grid;grid-template-columns:86px 1fr;gap:12px;padding:11px 0;border-top:1px solid var(--rule);font-size:14px}
+.log time{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);padding-top:3px}
+.log .kind{display:inline-block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin-right:6px;color:var(--oxblood)}
+.watch-bar{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:13px;color:var(--sage)}
+.pulse{width:9px;height:9px;border-radius:50%;background:var(--sage);box-shadow:0 0 0 0 #2f5a4088}
+.reservation .stamp{
+  float:right;border:2px solid var(--sage);color:var(--sage);padding:6px 8px;font-size:10px;
+  letter-spacing:.16em;transform:rotate(-8deg);margin-top:-4px;
+}
+.reservation .hotel{font-family:Fraunces,Georgia,serif;font-size:28px;margin:18px 0 4px}
+.reservation .meta{color:var(--muted);font-size:14px}
+.price-block{display:flex;justify-content:space-between;align-items:end;border-top:1px solid var(--ink);margin-top:18px;padding-top:12px}
+.price-block strong{font-family:Fraunces,Georgia,serif;font-size:42px;line-height:1;font-weight:600}
+.price-block span{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.keep{font-size:13px;color:var(--muted);margin-top:12px}
+.sectionhead{display:flex;justify-content:space-between;align-items:end;gap:12px;border-top:3px double var(--ink);padding-top:18px;margin:10px 0 22px}
+.sectionhead h2{font-family:Fraunces,Georgia,serif;font-size:clamp(26px,4vw,38px);font-weight:600}
+.sectionhead p{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--oxblood)}
+.story{
+  display:grid;gap:18px;padding:26px 0;border-bottom:1px solid var(--rule);
+}
+.plate{position:relative}
+.plate img{width:100%;height:220px;object-fit:cover;filter:saturate(.88)}
+.plate .num{
+  position:absolute;left:10px;top:10px;background:var(--cream);padding:6px 10px;
+  font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+}
+.story h3{font-family:Fraunces,Georgia,serif;font-size:clamp(26px,3vw,36px);font-weight:600;line-height:1.12;margin:8px 0}
+.pull{
+  font-family:Fraunces,Georgia,serif;font-style:italic;font-size:28px;line-height:1.15;
+  color:var(--oxblood);border-left:2px solid var(--gold);padding-left:14px;margin:14px 0;
+}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.chips span{border:1px solid var(--rule);padding:5px 9px;font-size:12px;color:var(--muted)}
+.chips .yes{border-color:var(--sage);color:var(--sage);background:#e7f0e6}
+.chips .no{border-color:#b5813a;color:#7a4e16;background:#f6ead6}
+.story-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.review{
+  background:var(--ink);color:var(--cream);border:0;padding:13px 18px;letter-spacing:.08em;
+  text-transform:uppercase;font-size:12px;font-weight:700;
+}
+.review:hover{background:var(--oxblood)}
+.note{font-size:13px;color:var(--muted)}
+.colophon{margin-top:28px;padding-top:16px;border-top:1px solid var(--rule);font-size:12px;color:var(--muted);line-height:1.7}
+.colophon a{color:var(--oxblood)}
+dialog{
+  width:min(720px, calc(100% - 24px));max-height:85vh;overflow:auto;margin:auto;border:0;padding:0;
+  background:var(--paper);color:var(--ink);box-shadow:0 30px 80px #1a120c33;
+}
+dialog::backdrop{background:#1a120c66}
+.sheet{padding:16px 20px 18px}
+.close{
+  float:right;width:36px;height:36px;
+  border:1px solid var(--ink);background:var(--cream);border-radius:0;
+}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+.mini{background:var(--cream);border:1px solid var(--rule);padding:12px}
+.mini.new{border-color:var(--oxblood)}
+.mini img{width:100%;height:72px;object-fit:cover;margin:8px 0}
+.mini .label{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.mini.new .label{color:var(--oxblood)}
+.mini h3{font-family:Fraunces,Georgia,serif;font-size:18px}
+.mini .room{font-size:13px;color:var(--muted);min-height:36px;margin:4px 0 8px}
+.mini .price{font-family:Fraunces,Georgia,serif;font-size:28px}
+.bill{display:flex;justify-content:space-between;align-items:center;background:#efe0c4;padding:14px 16px;margin-bottom:16px}
+.bill strong{font-family:Fraunces,Georgia,serif;font-size:32px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px}
+th,td{text-align:left;padding:9px 6px;border-bottom:1px solid var(--rule)}
+th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.cta{width:100%;background:var(--oxblood);color:#fbf6ea;border:0;padding:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.cta:disabled{opacity:.45;cursor:not-allowed}
+.secondary{width:100%;border:0;background:none;color:var(--muted);padding:12px}
+.receipt{color:var(--sage);margin-top:10px}
+.footnote{font-size:12px;color:var(--muted);margin-top:10px}
+@media(min-width:880px){
+  .spread{grid-template-columns:1.1fr .9fr;gap:36px}
+  .story{grid-template-columns:280px 1fr;align-items:center;gap:28px}
+  .plate img{height:240px}
+  dialog{border-radius:0}
+}
+@media(max-width:620px){
+  .folio{flex-direction:column;gap:4px;text-align:left}
+  .pair{grid-template-columns:1fr}
+  .log li{grid-template-columns:1fr}
+  .hph-switch{padding:10px 14px}
+  .wrap{padding:12px 14px 48px}
+  dialog{width:100%;max-height:92vh;margin:auto 0 0;border-radius:20px 20px 0 0}
+}
+@media(prefers-reduced-motion:no-preference){
+  .pulse{animation:pulse 2.2s ease-out infinite}
+  .story,.dispatch,.reservation,.lead figure{animation:rise .7s ease both}
+  .story:nth-child(2){animation-delay:.08s}
+  .story:nth-child(3){animation-delay:.16s}
+  .review{transition:transform .15s ease, background .15s ease}
+  .review:hover{transform:translateY(-1px)}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+@keyframes pulse{70%{box-shadow:0 0 0 10px transparent}}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<a href="#revisions" style="position:absolute;left:-999px">Skip to revisions</a>
+<nav class="hph-switch" aria-label="Design versions">
+  <span>Compare designs</span>
+  <div class="links"><a data-design-link="original">Original</a><a data-design-link="atelier" aria-current="page">Atelier</a><a data-design-link="radar">Radar</a><a data-design-link="keep">Keep</a><a data-design-link="ledger">Ledger</a><a data-design-link="rooms">Rooms</a><a data-design-link="poster">Poster</a><a data-design-link="found">Found</a><a data-design-link="vista">Vista</a></div>
+</nav>
+<div class="wrap">
+  <header class="masthead">
+    <div class="folio"><span>Vol. VIII · Phuket</span><span>5 November 2026 · The desk is still open</span></div>
+    <p class="nameplate">Hotel Price Hunter</p>
+    <p class="issue">The Atelier Issue · Refundable rates, watched in print</p>
+  </header>
+  <section class="lead">
+    <p class="kicker">Already booked · still being edited</p>
+    <h1 class="headline">Your Phuket stay, reset in type.</h1>
+    <p class="dek">12–15 November · three nights · two adults and a child. A correspondent on the desk keeps reading the same room until free cancellation ends.</p>
+    <figure>
+      <img src="https://cache.marriott.com/is/image/marriotts7prod/mc-hktmb-premier-pool-access-26214-48003%3AClassic-Hor?fit=constrain&wid=1400" alt="Illustrative room photo">
+      <figcaption>Plate I · The stay of record — Seabreeze Hotel, Deluxe Twin, held until 9 November, 6 pm.</figcaption>
+    </figure>
+  </section>
+  <div class="spread">
+    <section class="dispatch" aria-label="Price watching activity">
+      <p class="kicker">From the Phuket desk</p>
+      <h2>Cables received today</h2>
+      <ul class="log">
+        <li><time datetime="2026-11-05T07:12">07:12</time><div><span class="kind">Watch</span>Opened a watch on the refundable Deluxe Twin. Ceiling: $600. Desk closes 9 Nov, 6 pm.</div></li>
+        <li><time datetime="2026-11-05T09:40">09:40</time><div><span class="kind">Reshop</span>Same hotel, same room, still $600. No revision filed.</div></li>
+        <li><time datetime="2026-11-05T11:02">11:02</time><div><span class="kind">Find</span>The identical stay reprinted at $550. Fifty dollars recovered; nothing else moves.</div></li>
+        <li><time datetime="2026-11-05T13:18">13:18</time><div><span class="kind">Reshop</span>Family room, same house, $575 — more floor, same breakfast.</div></li>
+        <li><time datetime="2026-11-05T16:05">16:05</time><div><span class="kind">Find</span>Palm Garden family room at $510. A longer walk to the water.</div></li>
+      </ul>
+      <p class="watch-bar"><span class="pulse" aria-hidden="true"></span>Live watch · 4 days remaining · you approve every change</p>
+    </section>
+    <aside class="reservation" aria-label="Your current booking">
+      <span class="stamp">Confirmed</span>
+      <p class="kicker">The stay of record</p>
+      <p class="hotel">Seabreeze Hotel</p>
+      <p class="meta">Deluxe twin · 28 m²<br>Twin beds + child bed<br>Breakfast included · Free cancellation</p>
+      <div class="price-block"><span>Full stay · paid</span><strong>$600</strong></div>
+      <p class="keep">This copy stays on the books unless you mark a revision.</p>
+    </aside>
+  </div>
+  <section id="revisions">
+    <div class="sectionhead">
+      <h2>Three possible revisions</h2>
+      <p>Save $25–$90</p>
+    </div>
+    <div id="proposals"></div>
+    <p class="note">All offers fit your party and keep the same cancellation deadline. Prices include taxes. USD.</p>
+  </section>
+  <p class="colophon">We’ll notify you of new savings until free cancellation ends. <b>You approve every change.</b><br>Illustrative offers · Snapshot: 5 Nov 2026 · No live checks or transactions.<br>Photography: <a href="https://www.marriott.com/en-us/hotels/hktmb-phuket-marriott-resort-and-spa-merlin-beach/rooms/premium-rooms/">Marriott</a>, <a href="https://www.thavornpalmbeach.com/gallery-rooms-suites-photo-phuket">Thavorn Palm Beach</a>, <a href="https://www.chanalai.com/en/romantica-resort-gallery.html">Chanalai</a>. Photos do not depict the fictional offers.</p>
+</div>
+<dialog id="comparison">
+  <div class="sheet">
+    <button class="close" aria-label="Close comparison">×</button>
+    <p class="kicker">Your booking · before and after</p>
+    <h2 id="dialogtitle" class="headline" style="font-size:28px;margin-top:8px"></h2>
+    <div class="pair" id="beforeafter"></div>
+    <div class="bill"><span>Net saving<br><small>No cancellation penalty</small></span><strong id="netsaving"></strong></div>
+    <table><thead><tr><th>What changes?</th><th>Booked</th><th>Proposed</th></tr></thead><tbody id="comparisonrows"></tbody></table>
+    <button class="cta" id="select">Approve this change</button>
+    <button class="secondary" id="keep">Leave my booking as it is</button>
+    <p class="receipt" id="receipt" role="status"></p>
+    <p class="footnote">Demo only. No booking will be made or cancelled.</p>
+  </div>
+</dialog>
+<script>
+const offers=[{hotel:'Seabreeze Hotel',room:'Deluxe twin',size:'28 m²',price:550,walk:3,badge:'Same stay. Lower price.',image:'https://cache.marriott.com/is/image/marriotts7prod/mc-hktmb-premier-pool-access-26214-48003%3AClassic-Hor?fit=constrain&wid=1200',change:'Nothing about your stay changes.',explain:'Same hotel, room type, breakfast and cancellation deadline. The price is $50 lower.',intro:'Keep the exact hotel and room you booked. Pay less.',benefit:'Same room & hotel'},{hotel:'Seabreeze Hotel',room:'Family room',size:'38 m²',price:575,walk:3,badge:'More space at your hotel',image:'https://www.thavornpalmbeach.com/upload/gallery-files/1754651277.2564.jpg',change:'10 m² more space. $25 less.',explain:'Move to a larger family room. Keep your hotel, bedding, breakfast and cancellation deadline.',intro:'Stay at your hotel with a different room that fits the same guests.',benefit:'Larger room'},{hotel:'Palm Garden Resort',room:'Family room',size:'38 m²',price:510,walk:8,badge:'Biggest saving · different hotel',image:'https://www.chanalai.com/_novaimg/4616061-1421509_0_0_2200_1636_1000_744.jpg',change:'A larger room, but farther from the beach.',explain:'Save $90 and gain 10 m². The beach is an 8-minute walk instead of 3. Breakfast and cancellation flexibility stay the same.',intro:'A different hotel. See the saving and the compromises side by side.',benefit:'Save $90'}];
+const $=id=>document.getElementById(id);
+const changes=[{type:'Same hotel · same room',title:'Pay less. Change nothing.',detail:'Your hotel, room and terms stay exactly the same.',chips:'<span class="yes">Everything stays the same</span>',pull:'“Fifty dollars recovered. The room does not move.”'},{type:'Same hotel · a different room',title:'More room. Less money.',detail:'Move to a family room at Seabreeze. Keep breakfast and flexibility.',chips:'<span class="yes">+10 m²</span><span>Same hotel</span>',pull:'“A larger page in the same house.”'},{type:'A different hotel',title:'Move hotels. Save more.',detail:'Palm Garden has a larger room. The beach is a longer walk.',chips:'<span class="yes">+10 m²</span><span class="no">+5 min to the beach</span>',pull:'“The largest saving, set a little farther from the water.”'}];
+$('proposals').innerHTML=changes.map((c,i)=>'<article class="story"><div class="plate"><img src="'+offers[i].image+'" alt="Illustrative room photo"><span class="num">Plate '+['II','III','IV'][i]+'</span></div><div><p class="kicker">0'+(i+1)+' · '+c.type+'</p><h3>'+c.title+'</h3><p>'+c.detail+'</p><p class="pull">'+c.pull+'</p><div class="chips">'+c.chips+'</div><div class="story-foot"><div class="note">$600 → <strong>$'+offers[i].price+'</strong></div><button class="review" data-offer="'+i+'">Review this change</button></div></div></article>').join('');
+function compare(i){const o=offers[i];$('dialogtitle').textContent=changes[i].title;$('netsaving').textContent='$'+(600-o.price);$('beforeafter').innerHTML=[{label:'Currently booked',hotel:'Seabreeze Hotel',room:'Deluxe twin · 28 m²',price:600,image:offers[0].image},{label:'After this change',hotel:o.hotel,room:o.room+' · '+o.size,price:o.price,image:o.image}].map((p,j)=>'<div class="mini '+(j?'new':'')+'"><div class="label">'+p.label+'</div><img src="'+p.image+'" alt="Illustrative room photo"><h3>'+p.hotel+'</h3><p class="room">'+p.room+'</p><div class="price">$'+p.price+'</div></div>').join('');const rows=[['Room size','28 m²',o.size],['Beach walk','3 min',o.walk+' min'],['Breakfast','Included','Included'],['Guests','2 adults + 1 child','2 adults + 1 child'],['Cancel free until','9 Nov, 6 pm','9 Nov, 6 pm']];$('comparisonrows').innerHTML=rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('');$('receipt').textContent='';$('select').disabled=false;$('select').textContent='Approve this change · save $'+(600-o.price);$('select').onclick=()=>{$('receipt').textContent='Noted on the copy. Your original booking has not changed.';$('select').disabled=true;$('receipt').scrollIntoView({block:'nearest'})};$('comparison').showModal()}
+document.querySelectorAll('[data-offer]').forEach(b=>b.onclick=()=>compare(Number(b.dataset.offer)));
+$('keep').onclick=()=>$('comparison').close();
+document.querySelector('.close').onclick=()=>$('comparison').close();
+(function(){
+  const file=/\.html$/i.test((location.pathname.split('/').pop()||''));
+  const hrefs=file?{original:'pitch.html',atelier:'atelier.html',radar:'radar.html',keep:'keep.html',ledger:'ledger.html',rooms:'rooms.html',poster:'poster.html',found:'found.html',vista:'vista.html'}:{original:'/',atelier:'/atelier',radar:'/radar',keep:'/keep',ledger:'/ledger',rooms:'/rooms',poster:'/poster',found:'/found',vista:'/vista'};
+  document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]});
+})();
+</script>
+</body>
+</html>

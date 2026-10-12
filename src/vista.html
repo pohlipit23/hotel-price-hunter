@@ -76,7 +76,7 @@ th,td{text-align:left;padding:5px 4px;border-bottom:1px solid #f4ead822}
 </style>
 </head>
 <body>
-<nav class="hph-switch" aria-label="Design versions"><div class="links"><a data-design-link="original">Original</a><a data-design-link="poster">Poster</a><a data-design-link="found">Found</a><a data-design-link="vista" aria-current="page">Vista</a></div></nav>
+<nav class="hph-switch" aria-label="Design versions"><div class="links"><a data-design-link="original">Original</a><a data-design-link="atelier">Atelier</a><a data-design-link="radar">Radar</a><a data-design-link="keep">Keep</a><a data-design-link="ledger">Ledger</a><a data-design-link="rooms">Rooms</a><a data-design-link="poster">Poster</a><a data-design-link="found">Found</a><a data-design-link="vista" aria-current="page">Vista</a></div></nav>
 <div class="film" id="film" aria-label="Stay frames">
   <section class="slide" data-frame="0">
     <img src="https://cache.marriott.com/is/image/marriotts7prod/mc-hktmb-premier-pool-access-26214-48003%3AClassic-Hor?fit=constrain&wid=1200" alt="Illustrative room photo">
@@ -164,7 +164,7 @@ function compare(i){const o=offers[i];$('dialogtitle').textContent=changes[i].ti
 $('dockbtn').onclick=()=>compare(Number($('dockbtn').dataset.offer));
 $('leave').onclick=()=>$('comparison').close();
 document.querySelector('.close').onclick=()=>$('comparison').close();
-(function(){const file=/\.html$/i.test((location.pathname.split('/').pop()||''));const hrefs=file?{original:'pitch.html',poster:'poster.html',found:'found.html',vista:'vista.html'}:{original:'/',poster:'/poster',found:'/found',vista:'/vista'};document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]})})();
+(function(){const file=/\.html$/i.test((location.pathname.split('/').pop()||''));const hrefs=file?{original:'pitch.html',atelier:'atelier.html',radar:'radar.html',keep:'keep.html',ledger:'ledger.html',rooms:'rooms.html',poster:'poster.html',found:'found.html',vista:'vista.html'}:{original:'/',atelier:'/atelier',radar:'/radar',keep:'/keep',ledger:'/ledger',rooms:'/rooms',poster:'/poster',found:'/found',vista:'/vista'};document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]})})();
 </script>
 </body>
 </html>

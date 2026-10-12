@@ -33,7 +33,7 @@ button[type=submit]{width:100%;min-height:52px;margin-top:20px;background:#ff3d6
 </style>
 </head>
 <body>
-<nav class="hph-switch" aria-label="Design versions"><div class="links"><a data-design-link="original">Original</a><a data-design-link="poster">Poster</a><a data-design-link="found" aria-current="page">Found</a><a data-design-link="vista">Vista</a></div></nav>
+<nav class="hph-switch" aria-label="Design versions"><div class="links"><a data-design-link="original">Original</a><a data-design-link="atelier">Atelier</a><a data-design-link="radar">Radar</a><a data-design-link="keep">Keep</a><a data-design-link="ledger">Ledger</a><a data-design-link="rooms">Rooms</a><a data-design-link="poster">Poster</a><a data-design-link="found" aria-current="page">Found</a><a data-design-link="vista">Vista</a></div></nav>
 <main>
   <div class="cabinet">
     <p style="margin:0;font-size:12px;letter-spacing:.08em">FARE HUNT</p>
@@ -51,7 +51,7 @@ button[type=submit]{width:100%;min-height:52px;margin-top:20px;background:#ff3d6
   </form>
 </main>
 <script>
-(function(){const file=/\.html$/i.test((location.pathname.split('/').pop()||''));const hrefs=file?{original:'login-original.html',poster:'login-poster.html',found:'login-found.html',vista:'login-vista.html'}:{original:'/',poster:'/poster',found:'/found',vista:'/vista'};document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]})})();
+(function(){const file=/\.html$/i.test((location.pathname.split('/').pop()||''));const hrefs=file?{original:'login-original.html',atelier:'login-atelier.html',radar:'login-radar.html',keep:'login-keep.html',ledger:'login-ledger.html',rooms:'login-rooms.html',poster:'login-poster.html',found:'login-found.html',vista:'login-vista.html'}:{original:'/',atelier:'/atelier',radar:'/radar',keep:'/keep',ledger:'/ledger',rooms:'/rooms',poster:'/poster',found:'/found',vista:'/vista'};document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]})})();
 </script>
 </body>
 </html>

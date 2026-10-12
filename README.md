@@ -16,7 +16,7 @@ All hotels, rates and notification behaviour are illustrative. There are no live
 
 Requires Node.js 22 or later.
 
-1. Edit files in `src/` (`pitch.html` is the original; `poster.html`, `found.html` and `vista.html` are full restyles; `login-*.html` are the matching sign-in screens).
+1. Edit files in `src/` (`pitch.html` is the original; the other `*.html` files are full restyles; `login-*.html` are the matching sign-in screens).
 2. Run `npm run build` to regenerate the Worker HTML.
 3. Copy `.dev.vars.example` to `.dev.vars` and set local credentials.
 4. Run `npx wrangler dev`.
@@ -26,13 +26,20 @@ After sign-in, use the **Compare designs** bar or open:
 | Route | Version |
 | --- | --- |
 | `/` | Original (booking-changes) |
-| `/poster` | Vivid travel-poster — saturated colour blocks, SVG illustration, display type |
-| `/found` | Playful hunt — motion, micro-interactions, celebratory approve |
-| `/vista` | Photo-led reel — full-bleed frames, editorial type, swipe |
+| `/atelier` | Magazine / print atelier |
+| `/radar` | Handheld radar console |
+| `/keep` | Quiet concierge |
+| `/ledger` | Savings-first ledger |
+| `/rooms` | Swipeable room cards |
+| `/poster` | Vivid travel-poster |
+| `/found` | Playful hunt with celebration |
+| `/vista` | Cinematic photo reel |
 
 Unauthenticated visits to those routes show the matching login screen. The original layout is unchanged aside from the comparison bar.
 
 You can also open the HTML files in `src/` directly, or serve them with `python3 -m http.server`.
+
+Mobile screenshots of each restyle live in [docs/designs](docs/designs).
 
 ## Deploy to Cloudflare Workers
 

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Your stay · Rooms</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f1ebe3;--ink:#201c18;--muted:#6a6259;--sea:#24584f;--linen:#fffaf3;--line:#e0d7cc;--pad:16px;--tap:48px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 Epilogue,Helvetica,sans-serif}
+button,a{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid #c4a56a;outline-offset:3px}
+h1,h2,h3,p{margin:0}
+img{display:block;max-width:100%}
+.hph-switch{position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--line);padding:6px var(--pad)}
+.hph-switch .links{display:flex;gap:4px;overflow-x:auto}
+.hph-switch a{flex:none;min-height:40px;display:grid;place-items:center;padding:0 12px;text-decoration:none;color:var(--muted);font-size:13px;font-weight:500}
+.hph-switch a[aria-current=page]{color:var(--ink);background:var(--linen);border-radius:999px}
+.current{margin:12px var(--pad) 8px;padding:12px;background:var(--linen);border-radius:14px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.current h1{font-family:"Source Serif 4",Georgia,serif;font-size:18px;font-weight:600}
+.current p{font-size:12px;color:var(--muted);margin-top:3px}
+.current .paid{font-family:"Source Serif 4",Georgia,serif;font-size:24px;text-align:right}
+.watch{margin:0 var(--pad) 12px;font-size:13px;color:var(--muted)}
+.watch b{color:var(--sea);font-weight:600}
+.pager{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding:var(--pad);padding:0 var(--pad) 12px;-webkit-overflow-scrolling:touch}
+.slide{flex:0 0 calc(100% - 36px);scroll-snap-align:start;background:var(--linen);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;min-height:420px}
+.slide img{width:100%;height:200px;object-fit:cover}
+.body{padding:14px 14px 16px;display:flex;flex-direction:column;flex:1}
+.kind{font-size:12px;font-weight:600;color:var(--sea)}
+.body h2{font-family:"Source Serif 4",Georgia,serif;font-size:24px;font-weight:600;letter-spacing:-.02em;margin:6px 0 6px;line-height:1.15}
+.body .detail{font-size:14px;color:var(--muted);flex:1}
+.delta{margin:12px 0;font-size:13px;color:var(--muted)}
+.delta b{color:var(--sea)}
+.slide .review{min-height:var(--tap);width:100%;border:0;background:var(--sea);color:var(--linen);border-radius:12px;font-weight:600}
+.dots{display:flex;justify-content:center;gap:6px;padding:4px 0 10px}
+.dots i{width:6px;height:6px;border-radius:50%;background:#cfc6ba;display:block}
+.dots i.on{background:var(--sea);width:16px;border-radius:4px}
+.legal{padding:0 var(--pad) 24px;font-size:12px;color:var(--muted);line-height:1.55}
+.legal a{color:var(--sea)}
+dialog{border:0;padding:0;width:100%;max-width:520px;max-height:92dvh;margin:auto 0 0;border-radius:20px 20px 0 0;background:var(--bg);overflow:auto}
+dialog::backdrop{background:#201c1860}
+.sheet{padding:16px}
+.close{float:right;width:44px;height:44px;border:0;background:var(--linen);border-radius:22px}
+.kicker{font-size:12px;color:var(--muted);font-weight:600}
+#dialogtitle{font-family:"Source Serif 4",Georgia,serif;font-size:26px;margin:8px 0 14px;clear:both}
+.stack{display:grid;gap:8px}
+.mini{background:var(--linen);border-radius:12px;padding:12px}
+.mini.new{box-shadow:inset 0 0 0 1px #b7cfc8}
+.mini img{width:100%;height:88px;object-fit:cover;border-radius:8px;margin:8px 0}
+.mini .label{font-size:11px;font-weight:600;color:var(--muted)}
+.mini.new .label{color:var(--sea)}
+.mini h3{font-size:16px}
+.mini .room{font-size:13px;color:var(--muted);margin:4px 0}
+.mini .price{font-family:"Source Serif 4",Georgia,serif;font-size:24px}
+.bill{display:flex;justify-content:space-between;align-items:center;padding:14px 0}
+.bill strong{font-family:"Source Serif 4",Georgia,serif;font-size:28px;color:var(--sea)}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px}
+th,td{text-align:left;padding:9px 4px;border-bottom:1px solid var(--line)}
+th{font-size:11px;color:var(--muted)}
+.actions{position:sticky;bottom:0;background:var(--bg);padding:8px 0 calc(8px + env(safe-area-inset-bottom))}
+.cta{width:100%;min-height:var(--tap);background:var(--sea);color:var(--linen);border:0;border-radius:12px;font-weight:600}
+.cta:disabled{opacity:.45}
+.secondary{width:100%;min-height:44px;border:0;background:none;color:var(--muted)}
+.receipt{color:var(--sea);margin-top:8px;font-size:14px}
+.footnote{font-size:12px;color:var(--muted);margin-top:8px}
+@media(min-width:880px){
+  .pager{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));overflow:visible;max-width:1080px;margin:0 auto;padding:8px 24px 24px}
+  .slide{flex:none;min-height:0}
+  .current,.watch,.legal,.dots{max-width:1080px;margin-left:auto;margin-right:auto;padding-left:24px;padding-right:24px}
+  .dots{display:none}
+  .stack{grid-template-columns:1fr 1fr}
+  dialog{margin:auto;border-radius:20px;max-height:85vh}
+}
+</style>
+</head>
+<body>
+<nav class="hph-switch" aria-label="Design versions"><div class="links"><a data-design-link="original">Original</a><a data-design-link="atelier">Atelier</a><a data-design-link="radar">Radar</a><a data-design-link="keep">Keep</a><a data-design-link="ledger">Ledger</a><a data-design-link="rooms" aria-current="page">Rooms</a><a data-design-link="poster">Poster</a><a data-design-link="found">Found</a><a data-design-link="vista">Vista</a></div></nav>
+<header class="current" aria-label="Your current booking">
+  <div>
+    <h1>Seabreeze Hotel</h1>
+    <p>Deluxe twin · 12–15 Nov · 2 adults + 1 child</p>
+  </div>
+  <div class="paid">$600<div style="font-family:Epilogue,sans-serif;font-size:11px;color:var(--muted);font-weight:600">Paid</div></div>
+</header>
+<p class="watch">Watching comparable rates until <b>9 Nov, 6 pm</b> · last find 16:05 · you approve every change</p>
+<div class="pager" id="proposals" aria-label="Possible changes"></div>
+<div class="dots" id="dots" aria-hidden="true"></div>
+<p class="legal">All three fit your party and keep the same cancellation deadline. Prices include taxes, USD.<br>Illustrative · Photography: <a href="https://www.marriott.com/en-us/hotels/hktmb-phuket-marriott-resort-and-spa-merlin-beach/rooms/premium-rooms/">Marriott</a>, <a href="https://www.thavornpalmbeach.com/gallery-rooms-suites-photo-phuket">Thavorn Palm Beach</a>, <a href="https://www.chanalai.com/en/romantica-resort-gallery.html">Chanalai</a>.</p>
+<dialog id="comparison">
+  <div class="sheet">
+    <button class="close" aria-label="Close comparison">×</button>
+    <p class="kicker">Before and after</p>
+    <h2 id="dialogtitle"></h2>
+    <div class="stack" id="beforeafter"></div>
+    <div class="bill"><span>Net saving<br><small>No cancellation penalty</small></span><strong id="netsaving"></strong></div>
+    <table><thead><tr><th>What changes?</th><th>Booked</th><th>Proposed</th></tr></thead><tbody id="comparisonrows"></tbody></table>
+    <div class="actions">
+      <button class="cta" id="select">Approve this change</button>
+      <button class="secondary" id="leave">Leave my booking as it is</button>
+      <p class="receipt" id="receipt" role="status"></p>
+      <p class="footnote">Demo only. No booking will be made or cancelled.</p>
+    </div>
+  </div>
+</dialog>
+<script>
+const offers=[{hotel:'Seabreeze Hotel',room:'Deluxe twin',size:'28 m²',price:550,walk:3,image:'https://cache.marriott.com/is/image/marriotts7prod/mc-hktmb-premier-pool-access-26214-48003%3AClassic-Hor?fit=constrain&wid=1200'},{hotel:'Seabreeze Hotel',room:'Family room',size:'38 m²',price:575,walk:3,image:'https://www.thavornpalmbeach.com/upload/gallery-files/1754651277.2564.jpg'},{hotel:'Palm Garden Resort',room:'Family room',size:'38 m²',price:510,walk:8,image:'https://www.chanalai.com/_novaimg/4616061-1421509_0_0_2200_1636_1000_744.jpg'}];
+const $=id=>document.getElementById(id);
+const changes=[{type:'Same hotel · same room',title:'Pay less. Change nothing.',detail:'Keep this room and breakfast. The rate is simply lower.',delta:'<b>Everything stays the same.</b> $600 becomes $550.'},{type:'Same hotel · a different room',title:'More room. Less money.',detail:'Move to a family room in the same hotel. Still breakfast, still free to cancel.',delta:'<b>+10 m²</b> at Seabreeze. $600 becomes $575.'},{type:'A different hotel',title:'Move hotels. Save more.',detail:'Palm Garden, family room. The beach is a longer walk.',delta:'<b>+10 m²</b> · <span>+5 min to the beach</span>. $600 becomes $510.'}];
+$('proposals').innerHTML=changes.map((c,i)=>'<article class="slide"><img src="'+offers[i].image+'" alt="Illustrative room photo"><div class="body"><p class="kind">'+c.type+'</p><h2>'+c.title+'</h2><p class="detail">'+c.detail+'</p><p class="delta">'+c.delta+'</p><button class="review" data-offer="'+i+'">Review this change · $'+(600-offers[i].price)+'</button></div></article>').join('');
+$('dots').innerHTML=changes.map((_,i)=>'<i'+(i?'':' class="on"')+'></i>').join('');
+const pager=$('proposals');
+pager.addEventListener('scroll',()=>{const w=pager.children[0]?.offsetWidth||1;const i=Math.round(pager.scrollLeft/(w+12));[...$('dots').children].forEach((d,n)=>d.classList.toggle('on',n===i))},{passive:true});
+function compare(i){const o=offers[i];$('dialogtitle').textContent=changes[i].title;$('netsaving').textContent='$'+(600-o.price);$('beforeafter').innerHTML=[{label:'Currently booked',hotel:'Seabreeze Hotel',room:'Deluxe twin · 28 m²',price:600,image:offers[0].image},{label:'After this change',hotel:o.hotel,room:o.room+' · '+o.size,price:o.price,image:o.image}].map((p,j)=>'<div class="mini '+(j?'new':'')+'"><div class="label">'+p.label+'</div><img src="'+p.image+'" alt="Illustrative room photo"><h3>'+p.hotel+'</h3><p class="room">'+p.room+'</p><div class="price">$'+p.price+'</div></div>').join('');const rows=[['Room size','28 m²',o.size],['Beach walk','3 min',o.walk+' min'],['Breakfast','Included','Included'],['Guests','2 adults + 1 child','2 adults + 1 child'],['Cancel free until','9 Nov, 6 pm','9 Nov, 6 pm']];$('comparisonrows').innerHTML=rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('');$('receipt').textContent='';$('select').disabled=false;$('select').textContent='Approve this change · save $'+(600-o.price);$('select').onclick=()=>{$('receipt').textContent='Saved in the demo. Your original booking has not changed.';$('select').disabled=true};$('comparison').showModal()}
+document.querySelectorAll('[data-offer]').forEach(b=>b.onclick=()=>compare(Number(b.dataset.offer)));
+$('leave').onclick=()=>$('comparison').close();
+document.querySelector('.close').onclick=()=>$('comparison').close();
+(function(){const file=/\.html$/i.test((location.pathname.split('/').pop()||''));const hrefs=file?{original:'pitch.html',atelier:'atelier.html',radar:'radar.html',keep:'keep.html',ledger:'ledger.html',rooms:'rooms.html',poster:'poster.html',found:'found.html',vista:'vista.html'}:{original:'/',atelier:'/atelier',radar:'/radar',keep:'/keep',ledger:'/ledger',rooms:'/rooms',poster:'/poster',found:'/found',vista:'/vista'};document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]})})();
+</script>
+</body>
+</html>
