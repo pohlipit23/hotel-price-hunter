@@ -1,0 +1,156 @@
+/* Run in an isolated local Playwright CLI session:
+   playwright-cli -s=hph-ui run-code --filename=tests/ui.browser.mjs
+   Requires the real localhost:8080 server and Firestore emulator.
+   The returned evidence checks the honest unconfigured-model path, not live Gemini.
+*/
+async originalPage => {
+  const context = await originalPage.context().browser().newContext();
+  const page = await context.newPage();
+  try {
+  const assert = (condition, message) => { if (!condition) throw new Error(message); };
+  const failures = [];
+  const runtimeErrors = [];
+  page.on('pageerror', error => runtimeErrors.push(error.message));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('http://localhost:8080/');
+  await page.locator('#content').waitFor({ state: 'visible' });
+  await page.locator('#invitation[open]').waitFor();
+  assert(await page.locator('#show-enrolment').evaluate(el => el === document.activeElement), 'Invitation did not focus its primary action');
+  await page.keyboard.press('Tab');
+  assert(await page.locator('#not-now').evaluate(el => el === document.activeElement), 'Invitation keyboard order is wrong');
+  await page.keyboard.press('Tab');
+  assert(await page.locator('#dismiss-invitation').evaluate(el => el === document.activeElement), 'Native dialog did not trap keyboard focus');
+  await page.keyboard.press('Escape');
+  await page.locator('#invitation').waitFor({ state: 'hidden' });
+  assert(await page.locator('#booking-total').textContent() === '$600', 'Escape changed the booked total');
+  await page.screenshot({ path: '.playwright-cli/hph-mobile-booking.png', fullPage: true });
+  await page.reload();
+  await page.locator('#invitation[open]').waitFor();
+  await page.locator('#not-now').click();
+  assert(await page.locator('#enrolment').isHidden(), 'Not now opened enrolment');
+  await page.reload();
+  await page.locator('#invitation[open]').waitFor();
+  await page.locator('#show-enrolment').click();
+  assert(await page.locator('#enrolment-title').evaluate(el => el === document.activeElement), 'Enrolment heading did not receive focus');
+  assert(await page.locator('#continue-monitoring').isChecked(), 'Continued monitoring must default on');
+  await page.locator('#enrolment').screenshot({ path: '.playwright-cli/hph-mobile-enrolment.png' });
+  await page.locator('#minimum').fill('24.99');
+  await page.locator('#save-preferences').click();
+  assert(await page.locator('#minimum').evaluate(el => el.validity.rangeUnderflow), 'Agency minimum is not enforced by the input');
+  assert(await page.locator('#enrolment').isVisible(), 'Invalid minimum saved enrolment');
+  await page.locator('#minimum').fill('30');
+  await page.locator('#automatic').check();
+  await page.locator('#save-preferences').click();
+  await page.locator('#preferences-error').filter({ hasText: 'Confirm equivalent-only' }).waitFor();
+  await page.locator('#permission-confirmed').check();
+  await page.locator('#frequency').selectOption('daily');
+  assert(await page.locator('[data-value="boardBasis"] option:checked').textContent() === 'Breakfast included', 'Meals expose a raw canonical token');
+  assert(await page.locator('[data-value="bedType"] option:checked').textContent() === 'King bed', 'Bed choice exposes a raw canonical token');
+  assert(await page.locator('[data-value="view"] option:checked').textContent() === 'City view', 'View choice exposes a raw canonical token');
+  const unchangedResponse = page.waitForResponse(response => response.url().endsWith('/api/enrolment') && response.request().method() === 'POST');
+  await page.locator('#save-preferences').click();
+  const unchanged = await unchangedResponse;
+  assert(unchanged.status() === 200, 'Unchanged readable essentials were rejected');
+  const unchangedState = await unchanged.json();
+  assert(unchangedState.preferences.essentialRequirements.boardBasis === 'BREAKFAST' && unchangedState.preferences.essentialRequirements.bedType === 'KING', 'Readable choices did not persist canonical scalars');
+  assert(unchangedState.offers.find(offer => offer.offerId === 'DEMO_EQUIVALENT').decision.action === 'automatic', 'Unchanged readable choices made an equivalent offer ineligible');
+  await page.locator('#enrolment').waitFor({ state: 'hidden' });
+  await page.reload();
+  await page.locator('#content').waitFor({ state: 'visible' });
+  await page.locator('#edit-preferences').click();
+  assert(await page.locator('[data-value="boardBasis"]').inputValue() === 'BREAKFAST' && await page.locator('[data-value="bedType"]').inputValue() === 'KING', 'Known essentials changed canonical values after refresh');
+  await page.locator('[data-value="boardBasis"]').selectOption({ label: 'Room only' });
+  await page.locator('#permission-confirmed').check();
+  const changedResponse = page.waitForResponse(response => response.url().endsWith('/api/enrolment') && response.request().method() === 'POST');
+  await page.locator('#save-preferences').click();
+  const changed = await changedResponse;
+  const changedState = await changed.json();
+  const changedDecision = changedState.offers.find(offer => offer.offerId === 'DEMO_EQUIVALENT').decision;
+  assert(changedDecision.action === 'blocked' && changedDecision.reasons.includes('ESSENTIAL_REQUIREMENT_MISMATCH'), 'A real changed meal requirement did not block a mismatched offer');
+  await page.locator('#enrolment').waitFor({ state: 'hidden' });
+  await page.reload();
+  await page.locator('#content').waitFor({ state: 'visible' });
+  assert(await page.locator('#invitation').isHidden(), 'Saved enrolment was not restored');
+  assert((await page.locator('#enrolment-summary').textContent()).includes('$30'), 'Minimum was not persisted');
+  await page.locator('#edit-preferences').click();
+  assert(await page.locator('[data-value="boardBasis"]').inputValue() === 'ROOM_ONLY', 'Edited essential was not persisted');
+  assert(await page.locator('#frequency').inputValue() === 'daily', 'Frequency was not persisted');
+  assert(await page.locator('#automatic').isChecked(), 'Automatic preference was not persisted');
+  assert(!await page.locator('#permission-confirmed').isChecked(), 'Editing permission must require fresh explicit confirmation');
+  const otherPage = await context.newPage();
+  await otherPage.goto('http://localhost:8080/');
+  await otherPage.locator('#content').waitFor({ state: 'visible' });
+  await otherPage.locator('#edit-preferences').click();
+  await otherPage.locator('#automatic').uncheck();
+  await otherPage.locator('#save-preferences').click();
+  await otherPage.locator('#enrolment').waitFor({ state: 'hidden' });
+  await page.locator('#permission-confirmed').check();
+  const staleResponse = page.waitForResponse(response => response.url().endsWith('/api/enrolment') && response.request().method() === 'POST');
+  await page.locator('#save-preferences').click();
+  const rejected = await staleResponse;
+  assert(rejected.status() === 409 && (await rejected.json()).error.code === 'PREFERENCES_VERSION_CHANGED', 'Stale preference save did not return the expected409');
+  await page.locator('#preferences-error').filter({ hasText: 'changed in another session' }).waitFor();
+  assert(!await page.locator('#automatic').isChecked(), 'A stale form resurrected revoked standing permission');
+  assert(!await page.locator('#permission-confirmed').isChecked(), 'Conflict reload retained stale permission confirmation');
+  await otherPage.close();
+  await page.locator('[data-value="boardBasis"]').selectOption({ label: 'Breakfast included' });
+  await page.locator('#save-preferences').click();
+  await page.locator('#enrolment').waitFor({ state: 'hidden' });
+  assert(await page.locator('#offers>.proposal').count() === 3, 'Default list must represent exactly the three refundable categories');
+  assert(await page.locator('#extra-offers').isHidden(), 'Non-refundable offers were shown without interest');
+  await page.locator('#non-refundable-interest').check();
+  assert(await page.locator('#extra-offers').isVisible(), 'Explicit non-refundable interest did not reveal the offer');
+  await page.locator('#extra-offers button').first().click();
+  await page.locator('#comparison').waitFor({ state: 'visible' });
+  assert((await page.locator('#selected-terms').textContent()).includes('Non-refundable'), 'Reduced flexibility was not prominent');
+  assert((await page.locator('#selected-authority').textContent()).includes('Separate permission'), 'Selection implied permission');
+  await page.reload();
+  await page.locator('#comparison').waitFor({ state: 'visible' });
+  assert((await page.locator('#selected-terms').textContent()).includes('Non-refundable'), 'Selected comparison did not survive refresh');
+  assert((await page.locator('#enrolment-summary').textContent()).includes('Automatic switches are off'), 'Selecting an offer changed standing permission');
+  assert((await page.locator('#model-status').textContent()).includes('unavailable'), 'Unconfigured Gemini was not labelled honestly');
+  await page.locator('#question').fill('<img src=x onerror=alert(1)> My plans may change.');
+  const adviceResponse = page.waitForResponse(response => response.url().endsWith('/api/advice'));
+  await page.locator('#ask').click();
+  const unavailable = await adviceResponse;
+  assert(unavailable.status() === 503 && (await unavailable.json()).error.code === 'ADVICE_UNAVAILABLE', 'Unconfigured model did not return the expected503');
+  await page.locator('.message.error').waitFor();
+  assert(await page.locator('#messages img').count() === 0, 'Customer text was interpreted as HTML');
+  assert((await page.locator('.message.error').textContent()).includes('intact'), 'Model failure lost or obscured saved state');
+  assert(await page.locator('#booking-total').textContent() === '$600', 'Advice changed the booked total');
+  const responsive = [];
+  for (const width of [320, 390, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: width >= 1024 ? 900 : 844 });
+    await page.locator('#question').scrollIntoViewIfNeeded();
+    await page.locator('#question').focus();
+    await page.locator('#question').press('End');
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const geometry = await page.evaluate(() => {
+      const rect = document.querySelector('.selected-summary').getBoundingClientRect();
+      return { viewport: innerWidth, document: document.documentElement.scrollWidth, summaryTop: rect.top, summaryBottom: rect.bottom, summaryHeight: rect.height };
+    });
+    assert(geometry.document <= geometry.viewport, `Horizontal overflow at ${width}px: ${geometry.document}`);
+    assert(geometry.summaryTop >= 0 && geometry.summaryBottom < 844, `Selected comparison is not fully in view at ${width}px: ${JSON.stringify(geometry)}`);
+    for (const selector of width < 800 ? ['#selected-identity', '#before-price', '#after-price', '#comparison-saving', '#selected-terms'] : ['#after-hotel', '#after-room', '#before-price', '#after-price', '#comparison-saving', '#selected-terms']) {
+      const box = await page.locator(selector).boundingBox();
+      assert(box && box.y >= 0 && box.y + box.height <= 844, `Required comparison fact ${selector} is clipped while typing at ${width}px: ${JSON.stringify(box)}`);
+    }
+    responsive.push({ width, ...geometry });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#question').scrollIntoViewIfNeeded();
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const finalGeometry = await page.locator('.selected-summary').boundingBox();
+  assert(finalGeometry.y >= 0, `Final mobile comparison was clipped: ${JSON.stringify(finalGeometry)}`);
+  await page.screenshot({ path: '.playwright-cli/hph-mobile-conversation.png' });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator('#comparison-title').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '.playwright-cli/hph-desktop-comparison.png' });
+  await page.locator('.evidence-details summary').click();
+  await page.locator('#unknown-offers button').first().click();
+  await page.locator('#selected-authority').filter({ hasText: 'Switch blocked' }).waitFor();
+  assert((await page.locator('#differences').textContent()).includes('Not verified'), 'Unknown facts were concealed');
+  assert(runtimeErrors.length === 0, `Client runtime errors: ${runtimeErrors.join('; ')}`);
+  return { status: 'passed', checks: ['invitation keyboard focus/trap/Escape/Not now', 'readable choices preserve canonical essentials and equivalent eligibility', 'changed essential blocks real mismatch', 'minimum threshold', 'separate permission confirmation', 'Firestore persistence on refresh', 'stale two-tab409 preserves revoked permission and requires review', 'non-refundable explicit interest', 'selection persists without permission', 'real unconfigured Gemini503 failure', 'customer HTML is text', 'unknown condition switch block', 'mobile/desktop overflow and comparison visibility'], responsive, runtimeErrors, failures, screenshots: ['.playwright-cli/hph-mobile-booking.png', '.playwright-cli/hph-mobile-enrolment.png', '.playwright-cli/hph-mobile-conversation.png', '.playwright-cli/hph-desktop-comparison.png'] };
+  } finally { await context.close(); }
+}
