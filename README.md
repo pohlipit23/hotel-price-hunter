@@ -28,3 +28,7 @@ Run `npx wrangler secret put PITCH_USERNAME` and `npx wrangler secret put PITCH_
 Credentials are runtime secrets. Do not commit `.dev.vars` or real passwords. The server refuses access if credentials are not configured.
 
 Existing hosted demo: https://hotel-price-hunter-pitch.clear-olm-9015.chatgpt.site
+
+## Design alternatives
+
+Three standalone mobile-first design snapshots are available in [designs/](designs/README.md): Travel journal, Clean comparison, and Booking changes. The current hosted prototype uses Booking changes.
