@@ -96,6 +96,8 @@ Relevant primary documentation: [Cloud Run container contract](https://docs.clou
 
 ## Existing pitch and design references
 
+The proposed deployment to project `sincere-apex-511418-p0` is documented in [the staged deployment plan](docs/deployment-plan.md). `./scripts/prepare-cloud.ps1` is offline/dry-run by default and prints the reviewed commands. Provisioning, image upload, private deployment and final public access remain gated by explicit approval and verified trial/access prerequisites; the cloud environment template contains no credentials.
+
 The original Cloudflare pitch remains in `src/pitch.html`, `worker/index.js` and `designs/`. `npm run build` regenerates only the Worker HTML; `npm run dev:pitch` starts its separate local Worker. Its existing username/password configuration remains separate from the jury application. `npm run deploy:pitch` is the existing publication path and requires separate deployment authorisation.
 
 The [previous hosted pitch](https://hotel-price-hunter-pitch.clear-olm-9015.chatgpt.site) is not the new application. The [design snapshots](designs/README.md) preserve Travel journal, Clean comparison and Booking changes. See [the data contract](docs/data-contract.md), [decision examples](docs/decision-examples.md) and [integration evidence](docs/integration-feasibility.md) for current live integration limits.

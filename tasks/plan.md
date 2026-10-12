@@ -68,6 +68,8 @@ Proposed demonstration assumption: use one explicit currency and an agency minim
 
 ## Next concrete action
 
+Update, 13 October: the user supplied project number `977401667230`, verified as `sincere-apex-511418-p0` with billing enabled. Application APIs are disabled; existing local ADC lacks target access. `docs/deployment-plan.md` and `scripts/prepare-cloud.ps1` now provide a reviewed offline bundle for Singapore resources, an attached runtime identity, private deployment and up to three separately authorised fixture-only Gemini checks. The cloud preparation review passed 29/29 offline fixtures. Trial credit status and explicit execution approval remain outstanding; no provisioning or deployment occurred.
+
 The contract, decision core, Firestore-backed runtime and customer UI are implemented. The full local suite passed 53/53 with zero skips against the Firestore emulator; three independent reviews resolved their findings, and the mobile/browser flow passed. The final container builds and serves its liveness endpoint and UI in production mode; no deployed database/model reachability is claimed.
 
 Next: resolve the user's requested fresh-project/free-credit setup and obtain the intended GCP project ID, then verify live Vertex advice with anonymised facts. Current account metadata cannot prove trial eligibility. Establish authorised Altovo tenant/booking access before live retrieval/search probes; stateful prebook remains outside read-only scope. The first milestone's live acceptance stays open. Simulated switching, scheduled monitoring/notifications, private retrieval, deployment and submission artifacts remain later work. See `tasks/todo.md` and the three `docs/review-*.md` reports for exact coverage.

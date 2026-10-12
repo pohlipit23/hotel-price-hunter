@@ -78,6 +78,8 @@ Dependencies: Tasks 3-4; verified Vertex prerequisites from Task 2 for live vali
 
 ## Current evidence and limits
 
+13 October cloud checkpoint: project `977401667230` resolves to `sincere-apex-511418-p0`; billing enabled, trial credit status unverified. The cloud preparation bundle passed independent review with 29/29 offline fixtures. See `docs/cloud-prerequisites.md`, `docs/deployment-plan.md` and `docs/review-cloud.md`. No API enablement, resource/IAM creation, image upload, deployment or model call occurred. Execution awaits credit confirmation and explicit scoped approval.
+
 Final status: core, runtime and UI independent reviews approve the verified local scope; all original findings are resolved. Readable essentials preserve canonical values. The final Docker build and isolated production-mode liveness/HTML/JS/CSS smoke checks passed without a cloud database/model request. See `docs/review-ui.md` for final UI approval.
 
 The complete local suite passed **53/53 with zero skips** using the real Firestore emulator. Core, runtime and UI independent reviews resolved their original findings and approved their bounded scopes. Browser checks verified enrolment, refresh, separate permission confirmation, stale two-tab rejection, honest model-unavailable handling and selected comparison visibility at 320–1440px. See `docs/review-core.md`, `docs/review-runtime.md` `docs/review-ui.md` and `docs/ui-verification.md`; final UI review approved the readable essential choices and compact selected comparison.

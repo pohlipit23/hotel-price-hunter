@@ -2,6 +2,8 @@
 
 Recorded: 12 October 2026, 22:47–22:53 Asia/Kuala_Lumpur. This records the starting environment; later local setup may supersede it.
 
+**13 October cloud update:** user-supplied number `977401667230` now resolves to intended active project `sincere-apex-511418-p0`, with billing enabled and an open MYR billing account. Trial credit balance/expiry remain unverified. Application APIs are disabled, Firestore metadata returned `SERVICE_DISABLED`, and existing ADC has none of the tested target-project permissions while CLI access does. See [current cloud prerequisite evidence](cloud-prerequisites.md) for the dated checks; the 12 October account/project snapshot below is retained as historical evidence. No cloud mutation or live model call occurred in this update.
+
 Fixture-based implementation can proceed. Live Altovo retrieval/search, fulfilment verification and live Gemini remain incomplete. No production booking, search, final-check or model call was made in this audit. No cloud resources, billing or IAM were changed.
 
 ## Evidence and scope
