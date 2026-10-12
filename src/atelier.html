@@ -116,18 +116,19 @@ img{display:block;max-width:100%}
 .colophon{margin-top:28px;padding-top:16px;border-top:1px solid var(--rule);font-size:12px;color:var(--muted);line-height:1.7}
 .colophon a{color:var(--oxblood)}
 dialog{
-  border:0;padding:0;max-width:720px;width:calc(100% - 24px);background:var(--paper);color:var(--ink);
-  box-shadow:0 30px 80px #1a120c33;
+  position:fixed;inset:auto;top:4vh;bottom:auto;margin:0 auto;border:0;padding:0;
+  max-width:720px;width:calc(100% - 24px);max-height:92dvh;overflow:auto;
+  background:var(--paper);color:var(--ink);box-shadow:0 30px 80px #1a120c33;
 }
 dialog::backdrop{background:#1a120c66}
-.sheet{padding:22px 22px 26px}
+.sheet{padding:16px 20px 18px}
 .close{
   float:right;width:36px;height:36px;border:1px solid var(--ink);background:var(--cream);border-radius:0;
 }
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
 .mini{background:var(--cream);border:1px solid var(--rule);padding:12px}
 .mini.new{border-color:var(--oxblood)}
-.mini img{width:100%;height:92px;object-fit:cover;margin:8px 0}
+.mini img{width:100%;height:72px;object-fit:cover;margin:8px 0}
 .mini .label{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
 .mini.new .label{color:var(--oxblood)}
 .mini h3{font-family:Fraunces,Georgia,serif;font-size:18px}
@@ -139,6 +140,7 @@ table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px}
 th,td{text-align:left;padding:9px 6px;border-bottom:1px solid var(--rule)}
 th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .cta{width:100%;background:var(--oxblood);color:#fbf6ea;border:0;padding:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.cta:disabled{opacity:.45;cursor:not-allowed}
 .secondary{width:100%;border:0;background:none;color:var(--muted);padding:12px}
 .receipt{color:var(--sage);margin-top:10px}
 .footnote{font-size:12px;color:var(--muted);margin-top:10px}
@@ -146,7 +148,7 @@ th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted
   .spread{grid-template-columns:1.1fr .9fr;gap:36px}
   .story{grid-template-columns:280px 1fr;align-items:center;gap:28px}
   .plate img{height:240px}
-  dialog{top:50%;transform:translateY(-50%);border-radius:0}
+  dialog{border-radius:0}
 }
 @media(max-width:620px){
   .folio{flex-direction:column;gap:4px;text-align:left}
@@ -231,7 +233,7 @@ th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted
   <div class="sheet">
     <button class="close" aria-label="Close comparison">×</button>
     <p class="kicker">Your booking · before and after</p>
-    <h2 id="dialogtitle" class="headline" style="font-size:32px;margin-top:10px"></h2>
+    <h2 id="dialogtitle" class="headline" style="font-size:28px;margin-top:8px"></h2>
     <div class="pair" id="beforeafter"></div>
     <div class="bill"><span>Net saving<br><small>No cancellation penalty</small></span><strong id="netsaving"></strong></div>
     <table><thead><tr><th>What changes?</th><th>Booked</th><th>Proposed</th></tr></thead><tbody id="comparisonrows"></tbody></table>
@@ -246,7 +248,7 @@ const offers=[{hotel:'Seabreeze Hotel',room:'Deluxe twin',size:'28 m²',price:55
 const $=id=>document.getElementById(id);
 const changes=[{type:'Same hotel · same room',title:'Pay less. Change nothing.',detail:'Your hotel, room and terms stay exactly the same.',chips:'<span class="yes">Everything stays the same</span>',pull:'“Fifty dollars recovered. The room does not move.”'},{type:'Same hotel · a different room',title:'More room. Less money.',detail:'Move to a family room at Seabreeze. Keep breakfast and flexibility.',chips:'<span class="yes">+10 m²</span><span>Same hotel</span>',pull:'“A larger page in the same house.”'},{type:'A different hotel',title:'Move hotels. Save more.',detail:'Palm Garden has a larger room. The beach is a longer walk.',chips:'<span class="yes">+10 m²</span><span class="no">+5 min to the beach</span>',pull:'“The largest saving, set a little farther from the water.”'}];
 $('proposals').innerHTML=changes.map((c,i)=>'<article class="story"><div class="plate"><img src="'+offers[i].image+'" alt="Illustrative room photo"><span class="num">Plate '+['II','III','IV'][i]+'</span></div><div><p class="kicker">0'+(i+1)+' · '+c.type+'</p><h3>'+c.title+'</h3><p>'+c.detail+'</p><p class="pull">'+c.pull+'</p><div class="chips">'+c.chips+'</div><div class="story-foot"><div class="note">$600 → <strong>$'+offers[i].price+'</strong></div><button class="review" data-offer="'+i+'">Review this change</button></div></div></article>').join('');
-function compare(i){const o=offers[i];$('dialogtitle').textContent=changes[i].title;$('netsaving').textContent='$'+(600-o.price);$('beforeafter').innerHTML=[{label:'Currently booked',hotel:'Seabreeze Hotel',room:'Deluxe twin · 28 m²',price:600,image:offers[0].image},{label:'After this change',hotel:o.hotel,room:o.room+' · '+o.size,price:o.price,image:o.image}].map((p,j)=>'<div class="mini '+(j?'new':'')+'"><div class="label">'+p.label+'</div><img src="'+p.image+'" alt="Illustrative room photo"><h3>'+p.hotel+'</h3><p class="room">'+p.room+'</p><div class="price">$'+p.price+'</div></div>').join('');const rows=[['Room size','28 m²',o.size],['Beach walk','3 min',o.walk+' min'],['Breakfast','Included','Included'],['Guests','2 adults + 1 child','2 adults + 1 child'],['Cancel free until','9 Nov, 6 pm','9 Nov, 6 pm']];$('comparisonrows').innerHTML=rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('');$('receipt').textContent='';$('select').disabled=false;$('select').textContent='Approve this change · save $'+(600-o.price);$('select').onclick=()=>{$('receipt').textContent='Noted on the copy. Your original booking has not changed.';$('select').disabled=true};$('comparison').showModal()}
+function compare(i){const o=offers[i];$('dialogtitle').textContent=changes[i].title;$('netsaving').textContent='$'+(600-o.price);$('beforeafter').innerHTML=[{label:'Currently booked',hotel:'Seabreeze Hotel',room:'Deluxe twin · 28 m²',price:600,image:offers[0].image},{label:'After this change',hotel:o.hotel,room:o.room+' · '+o.size,price:o.price,image:o.image}].map((p,j)=>'<div class="mini '+(j?'new':'')+'"><div class="label">'+p.label+'</div><img src="'+p.image+'" alt="Illustrative room photo"><h3>'+p.hotel+'</h3><p class="room">'+p.room+'</p><div class="price">$'+p.price+'</div></div>').join('');const rows=[['Room size','28 m²',o.size],['Beach walk','3 min',o.walk+' min'],['Breakfast','Included','Included'],['Guests','2 adults + 1 child','2 adults + 1 child'],['Cancel free until','9 Nov, 6 pm','9 Nov, 6 pm']];$('comparisonrows').innerHTML=rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('');$('receipt').textContent='';$('select').disabled=false;$('select').textContent='Approve this change · save $'+(600-o.price);$('select').onclick=()=>{$('receipt').textContent='Noted on the copy. Your original booking has not changed.';$('select').disabled=true;$('receipt').scrollIntoView({block:'nearest'})};$('comparison').showModal()}
 document.querySelectorAll('[data-offer]').forEach(b=>b.onclick=()=>compare(Number(b.dataset.offer)));
 $('keep').onclick=()=>$('comparison').close();
 document.querySelector('.close').onclick=()=>$('comparison').close();
