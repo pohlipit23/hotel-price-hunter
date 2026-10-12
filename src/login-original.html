@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in · Hotel Price Hunter</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f6f8f6;color:#172b30;font-family:Arial,sans-serif;display:grid;min-height:100dvh;place-items:center;padding:24px}
+.hph-switch{position:fixed;top:0;left:0;right:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 18px;background:#eef3f0;border-bottom:1px solid #d5ded9;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.hph-switch .links{display:flex;gap:6px;flex-wrap:wrap}
+.hph-switch a{color:#647378;text-decoration:none;padding:6px 10px}
+.hph-switch a[aria-current=page]{color:#172b30;background:#fff;border-radius:6px}
+.box{max-width:400px;width:100%;background:white;border:1px solid #e1e8e5;border-radius:20px;padding:30px;margin-top:36px}
+small{color:#647378}
+h1{font-size:25px;letter-spacing:-.7px}
+p{line-height:1.5;color:#647378;font-size:14px}
+label{display:block;font-size:13px;font-weight:bold;margin:20px 0 7px}
+input{font:inherit;width:100%;padding:13px;border:1px solid #cbd7d0;border-radius:9px}
+button{font:inherit;width:100%;background:#116a55;color:white;padding:14px;border:0;border-radius:9px;margin-top:25px;font-weight:bold;cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #b59039;outline-offset:3px}
+.error{color:#a53122;background:#fff0ec;padding:10px;border-radius:8px}
+</style>
+</head>
+<body>
+<nav class="hph-switch" aria-label="Design versions">
+  <span>Compare designs</span>
+  <div class="links">
+    <a data-design-link="original" aria-current="page">Original</a>
+    <a data-design-link="atelier">Atelier</a>
+    <a data-design-link="radar">Radar</a>
+  </div>
+</nav>
+<main class="box">
+  <small>Hotel Price Hunter</small>
+  <h1>View your stay options.</h1>
+  <p>Enter the shared username and password to open the prototype.</p>
+  <!--LOGIN_ERROR-->
+  <form action="/login" method="post">
+    <input type="hidden" name="next" value="/">
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" required maxlength="100" autocapitalize="none">
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="200">
+    <button type="submit">Open prototype</button>
+  </form>
+</main>
+<script>
+(function(){
+  const file=/\.html$/i.test((location.pathname.split('/').pop()||''));
+  const hrefs=file?{original:'login-original.html',atelier:'login-atelier.html',radar:'login-radar.html'}:{original:'/',atelier:'/atelier',radar:'/radar'};
+  document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]});
+})();
+</script>
+</body>
+</html>

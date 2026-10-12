@@ -16,10 +16,22 @@ All hotels, rates and notification behaviour are illustrative. There are no live
 
 Requires Node.js 22 or later.
 
-1. Edit `src/pitch.html`.
+1. Edit files in `src/` (`pitch.html` is the original; `atelier.html` and `radar.html` are full restyles; `login-*.html` are the matching sign-in screens).
 2. Run `npm run build` to regenerate the Worker HTML.
 3. Copy `.dev.vars.example` to `.dev.vars` and set local credentials.
 4. Run `npx wrangler dev`.
+
+After sign-in, use the **Compare designs** bar or open:
+
+| Route | Version |
+| --- | --- |
+| `/` | Original (booking-changes) |
+| `/atelier` | Editorial travel-magazine restyle |
+| `/radar` | Retro-futurist price-hunting restyle |
+
+Unauthenticated visits to those routes show the matching login screen. The original layout is unchanged aside from the comparison bar.
+
+You can also open the HTML files in `src/` directly, or serve them with `python3 -m http.server`.
 
 ## Deploy to Cloudflare Workers
 
@@ -31,4 +43,4 @@ Existing hosted demo: https://hotel-price-hunter-pitch.clear-olm-9015.chatgpt.si
 
 ## Design alternatives
 
-Three standalone mobile-first design snapshots are available in [designs/](designs/README.md): Travel journal, Clean comparison, and Booking changes. The current hosted prototype uses Booking changes.
+Live restyles ship with the Worker (see routes above). Older standalone snapshots remain in [designs/](designs/README.md): Travel journal, Clean comparison, and Booking changes. The original hosted prototype still uses Booking changes.

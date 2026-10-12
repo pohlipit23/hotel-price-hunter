@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HUNTER MK-8 · Hotel Price Hunter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --desk:#efe4cc;
+  --shell:#fff8ea;
+  --navy:#1b2744;
+  --orange:#e54816;
+  --blue:#2157d6;
+  --mint:#0f8a62;
+  --grid:#e7dcc6;
+  --muted:#4e5a72;
+  --ink:#1b2744;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--desk);color:var(--ink);font:15px/1.45 Outfit,Helvetica,sans-serif}
+body{
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:28px 28px;
+  background-position:center top;
+}
+button,a{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+h1,h2,h3,p,ul{margin:0}
+.hph-switch{
+  position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  justify-content:space-between;padding:10px 18px;background:#efe4cce8;backdrop-filter:blur(8px);
+  border-bottom:3px solid var(--navy);font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-family:"IBM Plex Mono",ui-monospace,monospace;
+}
+.hph-switch .links{display:flex;gap:6px;flex-wrap:wrap}
+.hph-switch a{text-decoration:none;padding:6px 10px;border:2px solid transparent;color:var(--muted)}
+.hph-switch a[aria-current=page]{border-color:var(--navy);background:#fff;color:var(--navy);box-shadow:3px 3px 0 var(--navy)}
+.desk{max-width:1120px;margin:0 auto;padding:18px 16px 48px}
+.device{
+  background:var(--shell);border:4px solid var(--navy);border-radius:28px;
+  box-shadow:10px 10px 0 var(--navy), 0 30px 50px #1b27441a;
+  padding:14px 14px 22px;position:relative;
+}
+.screws{position:absolute;inset:10px 14px auto auto;display:flex;gap:8px}
+.screws i{width:10px;height:10px;border:2px solid var(--navy);border-radius:50%;display:block}
+.status{
+  display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;
+  background:var(--navy);color:#fff8ea;padding:10px 14px;border-radius:16px 16px 6px 6px;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.08em;
+}
+.live{display:flex;align-items:center;gap:8px;color:#9dffc2}
+.dot{width:8px;height:8px;border-radius:50%;background:#9dffc2}
+.hud{display:grid;gap:14px;margin:14px 0}
+.radar-card,.lock-card,.score-card{
+  border:3px solid var(--navy);border-radius:18px;background:#fffdf7;padding:14px;position:relative;
+}
+.radar-wrap{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center}
+.radar{
+  width:120px;height:120px;border-radius:50%;border:4px solid var(--navy);position:relative;
+  background:
+    repeating-radial-gradient(circle, transparent 0 14px, #2157d614 15px 16px),
+    conic-gradient(from 0deg, #e5481622, transparent 40%, #2157d61f);
+  overflow:hidden;
+}
+.sweep{position:absolute;inset:0;background:conic-gradient(#e5481688, transparent 70deg, transparent 360deg);transform-origin:center}
+.blip{position:absolute;width:8px;height:8px;background:var(--orange);border-radius:50%;top:28%;left:62%;box-shadow:0 0 0 4px #e5481633}
+.blip.b2{top:58%;left:38%;background:var(--blue)}
+.blip.b3{top:42%;left:48%;background:var(--mint)}
+.radar-copy h1{font-family:"Archivo Black",Impact,sans-serif;font-size:clamp(22px,4vw,32px);letter-spacing:-.03em;line-height:1}
+.radar-copy p{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;color:var(--muted);margin-top:8px}
+.lock-card{display:grid;grid-template-columns:72px 1fr auto;gap:12px;align-items:center}
+.lock-card img{width:72px;height:78px;object-fit:cover;border:3px solid var(--navy);border-radius:8px}
+.lock-card h2{font-size:18px}
+.lock-card p{font-size:12px;color:var(--muted)}
+.stamp{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10px;letter-spacing:.12em;border:2px dashed var(--mint);color:var(--mint);padding:5px 7px;transform:rotate(-6deg)}
+.paid{font-family:"Archivo Black",Impact,sans-serif;font-size:28px;line-height:1;text-align:right}
+.paid small{display:block;font-family:Outfit,sans-serif;font-size:10px;letter-spacing:.12em;color:var(--muted);margin-top:4px;font-weight:700}
+.score-card{display:flex;justify-content:space-between;align-items:center;background:#fff1e4;gap:10px}
+.score-card strong{font-family:"Archivo Black",Impact,sans-serif;font-size:clamp(28px,5vw,42px);color:var(--orange);letter-spacing:-.03em}
+.keep{font-size:12px;color:var(--muted);margin:8px 4px 0}
+.logbox{
+  border:3px solid var(--navy);border-radius:14px;background:#1b2744;color:#d7f5ff;padding:12px 14px;margin:4px 0 16px;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;
+}
+.logbox h2{color:#9dffc2;font-size:11px;letter-spacing:.16em;margin-bottom:8px;font-family:inherit}
+.logbox ul{list-style:none;padding:0}
+.logbox li{display:grid;grid-template-columns:54px 56px 1fr;gap:8px;padding:5px 0;border-top:1px dashed #3b4d78}
+.logbox .tag{color:#ffb089}
+.cursor{display:inline-block;width:8px;height:12px;background:#9dffc2;margin-left:4px;vertical-align:text-bottom}
+.missions h2{font-family:"Archivo Black",Impact,sans-serif;font-size:22px;margin-bottom:4px}
+.missions .sub{font-size:12px;color:var(--muted);margin-bottom:12px}
+.board{display:grid;gap:12px}
+.mission{
+  border:3px solid var(--navy);border-radius:16px;background:#fff;padding:0;overflow:hidden;
+  box-shadow:5px 5px 0 var(--navy);
+}
+.mission-top{display:grid;grid-template-columns:110px 1fr;min-height:118px}
+.mission img{width:100%;height:100%;object-fit:cover;border-right:3px solid var(--navy)}
+.mission .body{padding:12px}
+.rank{display:inline-block;background:var(--orange);color:#fff;font-size:10px;letter-spacing:.12em;padding:3px 7px;font-weight:800}
+.mission h3{font-size:18px;margin:6px 0 4px}
+.mission .detail{font-size:13px;color:var(--muted)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 12px}
+.chips span{border:2px solid var(--navy);padding:3px 7px;font-size:11px;font-weight:700}
+.chips .yes{background:#d9f6e8;border-color:var(--mint);color:var(--mint)}
+.chips .no{background:#ffe4c8;border-color:var(--orange);color:#9a3a12}
+.moneyrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:0 12px 12px}
+.saving{font-family:"Archivo Black",Impact,sans-serif;font-size:28px;color:var(--blue)}
+.saving small{display:block;font-family:Outfit,sans-serif;font-size:11px;color:var(--muted);font-weight:700}
+.review{
+  border:3px solid var(--navy);background:var(--blue);color:#fff;padding:10px 12px;font-weight:800;
+  box-shadow:3px 3px 0 var(--navy);border-radius:10px;
+}
+.review:hover{background:var(--orange)}
+.mission:first-child .review{background:var(--orange)}
+.pricenote{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;color:var(--muted);padding:0 12px 12px}
+.legend,.updates,footer{font-size:12px;color:var(--muted);margin-top:14px}
+footer{border-top:3px solid var(--navy);padding-top:12px;line-height:1.6}
+footer a{color:var(--blue)}
+dialog{
+  border:4px solid var(--navy);border-radius:20px;padding:0;max-width:640px;width:calc(100% - 20px);
+  background:#fff8ea;box-shadow:8px 8px 0 var(--navy);
+}
+dialog::backdrop{background:#1b274466}
+.sheet{padding:18px}
+.close{float:right;width:36px;height:36px;border:3px solid var(--navy);background:#fff;border-radius:8px;font-weight:800}
+.vs{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:stretch;margin:14px 0}
+.vs-mark{
+  font-family:"Archivo Black",Impact,sans-serif;align-self:center;background:var(--orange);color:#fff;
+  width:42px;height:42px;display:grid;place-items:center;border:3px solid var(--navy);border-radius:50%;
+}
+.mini{border:3px solid var(--navy);padding:10px;background:#fff;border-radius:12px}
+.mini.new{background:#eef3ff}
+.mini img{width:100%;height:84px;object-fit:cover;border:2px solid var(--navy);margin:8px 0}
+.mini .label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:var(--muted)}
+.mini.new .label{color:var(--blue)}
+.mini h3{font-size:15px}
+.mini .room{font-size:12px;color:var(--muted);min-height:34px}
+.mini .price{font-family:"Archivo Black",Impact,sans-serif;font-size:24px}
+.bill{display:flex;justify-content:space-between;align-items:center;background:#ffe3d2;border:3px solid var(--navy);padding:12px;margin-bottom:12px;border-radius:12px}
+.bill strong{font-family:"Archivo Black",Impact,sans-serif;font-size:30px;color:var(--orange)}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px}
+th,td{text-align:left;padding:8px 5px;border-bottom:2px solid #efe4cc}
+th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.cta{
+  width:100%;background:var(--orange);color:#fff;border:3px solid var(--navy);padding:13px;
+  font-weight:800;letter-spacing:.08em;text-transform:uppercase;box-shadow:4px 4px 0 var(--navy);border-radius:12px;
+}
+.secondary{width:100%;border:0;background:none;color:var(--muted);padding:12px;font-weight:700}
+.receipt{color:var(--mint);font-weight:700;margin-top:8px}
+.footnote{font-size:12px;color:var(--muted);margin-top:8px}
+@media(min-width:880px){
+  .hud{grid-template-columns:1.1fr .9fr;grid-template-areas:"radar score" "lock lock"}
+  .radar-card{grid-area:radar}
+  .score-card{grid-area:score}
+  .lock-card{grid-area:lock}
+  .board{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .mission-top{grid-template-columns:1fr}
+  .mission img{height:130px;border-right:0;border-bottom:3px solid var(--navy)}
+  dialog{top:50%;transform:translateY(-50%)}
+}
+@media(max-width:420px){
+  .radar-wrap,.lock-card,.mission-top{grid-template-columns:1fr}
+  .lock-card img,.mission img{width:100%;height:120px}
+  .vs{grid-template-columns:1fr; }
+  .vs-mark{justify-self:center}
+  .logbox li{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:no-preference){
+  .sweep{animation:spin 4s linear infinite}
+  .dot,.cursor{animation:blink 1s steps(2) infinite}
+  .blip{animation:ping 1.8s ease-out infinite}
+  .review,.cta{transition:transform .12s ease}
+  .review:hover,.cta:hover{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--navy)}
+  .review:active,.cta:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--navy)}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes blink{50%{opacity:0}}
+@keyframes ping{70%{box-shadow:0 0 0 12px transparent}}
+</style>
+</head>
+<body>
+<nav class="hph-switch" aria-label="Design versions">
+  <span>Channel select</span>
+  <div class="links">
+    <a data-design-link="original">Original</a>
+    <a data-design-link="atelier">Atelier</a>
+    <a data-design-link="radar" aria-current="page">Radar</a>
+  </div>
+</nav>
+<div class="desk">
+  <div class="device">
+    <div class="screws" aria-hidden="true"><i></i><i></i></div>
+    <div class="status">
+      <span>HUNTER MK-8 · UNIT TRIPLE-8</span>
+      <span class="live"><span class="dot"></span>LIVE SWEEP · 4 DAYS LEFT</span>
+    </div>
+    <div class="hud">
+      <section class="radar-card" aria-label="Price watching radar">
+        <div class="radar-wrap">
+          <div class="radar" aria-hidden="true"><div class="sweep"></div><span class="blip"></span><span class="blip b2"></span><span class="blip b3"></span></div>
+          <div class="radar-copy">
+            <p class="kicker" style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:var(--blue)">Already booked · still hunting</p>
+            <h1>Your Phuket stay.</h1>
+            <p>12–15 NOV · 3 NIGHTS · 2 ADULTS + 1 CHILD<br>CHECKS END 9 NOV, 18:00</p>
+          </div>
+        </div>
+      </section>
+      <section class="score-card" aria-label="Possible savings">
+        <div>
+          <p style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:800">Score on the board</p>
+          <p style="font-size:13px;color:var(--muted);margin-top:4px">Three locked targets · save $25–$90</p>
+        </div>
+        <strong>+$90</strong>
+      </section>
+      <section class="lock-card" aria-label="Your current booking">
+        <img src="https://cache.marriott.com/is/image/marriotts7prod/mc-hktmb-premier-pool-access-26214-48003%3AClassic-Hor?fit=constrain&wid=800" alt="Illustrative room photo">
+        <div>
+          <p style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:var(--blue)">Locked target</p>
+          <h2>Seabreeze Hotel</h2>
+          <p>Deluxe twin · 28 m² · breakfast · free cancel</p>
+        </div>
+        <div>
+          <div class="stamp">CONFIRMED</div>
+          <div class="paid">$600<small>FULL STAY · PAID</small></div>
+        </div>
+      </section>
+    </div>
+    <p class="keep">This stay stays locked unless you confirm a swap.</p>
+    <section class="logbox" aria-label="Rebook activity log">
+      <h2>MISSION LOG · 05 NOV 2026 <span class="cursor" aria-hidden="true"></span></h2>
+      <ul>
+        <li><span>07:12</span><span class="tag">WATCH</span><span>Opened refundable watch on Deluxe Twin · cap $600</span></li>
+        <li><span>09:40</span><span class="tag">SCAN</span><span>Reshop complete · same room still $600</span></li>
+        <li><span>11:02</span><span class="tag">FIND</span><span>Same room drop · $550 · save $50</span></li>
+        <li><span>13:18</span><span class="tag">SCAN</span><span>Family room, same hotel · $575</span></li>
+        <li><span>16:05</span><span class="tag">FIND</span><span>Palm Garden family room · $510 · save $90</span></li>
+      </ul>
+    </section>
+    <section class="missions">
+      <h2>Three possible changes</h2>
+      <p class="sub">Targets fit your party and keep the same cancel deadline. USD, taxes in.</p>
+      <div class="board" id="proposals"></div>
+    </section>
+    <p class="updates">We’ll notify you of new savings until free cancellation ends. <b>You approve every change.</b></p>
+    <footer>Illustrative offers · Snapshot: 5 Nov 2026 · No live checks or transactions.<br>Illustrative hotel photography: <a href="https://www.marriott.com/en-us/hotels/hktmb-phuket-marriott-resort-and-spa-merlin-beach/rooms/premium-rooms/">Marriott</a>, <a href="https://www.thavornpalmbeach.com/gallery-rooms-suites-photo-phuket">Thavorn Palm Beach</a>, <a href="https://www.chanalai.com/en/romantica-resort-gallery.html">Chanalai</a>. Photos do not depict the fictional offers.</footer>
+  </div>
+</div>
+<dialog id="comparison">
+  <div class="sheet">
+    <button class="close" aria-label="Close comparison">×</button>
+    <p style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:var(--blue)">Swap preview · before vs after</p>
+    <h2 id="dialogtitle" style="font-family:'Archivo Black',Impact,sans-serif;font-size:28px;margin:8px 0 0"></h2>
+    <div class="vs" id="beforeafter"></div>
+    <div class="bill"><span>Net saving<br><small>No cancellation penalty</small></span><strong id="netsaving"></strong></div>
+    <table><thead><tr><th>What changes?</th><th>Booked</th><th>Proposed</th></tr></thead><tbody id="comparisonrows"></tbody></table>
+    <button class="cta" id="select">Approve this change</button>
+    <button class="secondary" id="keep">Leave my booking as it is</button>
+    <p class="receipt" id="receipt" role="status"></p>
+    <p class="footnote">Demo only. No booking will be made or cancelled.</p>
+  </div>
+</dialog>
+<script>
+const offers=[{hotel:'Seabreeze Hotel',room:'Deluxe twin',size:'28 m²',price:550,walk:3,badge:'Same stay. Lower price.',image:'https://cache.marriott.com/is/image/marriotts7prod/mc-hktmb-premier-pool-access-26214-48003%3AClassic-Hor?fit=constrain&wid=1200',change:'Nothing about your stay changes.',explain:'Same hotel, room type, breakfast and cancellation deadline. The price is $50 lower.',intro:'Keep the exact hotel and room you booked. Pay less.',benefit:'Same room & hotel'},{hotel:'Seabreeze Hotel',room:'Family room',size:'38 m²',price:575,walk:3,badge:'More space at your hotel',image:'https://www.thavornpalmbeach.com/upload/gallery-files/1754651277.2564.jpg',change:'10 m² more space. $25 less.',explain:'Move to a larger family room. Keep your hotel, bedding, breakfast and cancellation deadline.',intro:'Stay at your hotel with a different room that fits the same guests.',benefit:'Larger room'},{hotel:'Palm Garden Resort',room:'Family room',size:'38 m²',price:510,walk:8,badge:'Biggest saving · different hotel',image:'https://www.chanalai.com/_novaimg/4616061-1421509_0_0_2200_1636_1000_744.jpg',change:'A larger room, but farther from the beach.',explain:'Save $90 and gain 10 m². The beach is an 8-minute walk instead of 3. Breakfast and cancellation flexibility stay the same.',intro:'A different hotel. See the saving and the compromises side by side.',benefit:'Save $90'}];
+const $=id=>document.getElementById(id);
+const changes=[{type:'Same hotel · same room',title:'Pay less. Change nothing.',detail:'Your hotel, room and terms stay exactly the same.',chips:'<span class="yes">Everything stays the same</span>'},{type:'Same hotel · a different room',title:'More room. Less money.',detail:'Move to a family room at Seabreeze. Keep breakfast and flexibility.',chips:'<span class="yes">+10 m²</span><span>Same hotel</span>'},{type:'A different hotel',title:'Move hotels. Save more.',detail:'Palm Garden has a larger room. The beach is a longer walk.',chips:'<span class="yes">+10 m²</span><span class="no">+5 min to the beach</span>'}];
+$('proposals').innerHTML=changes.map((c,i)=>'<article class="mission"><div class="mission-top"><img src="'+offers[i].image+'" alt="Illustrative room photo"><div class="body"><span class="rank">TARGET 0'+(i+1)+'</span><p style="font-size:11px;margin-top:8px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;color:var(--blue)">'+c.type+'</p><h3>'+c.title+'</h3><p class="detail">'+c.detail+'</p></div></div><div class="chips">'+c.chips+'</div><div class="moneyrow"><div class="saving">+$'+(600-offers[i].price)+'<small>back in your pocket</small></div><button class="review" data-offer="'+i+'">Review this change ↗</button></div><p class="pricenote">Your total: $600 → $'+offers[i].price+'</p></article>').join('');
+function compare(i){const o=offers[i];$('dialogtitle').textContent=changes[i].title;$('netsaving').textContent='$'+(600-o.price);$('beforeafter').innerHTML=[{label:'Currently booked',hotel:'Seabreeze Hotel',room:'Deluxe twin · 28 m²',price:600,image:offers[0].image},{label:'After this change',hotel:o.hotel,room:o.room+' · '+o.size,price:o.price,image:o.image}].map((p,j)=>'<div class="mini '+(j?'new':'')+'"><div class="label">'+p.label+'</div><img src="'+p.image+'" alt="Illustrative room photo"><h3>'+p.hotel+'</h3><p class="room">'+p.room+'</p><div class="price">$'+p.price+'</div></div>').join('<div class="vs-mark" aria-hidden="true">VS</div>');
+  const rows=[['Room size','28 m²',o.size],['Beach walk','3 min',o.walk+' min'],['Breakfast','Included','Included'],['Guests','2 adults + 1 child','2 adults + 1 child'],['Cancel free until','9 Nov, 6 pm','9 Nov, 6 pm']];$('comparisonrows').innerHTML=rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('');$('receipt').textContent='';$('select').disabled=false;$('select').textContent='Approve this change · save $'+(600-o.price);$('select').onclick=()=>{$('receipt').textContent='SWAP QUEUED in the demo. Your original booking has not changed.';$('select').disabled=true};$('comparison').showModal()}
+document.querySelectorAll('[data-offer]').forEach(b=>b.onclick=()=>compare(Number(b.dataset.offer)));
+$('keep').onclick=()=>$('comparison').close();
+document.querySelector('.close').onclick=()=>$('comparison').close();
+(function(){
+  const file=/\.html$/i.test((location.pathname.split('/').pop()||''));
+  const hrefs=file?{original:'pitch.html',atelier:'atelier.html',radar:'radar.html'}:{original:'/',atelier:'/atelier',radar:'/radar'};
+  document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]});
+})();
+</script>
+</body>
+</html>

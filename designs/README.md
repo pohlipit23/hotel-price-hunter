@@ -9,3 +9,11 @@ Open any HTML file locally, or serve this directory using `python3 -m http.serve
 | [Booking changes](booking-changes.html) | A confirmed reservation branches into three possible changes, with before-and-after review. Current direction. |
 
 These are standalone design snapshots. They contain illustrative data and no live integrations, transactions or password gate. Authentication for the hosted prototype is implemented in `worker/index.js`.
+
+Two later full-app restyles live in the Worker, with the original still at `/`:
+
+| Route | Direction |
+| --- | --- |
+| `/` | Original booking-changes prototype |
+| `/atelier` | Light editorial travel magazine |
+| `/radar` | Light retro-futurist price-hunting handheld |
