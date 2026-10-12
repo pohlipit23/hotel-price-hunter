@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sign in · Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;background:#f6f5f0;color:#1c1c1a;font:16px/1.45 "Instrument Sans",Helvetica,sans-serif;padding:56px 16px 24px}
+button,a,input{font:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #b7a16a;outline-offset:3px}
+.hph-switch{position:fixed;top:0;left:0;right:0;padding:6px 12px;background:#f6f5f0;border-bottom:1px solid #e0dcd2}
+.hph-switch .links{display:flex;gap:4px;overflow-x:auto}
+.hph-switch a{flex:none;min-height:40px;display:grid;place-items:center;padding:0 12px;text-decoration:none;color:#5c5a54;font-size:13px}
+.hph-switch a[aria-current=page]{color:#1c1c1a;background:#fff;border-radius:999px}
+main{max-width:400px;margin:24px auto 0}
+.kicker{font-size:13px;color:#5c5a54;font-weight:600}
+h1{font-family:"Instrument Serif",Georgia,serif;font-size:34px;font-weight:400;letter-spacing:-.03em;margin:8px 0 10px}
+p{color:#5c5a54;margin:0 0 20px}
+label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
+input{width:100%;min-height:48px;padding:12px;border:1px solid #e0dcd2;border-radius:12px;background:#fff}
+button[type=submit]{width:100%;min-height:52px;margin-top:20px;background:#1b5c43;color:#f6f5f0;border:0;border-radius:12px;font-weight:600}
+.error{color:#1b5c43;background:#e4efe8;padding:12px;border-radius:10px}
+</style>
+</head>
+<body>
+<nav class="hph-switch" aria-label="Design versions"><div class="links"><a data-design-link="original">Original</a><a data-design-link="keep">Keep</a><a data-design-link="ledger" aria-current="page">Ledger</a><a data-design-link="rooms">Rooms</a></div></nav>
+<main>
+  <p class="kicker">Hotel Price Hunter</p>
+  <h1>See what you could keep.</h1>
+  <p>Enter the shared username and password to open the stay ledger.</p>
+  <!--LOGIN_ERROR-->
+  <form action="/login" method="post">
+    <input type="hidden" name="next" value="/ledger">
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" required maxlength="100" autocapitalize="none">
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="200">
+    <button type="submit">Continue</button>
+  </form>
+</main>
+<script>
+(function(){const file=/\.html$/i.test((location.pathname.split('/').pop()||''));const hrefs=file?{original:'login-original.html',keep:'login-keep.html',ledger:'login-ledger.html',rooms:'login-rooms.html'}:{original:'/',keep:'/keep',ledger:'/ledger',rooms:'/rooms'};document.querySelectorAll('[data-design-link]').forEach(a=>{a.href=hrefs[a.dataset.designLink]})})();
+</script>
+</body>
+</html>

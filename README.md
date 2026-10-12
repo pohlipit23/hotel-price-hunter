@@ -16,7 +16,7 @@ All hotels, rates and notification behaviour are illustrative. There are no live
 
 Requires Node.js 22 or later.
 
-1. Edit files in `src/` (`pitch.html` is the original; `atelier.html` and `radar.html` are full restyles; `login-*.html` are the matching sign-in screens).
+1. Edit files in `src/` (`pitch.html` is the original; `keep.html`, `ledger.html` and `rooms.html` are full restyles; `login-*.html` are the matching sign-in screens).
 2. Run `npm run build` to regenerate the Worker HTML.
 3. Copy `.dev.vars.example` to `.dev.vars` and set local credentials.
 4. Run `npx wrangler dev`.
@@ -26,8 +26,9 @@ After sign-in, use the **Compare designs** bar or open:
 | Route | Version |
 | --- | --- |
 | `/` | Original (booking-changes) |
-| `/atelier` | Editorial travel-magazine restyle |
-| `/radar` | Retro-futurist price-hunting restyle |
+| `/keep` | Quiet concierge — photo of the held stay, list of changes, thumb bar |
+| `/ledger` | Savings-first ledger of today’s checks and finds |
+| `/rooms` | One-thumb swipe across the three rooms |
 
 Unauthenticated visits to those routes show the matching login screen. The original layout is unchanged aside from the comparison bar.
 
