@@ -1,0 +1,92 @@
+/* Selected direction B. booking.css retains shared form and conversation layout. */
+:root {
+  color-scheme: light;
+  --bg:#f7faff; --surface:#fff; --ink:#162d46; --muted:#52657b;
+  --purple:#195ac5; --tint:#e9f1ff; --lime:#e1efdf; --line:#d9e3ee;
+  --error:#9a3434; --focus:#9a620e;
+}
+body{font-family:'Segoe UI',Arial,sans-serif}
+header{max-width:1120px;padding:16px 20px}
+main{max-width:1120px;padding:8px 20px 32px}
+.brand{font-size:14px;letter-spacing:-.4px}.brand span{background:var(--purple);color:#fff;border-radius:6px}
+.demo-tag{font-size:10px;letter-spacing:.5px}
+.triphead{margin-bottom:20px}.triphead>.eyebrow{color:var(--purple)}
+h1{font:750 32px/1.08 'Segoe UI',Arial,sans-serif;letter-spacing:-1.3px;margin:10px 0 14px}
+#stay{font-size:12px;line-height:1.6}
+.reference{position:static}.ticket{border-radius:8px;overflow:hidden}
+.stay-gallery{display:grid;grid-template-columns:1.45fr 1fr;gap:4px;position:relative;width:100%;height:192px;padding:0;border:0;background:white;text-align:left}
+.stay-gallery>span:not(.photo-tag):not(.gallery-count){min-width:0;height:100%}
+.stay-photo{display:block;width:100%;height:100%;overflow:hidden;background:#e9ece8}
+.stay-photo svg{display:block;width:100%;height:100%}
+.photo-tag{position:absolute;top:12px;left:12px;padding:4px 7px;background:#fffdf4f2;color:#41483e;font-size:10px;border-radius:3px}
+.gallery-count{position:absolute;bottom:12px;left:12px;padding:8px 10px;background:#fffdf4;color:var(--ink);font-size:11px;font-weight:650;border-radius:4px}
+.photo-unavailable{display:grid;place-items:center;padding:16px;min-height:120px;font-size:12px;color:var(--muted)}
+.ticket-caption{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px}
+.ticketmain{padding:0;min-width:0}.ticket h2{font-size:17px;line-height:1.2;letter-spacing:-.5px;margin:6px 0}
+.ticketmain .eyebrow{font-size:9px;letter-spacing:1px}.ticketmain>.muted{font-size:12px}
+.ticketstub{display:block;padding:0;text-align:right;border:0;flex-shrink:0}
+.ticketstub strong{display:block;font-size:21px;letter-spacing:-.7px}.ticketstub span{display:block;font-size:10px;max-width:100px}
+.booking-details{border-top:1px solid var(--line);padding:0 16px 12px;font-size:12px}
+.booking-details:not([open]){padding-bottom:0}.booking-details summary{padding:10px 0;min-height:44px}
+.booking-details .chips{margin:4px 0 12px}
+.featured-saving{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;background:var(--tint);border-left:3px solid var(--purple);border-radius:4px;margin-top:12px;padding:16px}
+.featured-saving .eyebrow{font-size:9px;letter-spacing:.8px;color:var(--purple)}
+.featured-saving .primary,.featured-saving>p{grid-column:1/-1}.featured-saving>p{text-align:center;font-size:11px}
+.featured-saving .primary{margin:0}.featured-saving.empty{display:block}.featured-saving.empty h2{font-size:18px;margin-bottom:8px}.featured-saving.empty p{text-align:left}
+.price-drop{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;margin:10px 0}
+.price-drop s,.previous-price{text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:#946859;color:var(--muted)}
+.price-drop s{font-size:16px}.price-drop strong{font-size:25px;line-height:1.2;letter-spacing:-.7px}
+.price-drop small{font-size:10px;color:var(--muted);flex-basis:100%;margin-top:-4px}
+.featured-saving .price-drop{margin-bottom:0}.featured-saving .price-drop strong{font-size:32px}.featured-saving .price-drop s{font-size:21px}
+.saving{font-size:inherit;letter-spacing:0;line-height:1.2;text-align:right}
+.saving strong{display:inline-block;background:#d8ecd8;color:#205936;font-size:23px;letter-spacing:-.7px;border-radius:5px;padding:6px 8px;font-weight:750}
+.saving small{font-size:10px;color:#205936;margin-top:5px;letter-spacing:0}
+.saving.unavailable strong{font-size:13px;background:#f7eedb;color:#805c21;letter-spacing:0}.saving.unavailable small{color:#805c21}
+.keep{font-size:11px;margin:12px 0 0}
+.changes{margin-top:28px}.changehead{align-items:center;margin-bottom:12px}.changehead .eyebrow{color:var(--muted);font-size:9px;margin-bottom:6px}
+.changehead h2{font-size:23px;line-height:1.15;letter-spacing:-.8px}.changehead>span{font-size:11px}
+.changes>p.small{font-size:11px}
+.fork{padding:0;border:0;display:grid;gap:12px;margin-top:16px}
+.proposal{display:grid;grid-template-columns:104px minmax(0,1fr);padding:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:white}
+.proposal:last-child{border-bottom:1px solid var(--line)}.proposal:before,.proposal:after{display:none}
+.proposal-photo{position:relative;height:auto;min-height:160px}.proposal-photo svg{position:absolute;inset:0}
+.proposal-body{padding:14px;min-width:0}.type{font-size:9px;line-height:1.4;letter-spacing:.6px;color:var(--muted)}
+.proposal h3{font:700 17px/1.2 'Segoe UI',Arial,sans-serif;letter-spacing:-.4px;margin:6px 0 8px}
+.detail{font-size:12px;line-height:1.5}.proposal .chips{margin:12px 0;gap:4px}.chip{font-size:10px;border-radius:3px;padding:3px 5px;background:#f4f7fc;color:var(--muted);border-color:var(--line)}
+.chip.positive{background:#e9f4e8;color:#285837;border-color:#d4e6d0}.chip.tradeoff{background:#f7eedb;color:#805c21;border-color:#eadab6}
+.moneyrow{gap:8px;margin:12px 0}.moneyrow .saving{text-align:left}.review{font-size:12px;border-radius:4px;padding:10px;min-height:44px;white-space:normal}
+.proposal:first-child .review{background:var(--purple);color:white;border-color:var(--purple)}
+.proposal .small,.checked{font-size:10px;line-height:1.5}.checked{margin-top:6px}
+.monitor-card{display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:16px;margin-top:20px}
+.monitor-card h3{font-size:15px;line-height:1.3;margin:6px 0}.monitor-card p+p,#enrolment-summary{font-size:12px;line-height:1.5;margin:0}.monitor-card .review{min-width:100px}
+.interest{font-size:13px}.evidence-details{font-size:12px}
+.primary{border-radius:4px;font-size:14px}.primary:hover{background:#164ca7}.panel{border-radius:8px;padding:20px}
+.panel h2{font:700 26px/1.2 'Segoe UI',Arial,sans-serif;letter-spacing:-.8px}
+.comparison-photo{height:190px;max-width:620px;overflow:hidden;border-radius:6px;margin:16px 0 8px}
+.mini{border-radius:6px}.mini.new{border-color:var(--purple)}.bill{background:var(--lime);color:#205936;border-radius:6px}
+.message,.confirmation{border-radius:6px}.selected-summary{padding-top:8px}
+dialog{background:var(--surface)}dialog h2{font:700 30px/1.15 'Segoe UI',Arial,sans-serif}.invitation-glyph{background:var(--tint);color:var(--purple)}
+.close{min-width:44px;min-height:44px;flex-shrink:0}.photo-tabs{margin:16px 0}
+#photo-gallery h2{font-size:26px;margin:8px 0 0}#photo-gallery .between{align-items:start;gap:12px;margin-bottom:20px}
+#gallery-image{aspect-ratio:3/2;border-radius:8px;overflow:hidden}#gallery-caption{font-size:13px;margin:12px 0}
+#photo-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:16px 0}
+#photo-tabs button{padding:3px;border:2px solid transparent;background:transparent;color:var(--ink);border-radius:4px;min-width:0}
+#photo-tabs button[aria-pressed=true]{border-color:var(--purple)}#photo-tabs .stay-photo{height:48px}#photo-tabs button>span:last-child{display:block;font-size:10px;margin-top:5px}
+body:has(dialog[open]){overflow:hidden}footer p+p{margin-top:6px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.skip:not(:focus){clip-path:inset(50%);width:1px;height:1px;overflow:hidden;padding:0}
+.empty-offers{padding:20px;background:var(--surface);border:1px solid var(--line);border-radius:6px;font-size:14px}
+@media(min-width:800px){
+  header{padding:24px 32px}main{padding:12px 32px 40px}.workspace{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px}
+  .reference{position:static}h1{font-size:38px}.stay-gallery{height:272px}.changes{margin-top:8px}
+  .proposal{grid-template-columns:132px minmax(0,1fr)}.proposal-body{padding:16px}.proposal h3{font-size:19px}
+  .panel{padding:28px}.featured-saving .price-drop strong{font-size:36px}
+}
+@media(max-width:359px){
+  header{padding:16px}main{padding:8px 16px 28px}.brand{font-size:12px}.demo-tag{font-size:9px}h1{font-size:28px}
+  .stay-gallery{height:176px}.ticket-caption{padding:12px;gap:8px}.ticket h2{font-size:15px}.ticketmain>.muted{font-size:11px}.ticketstub strong{font-size:19px}.ticketstub span{max-width:82px}
+  .featured-saving{padding:12px;gap:12px}.featured-saving .price-drop strong{font-size:29px}.featured-saving .price-drop s{font-size:18px}
+  .proposal{grid-template-columns:76px minmax(0,1fr)}.proposal-body{padding:12px}.proposal h3{font-size:15px}
+  .saving strong{font-size:20px}.review{font-size:11px;padding:8px}.monitor-card{display:block}.monitor-card .review{margin-top:12px;width:100%}
+  #photo-gallery{padding:16px}#photo-gallery h2{font-size:23px}.price-drop strong{font-size:22px}
+}

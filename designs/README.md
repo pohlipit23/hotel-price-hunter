@@ -6,13 +6,13 @@ Open any HTML file locally, or serve this directory using `python3 -m http.serve
 | --- | --- |
 | [Travel journal](travel-journal.html) | Cream and terracotta, wide hotel photography; three offers stacked on mobile. |
 | [Clean comparison](clean-comparison.html) | White and blue, compact image-and-price comparisons. |
-| [Booking changes](booking-changes.html) | A confirmed reservation branches into three possible changes, with before-and-after review. Current direction. |
+| [Booking changes](booking-changes.html) | Earlier direction: a confirmed reservation branches into three possible changes, with before-and-after review. |
 
 These are standalone design snapshots. They contain illustrative data and no live integrations, transactions or password gate. Authentication for the hosted prototype is implemented in `worker/index.js`.
 
 ## Mobile-first light directions
 
-Open [the side-by-side comparison](light-directions.html), [A · The stay journal](savings-mint.html), or [B · The city escape](savings-blue.html). Both combine inspirational hotel and room imagery with savings-first hierarchy and offer comparison. They do not replace the current application.
+Open [the side-by-side comparison](light-directions.html), [A · The stay journal](savings-mint.html), or [B · The city escape](savings-blue.html). Both combine inspirational hotel and room imagery with savings-first hierarchy and offer comparison. **B was selected and integrated into the application on 13 October 2026.** These files remain standalone visual references; the application uses server data, persisted preferences, selection and advice endpoints.
 
 - **A:** warm ivory, forest green, serif headings, a large booked-room photograph with hotel inset, one featured photographic offer and two compact alternatives.
 - **B:** fresh white and blue, bold sans-serif headings, a hotel-and-room collage, and three compact image-led comparison rows.

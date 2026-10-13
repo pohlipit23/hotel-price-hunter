@@ -1,5 +1,7 @@
 /* Public jury UI. Server facts and authority remain the source of truth. */
 'use strict';
+import { featuredOffer, refundPresentation, isPriceDrop } from './pricing.js';
+import { stayPhoto, offerPhotoIndex, setupStayGallery } from './stay-photos.js';
 const $ = id => document.getElementById(id);
 const labels = { boardBasis: 'Meals', bedType: 'Bed type', nonSmoking: 'Non-smoking', accessible: 'Accessible room', view: 'View', roomSizeSqm: 'Room size (m²)' };
 const requirementChoices = {
@@ -63,7 +65,9 @@ function setStatus(text, error = false) {
 }
 function renderBooking() {
   const b = state.booking;
-  $('stay').textContent = `${b.stay.checkin} → ${b.stay.checkout} · ${b.occupancy.adults} adults${b.occupancy.childAges.length ? ` + ${b.occupancy.childAges.length} child (age ${b.occupancy.childAges.join(', ')})` : ''}${b.occupancy.infantAges.length ? ` + ${b.occupancy.infantAges.length} infant` : ''}`;
+  const date = value => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`));
+  const nights = Math.round((Date.parse(b.stay.checkout) - Date.parse(b.stay.checkin)) / 86400000);
+  $('stay').textContent = `${date(b.stay.checkin)} – ${date(b.stay.checkout)} ${b.stay.checkout.slice(0, 4)} · ${nights} nights · ${b.occupancy.adults} adults${b.occupancy.childAges.length ? ` + ${b.occupancy.childAges.length} child (age ${b.occupancy.childAges.join(', ')})` : ''}${b.occupancy.infantAges.length ? ` + ${b.occupancy.infantAges.length} infant` : ''}`;
   $('hotel').textContent = b.hotel.name;
   $('room').textContent = `${b.room.name} · ${valueText(b.room.conditions.roomSizeSqm)} m²`;
   $('booking-total').textContent = money(b.retail.totalMinor, b.retail.currency);
@@ -73,6 +77,40 @@ function renderBooking() {
   const p = state.preferences;
   $('enrolment-summary').textContent = state.enrolled ? `Preferences saved · ${valueText(p.notificationFrequency)} updates · minimum refund ${money(p.minimumSavingMinor)}. ${p.automaticEquivalentSwitches ? 'Equivalent-only permission confirmed.' : 'Automatic switches are off.'}` : 'Set your essentials and decide how we should look for savings.';
   $('edit-preferences').textContent = state.enrolled ? 'Edit my price watch ↗' : 'Set up price watch ↗';
+}
+function priceDrop(offer) {
+  const prices = node('div', undefined, 'price-drop');
+  if (isPriceDrop(state.booking, offer)) {
+    prices.append(node('span', 'Stay total reduced from ', 'sr-only'), node('s', money(state.booking.retail.totalMinor, state.booking.retail.currency)), node('span', ' to ', 'sr-only'));
+  }
+  prices.append(node('strong', money(offer.retail.totalMinor, offer.retail.currency)), node('small', 'stay total · taxes included'));
+  return prices;
+}
+function refundBadge(offer) {
+  const refund = refundPresentation(offer);
+  const box = node('div', undefined, `saving${refund.available ? '' : ' unavailable'}`);
+  const amount = node('strong', refund.available ? `−${money(refund.minor, offer.refundQuote?.currency)}` : 'Unavailable');
+  if (refund.available) amount.setAttribute('aria-label', `${money(refund.minor, offer.refundQuote?.currency)} net refund to you`);
+  box.append(amount, node('small', refund.caption));
+  return box;
+}
+function renderFeatured() {
+  const section = $('featured-saving');
+  const offer = featuredOffer(state.offers);
+  section.hidden = false;
+  section.replaceChildren();
+  if (!offer) {
+    section.classList.add('empty');
+    section.append(node('h2', 'Your stay is still yours.'), node('p', 'No verified equivalent refund matches your requirements. Compare the other offers or adjust your price watch.', 'small muted'));
+    return;
+  }
+  section.classList.remove('empty');
+  const summary = node('div');
+  summary.append(node('p', 'Same stay, lower rate', 'eyebrow'), priceDrop(offer));
+  const button = node('button', 'Review price drop →', 'primary');
+  button.type = 'button'; button.id = 'review-featured';
+  button.addEventListener('click', () => select(offer, button));
+  section.append(summary, refundBadge(offer), button, node('p', `${state.currency.code} · Same room, meals & flexibility.`, 'small muted'));
 }
 function differenceEntries(offer) {
   const b = state.booking;
@@ -96,31 +134,34 @@ function authorityText(offer) {
 function offerCard(offer, index) {
   const article = node('article', undefined, 'proposal');
   article.dataset.offer = offer.offerId;
+  const photo = stayPhoto(offerPhotoIndex(offer));
+  photo.classList.add('proposal-photo');
+  const body = node('div', undefined, 'proposal-body');
   const copy = categoryCopy[offer.category] || ['Offer', 'Compare this offer.'];
   const nonRefundable = offer.cancellation.refundability === 'non-refundable';
-  article.append(node('p', `${String(index + 1).padStart(2, '0')} · ${copy[0]}`, 'type'), node('h3', nonRefundable ? 'Lower price. Less flexibility.' : copy[1]));
-  const differences = differenceEntries(offer);
-  const description = offer.equivalence === 'verified' && differences.length === 1 ? 'Same hotel, verified equivalent room, guests and cancellation deadline.' : `${offer.hotel.name} · ${offer.room.name}. ${differences.filter(([key]) => key !== 'Cancellation').map(([key, value]) => `${key}: ${value}`).join('. ')}`;
-  article.append(node('p', description, 'detail'));
+  body.append(node('p', `${String(index + 1).padStart(2, '0')} · ${copy[0]}`, 'type'), node('h3', nonRefundable ? 'Lower price. Less flexibility.' : copy[1]));
+  body.append(node('p', `${offer.hotel.name} · ${offer.room.name} · ${valueText(offer.room.conditions.roomSizeSqm)} m²`, 'detail'), priceDrop(offer));
   const chips = node('div', undefined, 'chips');
   chips.append(node('span', valueText(offer.cancellation.refundability), `chip ${nonRefundable ? 'tradeoff' : 'positive'}`));
   if (offer.decision?.action === 'blocked') chips.append(node('span', 'Required facts unresolved · switch blocked', 'chip tradeoff'));
   if (offer.category !== 'equivalent' || nonRefundable) chips.append(node('span', 'Separate approval required', 'chip'));
-  article.append(chips);
+  body.append(chips);
   const row = node('div', undefined, 'moneyrow');
-  const saving = node('div', money(offer.decision?.netSavingMinor ?? offer.refundQuote?.netSavingMinor, offer.refundQuote?.currency), 'saving');
-  saving.append(node('small', 'potential refund after fees'));
-  const button = node('button', 'Compare this offer ↗', 'review');
+  const button = node('button', 'Compare →', 'review');
   button.type = 'button';
   button.setAttribute('aria-label', `Compare ${offer.hotel.name}, ${offer.room.name}, ${valueText(offer.cancellation.refundability)}`);
   button.addEventListener('click', () => select(offer, button));
-  row.append(saving, button);
-  article.append(row, node('p', `Full stay: ${money(state.booking.retail.totalMinor)} → ${money(offer.retail.totalMinor, offer.retail.currency)} · taxes and fees included`, 'pricenote'), node('p', deadline(offer), 'small muted'), node('p', `Simulated check: ${instant(offer.checkedAt, 'UTC')}`, 'checked'));
+  row.append(refundBadge(offer), button);
+  body.append(row, node('p', deadline(offer), 'small muted'), node('p', `Simulated check: ${instant(offer.checkedAt, 'UTC')}`, 'checked'));
+  article.append(photo, body);
   return article;
 }
 function renderOffers() {
   const defaults = ['equivalent', 'different-room', 'different-hotel'].map(category => state.offers.find(o => o.category === category && o.cancellation.refundability === 'refundable' && o.equivalence !== 'unknown')) .filter(Boolean);
   $('offers').replaceChildren(...defaults.map(offerCard));
+  $('offer-count').textContent = `${defaults.length} offers`;
+  $('offer-currency').textContent = state.currency.code;
+  if (!defaults.length) $('offers').append(node('p', 'No refundable offers to compare right now. Your booking is unchanged.', 'empty-offers'));
   $('extra-offers').replaceChildren(...state.offers.filter(o => o.cancellation.refundability === 'non-refundable').map(offerCard));
   $('extra-offers').hidden = !$('non-refundable-interest').checked;
   $('unknown-offers').replaceChildren(...state.offers.filter(o => o.equivalence === 'unknown' || Object.values(o.room.conditions).some(v => v === null)).map(offerCard));
@@ -130,6 +171,7 @@ function renderState(next) {
   $('content').hidden = false;
   renderBooking();
   renderOffers();
+  renderFeatured();
   if (state.selectedOfferId) {
     selectedOffer = state.offers.find(o => o.offerId === state.selectedOfferId);
     if (selectedOffer) renderComparison();
@@ -237,13 +279,17 @@ function renderComparison() {
   const b = state.booking;
   $('comparison').hidden = false;
   $('comparison-title').textContent = `${o.hotel.name} · ${o.room.name}`;
+  $('comparison-photo').replaceChildren(stayPhoto(offerPhotoIndex(o)));
   $('selected-identity').textContent = `Selected: ${o.hotel.name} · ${o.room.name}`;
   for (const [prefix, record] of [['before', b], ['after', o]]) {
     $(`${prefix}-hotel`).textContent = record.hotel.name;
     $(`${prefix}-room`).textContent = record.room.name;
     $(`${prefix}-price`).textContent = money(record.retail.totalMinor, record.retail.currency);
   }
-  $('comparison-saving').textContent = money(o.decision?.netSavingMinor ?? o.refundQuote?.netSavingMinor, o.refundQuote?.currency);
+  $('before-price').classList.toggle('previous-price', isPriceDrop(b, o));
+  const refund = refundPresentation(o);
+  $('comparison-saving').textContent = refund.available ? `−${money(refund.minor, o.refundQuote?.currency)}` : 'Unavailable';
+  $('comparison-saving').setAttribute('aria-label', refund.available ? `${money(refund.minor, o.refundQuote?.currency)} net refund to you` : refund.caption);
   $('selected-terms').textContent = deadline(o);
   $('selected-authority').textContent = authorityText(o);
   const details = differenceEntries(o);
@@ -323,4 +369,5 @@ async function bootstrap() {
     const retry = node('button', 'Try again', 'review'); retry.type = 'button'; retry.addEventListener('click', () => { retry.remove(); bootstrap(); }); $('page-status').append(' ', retry);
   }
 }
+setupStayGallery();
 bootstrap();
