@@ -125,3 +125,18 @@ dialog{color:var(--ink);background:var(--surface);border:0;border-radius:24px 24
 dialog h2{font-family:var(--heading);font-weight:400}body[data-direction=blue] dialog h2{font-weight:700}
 @media(min-width:800px){dialog{top:50%;bottom:auto;transform:translateY(-50%);border-radius:16px;max-height:90dvh}}
 @media(max-width:359px){dialog{padding:16px}.comparison-grid{gap:8px}.comparison-grid>div{padding:8px}}
+/* Put the direction of the money in the main label, never in fine print. */
+.featured{grid-template-columns:minmax(0,1fr)}
+.featured h2{font-size:27px;line-height:1.2;margin:8px 0}
+.featured h2 strong{font-weight:700;color:#21613f;white-space:nowrap}
+.featured-copy{font-size:13px;color:var(--ink)}
+.price-path{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--muted)}
+.price-path b{color:var(--ink);font-weight:650}
+.offer-prices{display:block;font-size:11px;color:var(--muted);margin-top:8px}
+.offer-bottom{display:flex;flex-direction:column;align-items:stretch;gap:10px}
+.offer-end{order:-1;text-align:left;white-space:normal}
+.offer-end strong{font:700 21px/1.2 'Segoe UI',Arial,sans-serif;color:#21613f;letter-spacing:-.5px}
+.offer-end>span{justify-content:flex-start;font-size:11px;color:var(--muted);margin-top:3px}
+.offer-flag{display:flex;flex-wrap:wrap;gap:4px 10px}.offer-flag>span{margin:0}
+body[data-direction=blue] .featured h2{font-size:25px}
+@media(max-width:359px){.featured h2,body[data-direction=blue] .featured h2{font-size:23px}.offer-end strong{font-size:19px}}
