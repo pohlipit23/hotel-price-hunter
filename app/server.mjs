@@ -146,7 +146,7 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
     response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
     try {
       const url = new URL(request.url, 'http://local.invalid');
-      if (request.method === 'GET' && url.pathname === '/healthz') return sendJson(response, 200, { status: 'ok', storage: storage.mode, model: advisor.status });
+      if (request.method === 'GET' && ['/health', '/healthz'].includes(url.pathname)) return sendJson(response, 200, { status: 'ok', storage: storage.mode, model: advisor.status });
       if (request.method === 'GET' && url.pathname === '/api/bootstrap') {
         if ([...url.searchParams.keys()].some(key => key !== 'scenario') || (url.searchParams.get('scenario') || 'jury-booking') !== 'jury-booking') fail(404, 'SCENARIO_NOT_FOUND', 'Only the anonymised jury scenario is available.');
         if (request.headers['sec-fetch-site'] === 'cross-site') fail(403, 'ORIGIN_REJECTED', 'Load the application directly.');
@@ -198,7 +198,7 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
           return { ...value, selectedOfferId: offer.offerId, adviceWindowStartedAt: reset ? now().toISOString() : value.adviceWindowStartedAt, adviceRequestCount: count + 1 };
         }));
         const decision = decisions(current).find(item => item.offerId === offer.offerId).decision;
-        const advice = await advisor.advise({ booking: fixture.booking, offer, preferences: current.preferences, decision, message: body.message });
+        const advice = await advisor.advise({ booking: fixture.booking, offer, preferences: current.preferences, decision, currency: fixture.currency, message: body.message });
         return sendJson(response, 200, { advice, decision, offerId: offer.offerId, source: 'vertex-gemini', permissionsChanged: false });
       }
       if (url.pathname.startsWith('/api/')) fail(404, 'ROUTE_NOT_FOUND', 'This public route is unavailable.');

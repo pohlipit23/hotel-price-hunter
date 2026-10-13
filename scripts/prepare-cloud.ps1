@@ -44,7 +44,7 @@ function Show-TaskCommand([string]$Program, [string[]]$CommandArguments) {
 }
 function Invoke-TaskCommand([string]$Program, [string[]]$CommandArguments, [switch]$Capture) {
     Show-TaskCommand $Program $CommandArguments | Write-Host
-    $taskResult = & $Program @CommandArguments 2>&1
+    $taskResult = & $Program @CommandArguments 2>$null
     $taskExit = $LASTEXITCODE
     if ($taskExit -ne 0) { throw "$Program failed in $Phase (exit $taskExit). Remote output is suppressed; stop and resolve the specific prerequisite without broadening permissions." }
     if ($Capture) { return ($taskResult | Out-String).Trim() }

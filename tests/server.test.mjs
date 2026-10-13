@@ -225,3 +225,29 @@ test('Firestore HTTP integration: a new server restores enrolment and comparison
   assert.equal(finalState.preferences.automaticEquivalentSwitches, false);
   assert.equal(finalState.permissionRecord, null);
 });
+
+test('health aliases return identical liveness without storage or model side effects', async t => {
+  let storageCalls = 0;
+  let modelCalls = 0;
+  const storage = {
+    mode: 'test-memory',
+    get() { storageCalls++; throw new Error('Health must not read storage.'); },
+    create() { storageCalls++; throw new Error('Health must not create storage.'); },
+    update() { storageCalls++; throw new Error('Health must not update storage.'); },
+  };
+  const advisor = { available: false, status: 'test-injected', advise() { modelCalls++; throw new Error('Health must not call a model.'); } };
+  const server = createAppServer({ storage, advisor, fixture });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const expected = { status: 'ok', storage: 'test-memory', model: 'test-injected' };
+  for (const path of ['/health', '/healthz']) {
+    const response = await fetch(`${origin}${path}`);
+    assert.equal(response.status, 200, `${path} liveness must be reachable`);
+    assert.deepEqual(await response.json(), expected);
+    assert.equal(response.headers.get('set-cookie'), null);
+  }
+  assert.equal(storageCalls, 0);
+  assert.equal(modelCalls, 0);
+});

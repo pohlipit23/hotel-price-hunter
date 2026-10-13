@@ -115,3 +115,7 @@ This removes only this service's `allUsers` invoker binding; it does not delete 
 ## Preparation verification
 
 PowerShell AST parsing passed with no diagnostics. Offline previews of Plan, Provision, BuildImage, DeployPrivate, Publish and DisablePublic passed while mock `gcloud` and `docker` functions would throw if invoked. A missing-approval Execute attempt was rejected before external commands. These checks validate local preparation/guards, not API enablement, IAM creation, registry upload, cloud deployment or live model access.
+
+### Cloud Run liveness path
+
+Use `GET /health` for deployed liveness verification. The first deployment showed GFE HTML404 at `/healthz` while authenticated root/static assets succeeded; Google's known issues explain reserved URL paths ending in `z`. The narrow reviewed repair aliases `/health` to the same side-effect-free handler and retains `/healthz` for local compatibility. This changes no storage/model authority, origin/CSRF rule or supplier flow. Release its new image under `milestone-20261013-health`, preserving the original immutable image. [Cloud Run reserved paths](https://docs.cloud.google.com/run/docs/known-issues)
