@@ -88,7 +88,7 @@ Final status: core, runtime and UI independent reviews approve the verified loca
 
 The complete local suite passed **53/53 with zero skips** using the real Firestore emulator. Core, runtime and UI independent reviews resolved their original findings and approved their bounded scopes. Browser checks verified enrolment, refresh, separate permission confirmation, stale two-tab rejection, honest model-unavailable handling and selected comparison visibility at 320–1440px. See `docs/review-core.md`, `docs/review-runtime.md` `docs/review-ui.md` and `docs/ui-verification.md`; final UI review approved the readable essential choices and compact selected comparison.
 
-Task 2's live Altovo probes remain unchecked. The supplied GCP project is deployed privately and live model response evidence is recorded above; visible billing metadata still cannot establish trial eligibility or remaining credits. No real Altovo transaction, public repository publication, notification delivery or submission occurred. The later simulated switching and operational/submission milestones in `tasks/plan.md` remain future work.
+Task 2's live Altovo probes remain unchecked. The supplied GCP project is deployed privately and live model response evidence is recorded above; visible billing metadata still cannot establish trial eligibility or remaining credits. No real Altovo transaction, public repository publication, notification delivery or submission occurred. Subsequent simulated-switch implementation is recorded below; operational/submission milestones remain future work.
 
 ## Next milestone: persisted simulated equivalent switch
 
@@ -104,24 +104,28 @@ Verification: coordinator trace against agreed plan §5–7 and current determin
 
 ### Task 7: Persist an atomic simulation and recovery history
 
-- [ ] The fictional equivalent offer executes only with current separately confirmed standing permission, valid complete revalidation and sufficient net refund; missing authority or changed material facts do not execute.
-- [ ] Replacement and fulfilment precede original cancellation; verified cancellation secures the saving and leaves refund pending; only a separate simulated settlement marks refund completed.
-- [ ] Same intent/stage retries and simultaneous requests cannot duplicate the replacement, cancellation, refund or history events. Mismatched intent payload fails; stale booking/preference requests cannot restore authority.
-- [ ] State survives a new client/server instance through the real Firestore emulator. Active booking/version and monitoring deadline rebase atomically; old offers cannot be used against the new baseline.
-- [ ] Unknown cancellation creates an unresolved agency exception without secured saving or completed refund; recovery observes the recorded intent before progressing. Ordinary monitoring stops without suppressing required recovery.
+- [x] The fictional equivalent offer executes only with current separately confirmed standing permission, valid complete revalidation and sufficient net refund; missing authority or changed material facts do not execute.
+- [x] Replacement and fulfilment precede original cancellation; verified cancellation secures the saving and leaves refund pending; only a separate simulated settlement marks refund completed.
+- [x] Same intent/stage retries and simultaneous requests cannot duplicate the replacement, cancellation, refund or history events. Mismatched intent payload fails; stale booking/preference requests cannot restore authority.
+- [x] State survives a new client/server instance through the real Firestore emulator. Active booking/version and monitoring deadline rebase atomically; old offers cannot be used against the new baseline.
+- [x] Unknown cancellation creates an unresolved agency exception without secured saving or completed refund; recovery observes the recorded intent before progressing. Ordinary monitoring stops without suppressing required recovery.
 
 Verification: meaningful unit/HTTP concurrency and authority tests plus real emulator persistence tests; no paid model or live supplier requests. Owned backend files are `app/domain/simulation.mjs`, `app/server.mjs`, and relevant tests; reuse `app/storage.mjs` transactions unless a demonstrated need requires an additive change. Depends on Task 6.
 
 ### Task 8: Show the simulated switch and refund history
 
-- [ ] A clearly labelled advance-demo control uses the backend transition process and displays persisted progress, distinct saving/refund states and the active booking.
-- [ ] Refresh, repeated clicks and stale tabs preserve the operation and cannot skip stages or execute another switch. Customer wording identifies simulated settlement throughout.
-- [ ] The existing responsive layout, comparison and separate permission confirmation remain usable; errors restore current state and permit safe retry of the same intent.
+- [x] A clearly labelled advance-demo control uses the backend transition process and displays persisted progress, distinct saving/refund states and the active booking.
+- [x] Refresh, repeated clicks and stale tabs preserve the operation and cannot skip stages or execute another switch. Customer wording identifies simulated settlement throughout.
+- [x] The existing responsive layout, comparison and separate permission confirmation remain usable; errors restore current state and permit safe retry of the same intent.
 
 Verification: real browser at mobile/desktop sizes, keyboard use, refresh at refund-pending, final settlement, no-authority block and cancellation-unknown outcome; capture safe screenshots/evidence. Depends on Task 6 for parallel UI work, Task 7 for integrated acceptance.
 
 ### Checkpoint: simulated saving path
 
-- [ ] Full local suite passes against Firestore emulator with no unreported skips; build/container checks appropriate to the changed app pass.
-- [ ] Fresh independent code/contract review resolves actionable findings; browser evidence verifies the implemented scope.
-- [ ] Documentation reports exact simulated coverage and remaining private-deployment/browser, supplier, non-refundable execution, scheduled-job, notification and submission gates.
+- [x] Full local suite passes against Firestore emulator with no unreported skips; build/container checks appropriate to the changed app pass.
+- [x] Fresh independent code/contract review resolves actionable findings; browser evidence verifies the implemented scope.
+- [x] Documentation reports exact simulated coverage and remaining private-deployment/browser, supplier, non-refundable execution, scheduled-job, notification and submission gates.
+
+Verified local simulation checkpoint, 14 October: **87/87** emulator-enabled tests with zero skips, **15** new browser checks with zero runtime errors, both existing browser regressions unchanged and passing, nine new responsive rows at 320/390/1440px, and a successful local Docker build/emulator smoke. Independent backend and UI reviews approved their bounded scopes after fixing monitoring continuation, stale changed-price refund, and fresh-session/competing-journey pending commands. See `docs/simulation-verification.md`, `docs/review-simulation.md` and `docs/review-simulation-ui.md`. The isolated QA browser/container were cleaned up; the local app remains available for review. The pre-existing emulator and unrelated `designs/brand/` are preserved.
+
+This completes the first local simulated equivalent-switch slice, including changed-material stopping and unknown-cancellation reconciliation. Offer-specific approval/non-refundable execution and a separate protected agency view remain next capabilities. No scheduler, email, private supplier retrieval, deployment, public access or additional live inference occurred; the existing cloud revision still contains the earlier customer path. Its deployed browser/live-Gemini checkpoint above remains unchecked rather than being closed by local or API-only proof.

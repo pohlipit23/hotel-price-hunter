@@ -1,0 +1,40 @@
+# Independent UI and security review: persisted simulated switch
+
+Reviewed 14 October 2026 against fixed base `40f77e5a6a2a2d41b76f631d5e2396d974bb1a9d` and `docs/simulated-switch-contract.md`. Scope: the full `app/public/booking.html`, `booking.css`, `booking.js` diff, new `simulation.js`, the final City Escape stylesheet cascade, and the public state/operation identity seams needed to assess UI recovery. This reviewer changed no application source, Git state, QA harness or browser session. Independent checks and isolated mutation copies are under ignored `.local/review-simulation-ui/`.
+
+## Verdict
+
+**Source APPROVED for the bounded fictional slice. No remaining actionable P1/P2 finding in the inspected final implementation.** The separate QA worker's bounded browser evidence also passes, as verified by inspection of its saved result below. This reviewer did not execute that browser run. Build, deployment, public access, live Gemini calls and real supplier effects remain separate gates.
+
+## Resolved findings
+
+- **P2: an old visitor's pending command survived a new bootstrap session.** At `app/public/simulation.js:51`, a stored unresolved start/advance initially remained active when bootstrap returned a new unenrolled visitor with no operation. The UI enabled “Retry the same demo step”, hid the permission control and submitted the old key/operation under the fresh session, producing 422/404 before recovering. The final implementation discards a start with a different server-issued scenario key and an advance whose operation is absent/different. Independent checks now prove the old command is cleared, the start button is disabled, permission guidance is visible and no request is sent. A same-key unresolved start still retains its exact original payload when preferences change.
+- **P2: a losing pending start overrode another tab's authoritative journey.** At `app/public/simulation.js:53`, an unresolved start for one scenario initially remained after another tab won a different scenario. Its same-visitor intent key still matched the scenario intent, so the selector showed the losing scenario over the winning operation's stage and enabled an unnecessary retry. The final implementation compares the authoritative operation ID to `sim-${pending.key}` before rendering the pending selector. The independent same-visitor fixture now shows the winning material-change journey and its disabled safety-stop control. Public scenario intents remain available for the original active offer; only `nextIntent` is suppressed by its reserved booking version.
+
+The server prevented duplicate execution in both cases; these were misleading recovery controls and mixed journey presentation, not demonstrated duplicate supplier effects.
+
+## Independent verification
+
+`node .local/review-simulation-ui/check.mjs` passes seven focused DOM checks: new-session pending start; new-session pending advance; exact unresolved same-key start payload after preference change; same-operation/same-revision retry retention; reconciliation after a newer same-operation revision; replacement of an old advance by a different authoritative operation; and replacement of a losing pending start by the winning scenario.
+
+`node .local/review-simulation-ui/run-mutation.mjs` inverts the session-key comparison in an isolated module copy. The independent fresh-session assertion fails as intended. The isolated copy is restored afterward; no application file is mutated. Evidence: `.local/review-simulation-ui/mutation.log`. These are targeted UI logic checks, not browser or Firestore transaction evidence.
+
+Independently inspected QA screenshots `.playwright-cli/simulation-material-change-320.png` and `.playwright-cli/simulation-refund-completed-desktop.png`: the changed room fact and USD 50 proposed refund fit at 320px; completed replacement totals use USD 540 as the active baseline, USD 600 as original history, and USD 55 as the separate simulated saving/refund. Both preserve the City Escape appearance and legible stage history. The final stylesheet warning color is `#9a620e` on white, contrast 5.088:1; the earlier base stylesheet token is overridden and is not a rendered contrast finding.
+
+## Separate browser evidence inspected
+
+Inspected `.playwright-cli/simulation-verification-result.json` after the QA worker's final run. The saved artifact reports `status: "passed"`, 15 acceptance checks, `runtimeErrors: []`, `liveModelRequests: 0`, five screenshots and nine responsive measurements across 320px, 390px and 1440px. Every recorded document width equals its viewport width.
+
+The recorded checks cover explicit permission boundaries; keyboard initiation and six happy-path advances; pending versus completed refund on reload; current replacement baseline and retirement of old comparisons; changed price/room safety stop; unknown cancellation and same-intent recovery; committed-but-lost start/advance replay; refresh reconciliation; concurrent tabs, double-click and stale-tab replay; revoked permission; fresh-visitor pending start/advance removal without a write; and a competing scenario whose winning committed operation replaces the losing uncertain retry. The coordinator reported that the last case used a held losing request, another tab's successful start, an aborted rejected response and reload. This execution detail was reported by the coordinator; the result and scenario outcome were independently read from the saved artifact.
+
+These browser results are evidence produced by the separate QA worker, not an independently repeated browser run. They supplement the independent source, DOM, mutation and screenshot inspection above. The QA worker is preparing the separate narrative `docs/simulation-verification.md`; the inspected JSON artifact is the current evidence reference.
+
+## Source coverage and limits
+
+The UI presents current `simulation.operation`, never a historical replay receipt, as its stage source. Same-command uncertain HTTP responses retain their body/key across reload; current operation/revision reconciliation cannot advance twice. A 409 refreshes current state; failed refresh disables further advances. Busy state prevents another simulation command and scenario changes while a request is active. Completed, failed and changed-material journeys have no advance control; unknown cancellation has an explicitly labelled observation/recovery control.
+
+The initial USD 55 is labelled proposed refund after fees. Saving becomes secured only when the server says cancellation is verified; refund remains pending until the separate completed receipt. Unknown cancellation preserves the original booking and states no secured saving or started refund. Material revalidation shows the changed room condition and recalculated USD 50, with no replacement/cancellation claim. Active replacement rendering retires old offers and comparisons and uses the current USD 540 booking for monitoring. Enrolment, comparison selection and advice do not create execution authority.
+
+Scenario/advance/history controls use native select, button and details elements, labelled controls, status messages and the shared focus styles. API and history text is inserted through text nodes; untrusted values are not rendered as HTML. Pending commands contain fictional IDs/versions and derived intent hashes, no session cookie or credentials. The existing server continues to check session ownership, origin, CSRF and strict schemas; the UI is not relied upon as an authorization boundary.
+
+This reviewer did not take over the QA browser, repeat the full Firestore suite, call a model, deploy, access a cloud resource or run external OCR. The inspected browser artifact proves its recorded scenarios and widths; it does not establish comprehensive accessibility auditing or every possible viewport. Build and deployment verification are separate. The private deployment still contains the older source; local approval does not establish deployment or live Gemini validation. All receipts and effects remain fictional.

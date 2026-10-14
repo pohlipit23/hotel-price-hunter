@@ -59,4 +59,4 @@ The checked-in browser harnesses create fresh isolated contexts for their cases,
 playwright-cli -s=hph-simulation-qa close
 ```
 
-Stop only the application command session created for this verification. Preserve the pre-existing emulator container and unrelated local processes; do not use global browser or container cleanup commands. Do not redeploy, modify cloud resources, or run the private-cloud model retest script as part of these local checks.
+When leaving the application available for user review, retain its command session and report that session identity. Otherwise stop only the application command session created for this verification. Preserve the pre-existing emulator container and unrelated local processes; do not use global browser or container cleanup commands. Do not redeploy, modify cloud resources, or run the private-cloud model retest script as part of these local checks.
