@@ -121,6 +121,21 @@ node scripts/setup-agency-review.mjs
 
 To run local review, use the documented emulator/demo environment, set `AGENCY_AUTH_MODE=local-review`, `BIND_HOST=127.0.0.1` and `APP_ORIGIN=http://localhost:8080`, then start the app. Retrieve the passphrase manually from ignored `.local/agency-review.json` and enter it at `/agency`; never paste it into tracked files, command arguments or reports. Operator sessions last 30 minutes and invalidate on restart/reauthentication. The case APIs are read-only, paginated and strip all visitor/session credentials and internal mutation identifiers. A real verified production identity provider and deployment remain separate gates.
 
+## Price watch and notification previews
+
+Use **Watch for better rates** to save checks-and-alerts consent and the first simulated check in one action; **Stop watching** revokes it. This grants no switch permission and changes no booking, enrolment or saved stay requirements. Updates are collapsed by default and explicitly preview-only: none are emailed. Daily/weekly/offers-only record policy uses existing saved preferences; manual refund progress and agency-attention records remain evidence-bound.
+
+`POST /api/price-watch` accepts `{bookingVersion,watchVersion,enabled}` plus the bootstrap's server-issued `Idempotency-Key` and normal session/origin/CSRF guards. `GET /api/notifications?limit=20` returns own-session safe previews (limit 1–50). New watch rates have separately generated simulated identities, actual check times and bound money; they are read-only observations and are not passed into the frozen demo approval flow. The original operation clock and approved source snapshots remain unchanged. Unsupported replacement sources record a failed check rather than claiming no saving exists.
+
+With the explicit demo/emulator environment from the local setup, run the packaged local worker once or leave its bounded 60-second polling loop active:
+
+```powershell
+node scripts/run-price-watch.mjs --once
+node scripts/run-price-watch.mjs --loop
+```
+
+Daily intent records, consent/version/deadline checks and immutable previews make restart/retry safe. CLI default/production/cloud or missing emulator configuration is rejected. This is a local worker; no Google Cloud Scheduler/Tasks resource, live provider, email delivery or agent automation is created. See [price-watch-contract.md](docs/price-watch-contract.md), [verification](docs/price-watch-verification.md) and [independent review](docs/review-price-watch.md). Final local verification passed 142 emulator tests with zero skips, 17 new browser groups and the preserved customer/agency regressions; actual host and packaged-worker checks passed.
+
 Relevant primary documentation: [Cloud Run container contract](https://docs.cloud.google.com/run/docs/container-contract), [Firestore server library](https://docs.cloud.google.com/firestore/native/docs/create-database-server-client-library), [Firestore emulator](https://docs.cloud.google.com/firestore/native/docs/emulator), [Google emulator Docker image](https://github.com/GoogleCloudPlatform/cloud-sdk-docker), [Google Gen AI SDK](https://github.com/googleapis/js-genai), and [structured model output](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/multimodal/control-generated-output).
 
 ## Existing pitch and design references

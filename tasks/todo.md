@@ -190,3 +190,34 @@ Verification: actual emulator index/persistence and rollback coverage; default/u
 - [x] Exact boundaries documented in `docs/flexibility-agency-verification.md` and `docs/review-flexibility-agency.md`: local fixture operator authentication only, no deployed identity, no historical index completeness, actual expiry/injected proof failures remain domain/API evidence, intercepted browser 401 is UI-clearing proof only.
 
 Next: scheduled checks and retry-safe monitoring, notification records/previews, production operator identity and separately approved deployment/submission. No real supplier action, email, source push, cloud change, public access or additional Vertex generation occurred.
+
+## Price watch and preview records — 15 October
+
+The user approved the next slice: one `Watch for better rates` opt-in, recorded daily checks and notification previews. Exact seam and limits are in `docs/price-watch-contract.md`. Existing price comparisons, permissions, operations, frozen demo clock and operator boundaries remain separate.
+
+### Task 13: Explicit watch and recorded daily checks
+
+- [x] One versioned/idempotent opt-in saves consent plus the first pure simulated check atomically. Stopping remains possible at capacity; exact replay cannot restore revoked consent or apply an old visitor's action.
+- [x] Actual-time fresh simulated identities and bound quote snapshots record offers found, verified no saving, failed or skipped outcomes. Deadline/session/day/quote expiry and consent/baseline/preference races are rechecked at commit.
+- [x] A private discovery index and bounded shared local worker run daily checks without granting standing authority or starting/advancing switches. Unsupported promoted source is failed, not a false successful no-saving search.
+- [x] Local `--once` process restarts replay the saved check without duplicate previews or changed operation facts; packaged CLI and retained `--loop` process operate only with explicit demo/emulator configuration.
+
+Verification: actual Firestore cross-server/index/consent/outbox concurrency; delayed discovery/preparation and expiry tests; guarded local driver and executable fixture modes. Cloud scheduler/resources and live suppliers are not implemented by these laboratory checks.
+
+### Task 14: Truthful notification previews
+
+- [x] Deduplicated prepared, weekly-pending and offers-only-suppressed records preserve check and saved manual-operation evidence, distinguishing pending/completed refunds and unknown cancellation from authority/proof stops.
+- [x] Preview cap/alias guards preserve all dedupe identities; full preview storage cannot block cancellation reconciliation or refund recovery. Nine due digest groups have distinct aliases within one transaction.
+- [x] Read-only own-session updates exclude private watch/index/credential/rate identifiers, recipients and executable checked-rate actions. Saved new check facts do not replace frozen approval offers.
+- [x] The original postcard remains simple, with one opt-in/stop row and collapsed Updates; current versus previous booking labels and Kuala Lumpur timestamps avoid internal version numbers. No real email is sent.
+
+Verification: currency-minor-unit/large-integer tests, notification policy and stage/replay tests, actual browser keyboard/reload/lost-response/identity/suppression and visual geometry. Existing postcard and operator regression harnesses are preserved.
+
+### Checkpoint: local watch and updates
+
+- [x] Final emulator-enabled suite passed **142/142**, zero failures/skips. Fresh copied-source review passed **14/14** and detected **11/11** targeted regressions; clock, privacy, event-truth and digest capacity issues are resolved.
+- [x] Price-watch browser acceptance passed **17 groups/15** geometry rows. Original postcard **11** groups and flexibility/agency **5** groups remained green, for **58** total geometry checks with zero browser runtime/model errors.
+- [x] Root and QA inspected clean customer captures; actual host `--once`/restart and at least three local loop passes were observed. Final Docker app and packaged worker smoke passed without mounts, published ports or credentials.
+- [x] Local app session `57889`, local worker session `84005` and existing emulator remain for review. Owned QA browsers/container are cleaned; access credentials remain ignored and never enter evidence.
+
+See `docs/price-watch-verification.md` and `docs/review-price-watch.md` for exact source/run boundaries. This completes checks and previews locally; production scheduler/task provisioning, delivery provider/real email, production operator identity, fresh supplier access and separately approved deployment/submission remain. No Vertex generation, real transaction, email, source push or cloud access change occurred.
