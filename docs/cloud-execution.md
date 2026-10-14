@@ -2,6 +2,8 @@
 
 Executed **13 October 2026, Asia/Kuala_Lumpur**. Target project only: `sincere-apex-511418-p0` / `977401667230`.
 
+**Current verification update, 14 October:** private revision `hotel-price-hunter-00006-hfm` passed cloud persistence/security checks and both newly authorised failed-case live retests. Full responses passed root and fresh independent semantic review, recorded in `docs/review-live-advice.md` and `docs/private-cloud-verification.md`. Original three-call evidence remains unchanged; separate exhausted ledgers are 3/3 and 2/2, five total. Generation is stopped. This does not authorise public access or establish trial credit balance. Operator stages and their zero-generation statements below describe their original execution times.
+
 The human's **13 October “go ahead with the approved plan”** followed the coordinator's explicit bundled request to confirm usable trial credits and approve Singapore resources, image upload, private deployment and at most three anonymised Gemini verification questions. Credit confirmation is **user-confirmation evidence only**: remaining balance, trial classification and expiry were not independently observed. Billing was rechecked enabled before each stage. No billing link or paid upgrade was performed.
 
 The operator used normal-host Windows PowerShell and the reviewed deployment script. Image source was isolated checkpoint `9c98ede278dc5a93c9563e729dbe7df8d594bfb6` at `C:/Users/pohli/.codex/worktrees/private-cloud-deployment/hotel-price-hunter`. Current checkout UI changes and unknown-owner `tests/presentation.test.mjs` were preserved, not run/staged/deleted, and absent from the image snapshot. No source Git push occurred.
