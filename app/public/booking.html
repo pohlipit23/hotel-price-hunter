@@ -1,66 +1,43 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f7faff">
-  <title>Your booking · Hotel Price Hunter</title>
-  <link rel="stylesheet" href="/booking.css">
-  <link rel="stylesheet" href="/city-escape.css">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#FFF9F2">
+  <title>Your booking · RoomDrop</title>
+  <link rel="icon" type="image/png" href="/assets/roomdrop-key-icon.png"><link rel="stylesheet" href="/booking.css">
   <script src="/booking.js" type="module"></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to your booking</a>
-  <header><a class="brand" href="/"><span aria-hidden="true">↘</span> Hotel Price Hunter</a><span class="demo-tag">Fictional demo</span></header>
-  <main id="main">
-    <p id="page-status" role="status" class="page-status">Loading your demo booking…</p>
-    <div id="content" hidden>
-      <div class="workspace">
-        <aside class="reference" aria-label="Your current booking">
-          <div class="triphead"><p class="eyebrow">Your next city escape</p><h1>A great stay.<br>An even better deal.</h1><p id="stay" class="muted"></p></div>
+  <div class="postcard">
+    <header><a class="brand" href="/" aria-label="RoomDrop home"><img src="/assets/roomdrop-logo.png" alt="RoomDrop"></a><span class="demo-tag">Fictional demo</span></header>
+    <main id="main">
+      <p id="page-status" role="status" class="page-status">Loading your demo booking…</p>
+      <div id="content" hidden>
+        <section id="booking-summary" aria-labelledby="hotel">
           <article class="ticket">
-            <button id="open-photos" class="stay-gallery" type="button" aria-label="View illustrative hotel and room photos"><span id="hotel-photo"></span><span id="room-photo"></span><span class="photo-tag">Illustrative photos</span><span class="gallery-count">View photos ↗</span></button>
-            <div class="ticket-caption"><div class="ticketmain"><p class="eyebrow">Your booked stay</p><h2 id="hotel"></h2><p id="room" class="muted"></p></div><div class="ticketstub"><span>Booked total</span><strong id="booking-total"></strong><span>Taxes & fees included</span></div></div>
-            <details class="booking-details"><summary>Booking details</summary><div id="booking-features" class="chips"></div><p id="deadline" class="small muted"></p></details>
+            <div class="booking-photo"><div id="booking-photo"></div><span class="photo-tag">Illustrative photo</span></div>
+            <div class="ticket-caption"><div class="ticketmain"><p class="eyebrow">Your current booking</p><h1 id="hotel"></h1><p id="room" class="muted"></p><p id="stay" class="muted"></p><p id="guests" class="muted"></p></div><div class="ticketstub"><strong id="booking-total"></strong><span>Whole stay · Taxes included</span></div></div>
           </article>
-          <section id="featured-saving" class="featured-saving" aria-label="Equivalent stay price drop" hidden></section>
-          <section id="simulated-switch" class="switch-demo" aria-labelledby="switch-title">
-            <p class="eyebrow">A fictional switch, step by step</p><h2 id="switch-title">Follow your saving.</h2>
-            <p class="small muted">Advance a saved demo one step at a time. No real booking, cancellation or refund happens.</p>
-            <label for="switch-scenario">Demo journey</label><select id="switch-scenario"><option value="equivalent-saving">Equivalent stay · saving</option><option value="material-change">Changed offer · safety stop</option><option value="uncertain-cancellation">Uncertain cancellation · recovery</option></select>
-            <p id="switch-guidance" class="small muted"></p>
-            <div id="switch-progress" hidden><p id="switch-stage" class="switch-stage" role="status"></p><p id="switch-explanation" class="small"></p><div id="switch-snapshots" class="switch-snapshots"></div><dl id="switch-money" class="switch-money"></dl><details id="switch-history-details" open><summary>Saved stage & refund history</summary><ol id="switch-history" class="switch-history"></ol></details></div>
-            <p id="switch-message" role="status" class="small"></p><button id="advance-demo" class="primary" type="button">Advance demo · start switch</button><button id="switch-permission" class="plain" type="button" hidden>Review price watch permission</button>
-          </section>
-          <p id="booking-disclaimer" class="keep">This fictional demo makes no real bookings, cancellations or refunds.</p>
-        </aside>
-        <section class="changes" aria-labelledby="changes-title"><div class="changehead"><div><p class="eyebrow">Find your fit</p><h2 id="changes-title">Compare your options</h2></div><span id="offer-count"></span></div><p class="muted small">Lower stay prices · Refunds after fees · <span id="offer-currency"></span></p><div id="offers" class="fork"></div>
-          <div class="monitor-card"><div><p class="eyebrow">Price watch</p><h3>Let better rates come to you.</h3><p id="enrolment-summary"></p></div><button id="edit-preferences" class="review" type="button">Set up price watch ↗</button></div>
-          <label class="interest"><input id="non-refundable-interest" type="checkbox"> I’d also like to compare non-refundable rates</label><p class="small muted">These give up cancellation flexibility and always need separate approval.</p><div id="extra-offers" class="fork"></div><details class="evidence-details"><summary>See an offer with an unverified condition</summary><div id="unknown-offers" class="fork"></div></details></section>
+          <section class="alternatives" aria-labelledby="changes-title"><div class="changehead"><h2 id="changes-title">Other ways to save</h2><span>Illustrative photos</span></div><div id="offers" class="offers"></div></section>
+        </section>
+        <section id="comparison" aria-labelledby="comparison-title" hidden>
+          <a id="close-comparison" class="back" href="#booking-summary"><span aria-hidden="true">‹</span> Your booking</a>
+          <h1 id="comparison-title" tabindex="-1"></h1><div id="comparison-pills" class="pills"></div>
+          <div class="selected-stay"><div class="selected-photo"><div id="comparison-photo"></div><span class="photo-tag">Illustrative photo</span></div><div><h2 id="after-room"></h2><p id="comparison-stay" class="muted"></p><p id="comparison-guests" class="muted"></p></div></div>
+          <div class="price-comparison"><div><span>Currently booked</span><strong id="before-price"></strong></div><div><span id="after-price-label">Same-stay alternative</span><strong id="after-price"></strong></div><p id="selected-summary" class="muted"></p></div>
+          <div id="saving-box" class="saving-box"><h2>Net saving after fees</h2><strong id="comparison-saving"></strong><p id="saving-caption"></p></div>
+          <details id="price-details" class="price-details"><summary>Price & cancellation details</summary><dl id="differences"></dl><p id="selected-checked" class="muted small"></p></details>
+          <p id="review-message" role="status" class="small"></p><div class="review-actions"><button id="approve-offer" class="primary" type="button">Approve simulated switch</button><button id="keep-booking" class="plain" type="button">Keep my booking</button></div>
+        </section>
+        <section id="simulated-switch" class="simulation" aria-labelledby="switch-stage" hidden>
+          <div class="simulation-heading"><span class="key-mark" aria-hidden="true"><img src="/assets/roomdrop-key-icon.png" alt=""></span><div><p class="eyebrow">Your simulated switch</p><h2 id="switch-stage" tabindex="-1"></h2></div></div>
+          <p id="switch-explanation"></p><dl id="switch-money" class="switch-outcome"></dl>
+          <details id="switch-history-details"><summary>Saved progress</summary><ol id="switch-history"></ol></details>
+          <p id="switch-message" role="status" class="small"></p><button id="advance-demo" class="primary" type="button">Continue simulation</button>
+        </section>
+        <footer><p>Fictional demo · No real booking, cancellation or refund</p><p>Illustrative photos do not verify hotel or room features.</p></footer>
       </div>
-      <section id="enrolment" class="panel" aria-labelledby="enrolment-title" hidden>
-        <div class="between"><p class="eyebrow">Make it yours</p><button id="close-enrolment" class="plain" type="button">Close</button></div>
-        <h2 id="enrolment-title" tabindex="-1">What matters for your stay?</h2><p class="muted">We’ve started with your booking. Correct the essentials you want us to check.</p>
-        <form id="preferences-form">
-          <fieldset><legend>Essential requirements</legend><div id="requirements"></div><p class="small muted">Uncheck an essential to remove your additional requirement. Known features of your booked room still constrain automatic switches.</p></fieldset>
-          <fieldset><legend>Permission to make equivalent switches</legend><label class="check"><input id="automatic" type="checkbox"> Allow automatic switches to a verified equivalent refundable offer</label><p class="small muted">Same hotel, equivalent room, dates, guests and essential conditions, with cancellation flexibility preserved. Other rooms, hotels or reduced flexibility need separate offer approval.</p><div id="confirmation" class="confirmation" hidden><label class="check"><input id="permission-confirmed" type="checkbox"> I explicitly confirm standing permission for equivalent-only switches on this booking.</label><p class="small">This is a separate permission record. Choosing an offer or asking a question does not give permission.</p></div></fieldset>
-          <div class="form-grid"><div><label for="minimum">Minimum refund to make a switch worthwhile <span id="minimum-currency"></span></label><input id="minimum" name="minimum" type="number" step="0.01" required inputmode="decimal" aria-describedby="minimum-help"><p id="minimum-help" class="small muted"></p></div><div><label for="frequency">Update frequency</label><select id="frequency"><option value="weekly">Weekly summary</option><option value="daily">Daily summary</option><option value="offers-only">Only when there is an offer</option></select></div></div>
-          <label class="check"><input id="continue-monitoring" type="checkbox" checked> Continue looking after an equivalent switch</label><p class="small muted">Monitoring uses the replacement’s cancellation deadline. An approved non-refundable replacement ends ordinary price monitoring.</p>
-          <p id="preferences-error" role="alert" class="error"></p><div class="actions"><button id="save-preferences" class="primary" type="submit">Save my price watch</button><button id="cancel-preferences" class="plain" type="button">Not now</button></div>
-        </form>
-      </section>
-      <section id="comparison" class="panel comparison" aria-labelledby="comparison-title" hidden>
-        <div class="between"><p class="eyebrow">Your selected comparison</p><button id="close-comparison" class="plain" type="button">Hide comparison</button></div>
-        <h2 id="comparison-title" tabindex="-1"></h2>
-        <div id="comparison-photo" class="comparison-photo" aria-label="Illustrative selected stay image"></div><p class="small muted">Illustrative image · Not verified hotel or room features.</p>
-        <div class="conversation-layout"><div class="selected-summary"><p id="selected-identity" class="compact-identity small"></p><div class="beforeafter"><div class="mini"><p class="eyebrow">Currently booked</p><h3 id="before-hotel"></h3><p id="before-room" class="small muted"></p><strong id="before-price"></strong></div><div class="mini new"><p class="eyebrow">Selected offer</p><h3 id="after-hotel"></h3><p id="after-room" class="small muted"></p><strong id="after-price"></strong></div></div><div class="bill"><span>Net refund after fees</span><strong id="comparison-saving"></strong></div><p id="selected-terms" class="small"></p><p id="selected-authority" class="small authority"></p><p class="small muted">Selecting this comparison does not change your booking.</p></div>
-          <div class="conversation"><details open><summary>What changes?</summary><dl id="differences"></dl><p id="selected-checked" class="small muted"></p></details><h3>Talk through the tradeoffs</h3><p id="model-status" class="small muted"></p><div id="messages" class="messages" aria-live="polite"></div><form id="advice-form"><label for="question">Your question about this offer</label><textarea id="question" rows="3" maxlength="1200" required placeholder="My plans might change. Is the saving worth it?"></textarea><button id="ask" class="primary" type="submit">Ask Gemini</button></form><p class="small muted">Advice cannot approve a change or predict future prices. Conversation resets on refresh; your selected comparison and preferences are saved.</p></div>
-        </div>
-      </section>
-      <footer><p id="demo-time"></p><p>Public jury demo · Anonymised fictional booking and simulated rate checks. No live search or transaction. Prices are in USD.</p><p>AI-generated illustrative images do not verify hotel amenities or room features.</p></footer>
-    </div>
-  </main>
-  <dialog id="invitation" aria-labelledby="invitation-title" aria-describedby="invitation-description"><button id="dismiss-invitation" class="close" aria-label="Close invitation" type="button">×</button><p class="eyebrow">Your fictional booked stay</p><div class="invitation-glyph" aria-hidden="true">↘</div><h2 id="invitation-title">Want us to look<br>for better rates?</h2><p id="invitation-description">Keep your stay, find a better price. Tell us what matters and choose whether equivalent switches can happen automatically.</p><p class="small muted">Fictional demo. You can follow a saved simulated switch; no real transaction happens.</p><button id="show-enrolment" class="primary" type="button">Yes, show me how</button><button id="not-now" class="plain" type="button">Not now</button></dialog>
-  <dialog id="photo-gallery" aria-labelledby="gallery-title"><div class="between"><div><p class="eyebrow">Picture your stay</p><h2 id="gallery-title">The hotel & the rooms</h2></div><button id="close-photos" class="close" type="button" aria-label="Close photos">×</button></div><div id="gallery-image"></div><p id="gallery-caption" aria-live="polite"></p><div id="photo-tabs" role="group" aria-label="Illustrative photos"></div><p class="small muted">AI-generated inspiration for fictional properties. These images do not represent verified hotel or room features.</p></dialog>
+    </main>
+  </div>
 </body>
 </html>
