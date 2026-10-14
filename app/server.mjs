@@ -8,6 +8,7 @@ import { createStorage } from './storage.mjs';
 import { createGeminiAdvisor } from './gemini.mjs';
 import { AgencyAuthError, AGENCY_COOKIE, createLocalAgencyAuth } from './agency-auth.mjs';
 import { SimulationError, initialiseSimulation, offerDecision, simulationView, agencyCaseView, startSwitch, approveOffer, advanceSwitch } from './domain/simulation.mjs';
+import { priceWatchView, notificationView, changePriceWatch, appendWatchOperationEvents, watchAliases, fixtureWatchProvider } from './domain/price-watch.mjs';
 
 const PUBLIC_ROOT = resolve(fileURLToPath(new URL('./public/', import.meta.url)));
 const COOKIE_NAME = 'hph_visitor';
@@ -67,7 +68,7 @@ async function stored(operation) {
 }
 
 /** Dependencies are injectable for tests; executable startup always uses Firestore. */
-export function createAppServer({ storage, advisor, fixture, origin, now = () => new Date(), adviceLimit = 8, agencyAuth = null } = {}) {
+export function createAppServer({ storage, advisor, fixture, origin, now = () => new Date(), adviceLimit = 8, agencyAuth = null, watchProvider = fixtureWatchProvider } = {}) {
   if (!storage || !advisor || !fixture) throw new Error('Storage, advisor and allowlisted jury fixture are required.');
   if (fixture.scenarioId !== 'jury-booking') throw new Error('Only the anonymised jury-booking scenario is allowlisted.');
   const demoNow = fixture.demoNow;
@@ -100,6 +101,7 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
       approvals: [], revision: state.revision, csrfToken: state.csrfToken,
       model: { available: advisor.available, status: advisor.status },
       monitoring: state.monitoring, simulation: simulationView(state, visitorId, fixture),
+      priceWatch: priceWatchView(state, { visitorId, recordedAt: now().toISOString() }),
     };
   }
   async function visitor(request, response, create = false) {
@@ -133,7 +135,9 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
   async function updateVisitor(id, change) {
     return stored(() => storage.update(id, value => {
       if (!Number.isFinite(Date.parse(value.expiresAt)) || Date.parse(value.expiresAt) <= now().getTime()) fail(401, 'SESSION_REQUIRED', 'Load the booking page before making changes.');
-      return initialiseSimulation(change(initialiseSimulation(value, fixture)), fixture);
+      const next = initialiseSimulation(change(initialiseSimulation(value, fixture)), fixture);
+      if (Date.parse(next.expiresAt) <= now().getTime()) fail(401, 'SESSION_REQUIRED', 'Load the booking page before making changes.');
+      return next;
     }));
   }
   function agencySessionCookie(request, token, maxAge) {
@@ -219,13 +223,33 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
         const { id, state } = await visitor(request, response, true);
         return sendJson(response, 200, publicState(state, id));
       }
-      const routes = ['/api/enrolment', '/api/selection', '/api/advice', '/api/switches', '/api/offer-approvals'];
+      if (request.method === 'GET' && url.pathname === '/api/notifications') {
+        if (request.headers['sec-fetch-site'] === 'cross-site') fail(403, 'ORIGIN_REJECTED', 'Load the application directly.');
+        if ([...url.searchParams.keys()].some(key => key !== 'limit') || url.searchParams.getAll('limit').length > 1) fail(422, 'VALIDATION_ERROR', 'Use a bounded notification page.');
+        const rawLimit = url.searchParams.get('limit') ?? '20';
+        if (!/^\d{1,2}$/.test(rawLimit) || Number(rawLimit) < 1 || Number(rawLimit) > 50) fail(422, 'VALIDATION_ERROR', 'Notification page size must be 1–50.');
+        const { state } = await visitor(request, response);
+        return sendJson(response, 200, notificationView(state, Number(rawLimit)));
+      }
+      const routes = ['/api/enrolment', '/api/selection', '/api/advice', '/api/switches', '/api/offer-approvals', '/api/price-watch'];
       const advanceRoute = /^\/api\/switches\/(sim-[a-f0-9]{64})\/advances$/.exec(url.pathname);
       if (request.method === 'POST' && (routes.includes(url.pathname) || advanceRoute)) {
         if (request.headers.origin !== expectedOrigin(request) || request.headers['sec-fetch-site'] === 'cross-site') fail(403, 'ORIGIN_REJECTED', 'Request origin was rejected.');
         const body = await readJson(request);
         const { id, state } = await visitor(request, response);
         if (!safeEqual(request.headers['x-csrf-token'], state.csrfToken)) fail(403, 'CSRF_REJECTED', 'Reload the page before making changes.');
+        if (url.pathname === '/api/price-watch') {
+          if (url.search) fail(422, 'VALIDATION_ERROR', 'Watch consent does not accept query parameters.');
+          object(body, ['bookingVersion', 'watchVersion', 'enabled'], 'price-watch consent');
+          if (!Number.isSafeInteger(body.bookingVersion) || body.bookingVersion < 1 || !Number.isSafeInteger(body.watchVersion) || body.watchVersion < 0 || typeof body.enabled !== 'boolean') fail(422, 'VALIDATION_ERROR', 'Send the current versioned watch consent.');
+          if (!/^[a-f0-9]{64}$/.test(request.headers['idempotency-key'] || '')) fail(422, 'INVALID_IDEMPOTENCY_KEY', 'Use the saved price-watch intent key.');
+          const recordedAt = now().toISOString(); const aliases = watchAliases(); let result;
+          const saved = await updateVisitor(id, current => {
+            result = changePriceWatch(current, { body, idempotencyKey: request.headers['idempotency-key'], visitorId: id, fixture, recordedAt, aliases, provider: watchProvider, now });
+            return result.state;
+          });
+          return sendJson(response, 200, { ...publicState(saved, id), replayed: result.replayed });
+        }
         const offerApprovalRoute = url.pathname === '/api/offer-approvals';
         if (url.pathname === '/api/switches' || offerApprovalRoute || advanceRoute) {
           const startFields = offerApprovalRoute
@@ -243,11 +267,12 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
           // Keep random aliases outside the retryable Firestore transaction callback.
           const agencyCaseId = advanceRoute ? undefined : `case-${randomBytes(32).toString('hex')}`;
           const recordedAt = now().toISOString();
+          const aliases = watchAliases();
           const saved = await updateVisitor(id, current => {
             result = advanceRoute
               ? advanceSwitch(current, { operationId: advanceRoute[1], expectedOperationRevision: body.expectedOperationRevision, fixture, recordedAt })
               : (offerApprovalRoute ? approveOffer : startSwitch)(current, { body, idempotencyKey: request.headers['idempotency-key'], visitorId: id, fixture, recordedAt, agencyCaseId });
-            return result.state;
+            return appendWatchOperationEvents(current, result.state, { recordedAt, aliases, currencyMetadata: fixture.currency });
           });
           return sendJson(response, 200, { ...publicState(saved, id), replayed: result.replayed,
             ...(result.replayedCommand ? { replayedCommand: result.replayedCommand } : {}) });

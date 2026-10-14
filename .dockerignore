@@ -5,3 +5,5 @@
 !app/**
 !fixtures/
 !fixtures/jury-booking.json
+!scripts/
+!scripts/run-price-watch.mjs

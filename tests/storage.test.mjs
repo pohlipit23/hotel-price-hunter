@@ -57,6 +57,23 @@ test('agency index exposes only new indexed operations and keeps case lookups se
   await storage.update('private-other-scenario', state => ({ ...state, operations: { current: { agencyCaseId: 'case-' + 'c'.repeat(64), isSimulated: true } } }));
   assert.equal((await storage.listCases({ limit: 20 })).length, 2);
 });
+test('private watch index is atomic, bounded, stable through stop and removed on session deletion', async () => {
+  const storage = createTestMemoryStorage(); const watchId = '1'.repeat(64);
+  await storage.create('private-watch-visitor', { scenarioId: 'jury-booking', revision: 0 });
+  assert.deepEqual(await storage.listWatches({ limit: 50 }), []);
+  await assert.rejects(storage.update('private-watch-visitor', state => { state.priceWatch = { watchId, enabled: true }; throw new Error('abort'); }));
+  assert.deepEqual(await storage.listWatches({ limit: 50 }), []);
+  await storage.update('private-watch-visitor', state => ({ ...state, priceWatch: { watchId, enabled: true } }));
+  assert.equal((await storage.listWatches({ limit: 1 }))[0].state.priceWatch.enabled, true);
+  await storage.update('private-watch-visitor', state => { state.priceWatch.enabled = false; return state; });
+  assert.equal((await storage.listWatches({ limit: 1 }))[0].state.priceWatch.enabled, false);
+  assert.deepEqual(await storage.listWatches({ limit: 1, after: watchId }), []);
+  for (const limit of [0, 51, -1, 1.5]) await assert.rejects(storage.listWatches({ limit }));
+  await storage.create('other-private-visitor', { scenarioId: 'jury-booking' });
+  await assert.rejects(storage.update('other-private-visitor', state => ({ ...state, priceWatch: { watchId, enabled: true } })), { code: 'ALREADY_EXISTS' });
+  assert.equal((await storage.get('other-private-visitor')).priceWatch, undefined);
+  await storage.delete('private-watch-visitor'); assert.deepEqual(await storage.listWatches({ limit: 50 }), []);
+});
 
 test('Firestore integration: new clients see persisted state and concurrent updates remain atomic', { skip: !process.env.RUN_FIRESTORE_INTEGRATION }, async () => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST || '', /^(localhost|127\.0\.0\.1):\d+$/);

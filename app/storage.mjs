@@ -1,5 +1,13 @@
 const copy = value => value == null ? value : structuredClone(value);
 const caseIdValid = value => typeof value === 'string' && /^case-[a-f0-9]{64}$/.test(value);
+const watchIdValid = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+function watchLocator(state, visitorId) {
+  return state?.scenarioId === 'jury-booking' && watchIdValid(state.priceWatch?.watchId)
+    ? { watchId: state.priceWatch.watchId, visitorId } : null;
+}
+function watchPage(limit, after) {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50 || (after !== null && !watchIdValid(after))) throw new Error('Use a bounded private watch page.');
+}
 function newCases(current, next, visitorId) {
   if (next.scenarioId !== 'jury-booking') return [];
   return Object.entries(next.operations ?? {}).filter(([id, operation]) => operation.isSimulated === true && caseIdValid(operation.agencyCaseId) && !current.operations?.[id]?.agencyCaseId)
@@ -21,12 +29,16 @@ function conflict(message) {
 export function createTestMemoryStorage() {
   const documents = new Map();
   const agencyCases = new Map();
+  const watches = new Map();
   return {
     mode: 'test-memory',
     async get(id) { return copy(documents.get(id) ?? null); },
     async create(id, state) {
       if (documents.has(id)) throw conflict('Visitor already exists.');
+      const locator = watchLocator(state, id);
+      if (locator && watches.has(locator.watchId)) throw conflict('Watch already exists.');
       documents.set(id, copy(state));
+      if (locator) watches.set(locator.watchId, locator);
       return copy(state);
     },
     async update(id, change) {
@@ -37,7 +49,10 @@ export function createTestMemoryStorage() {
       if (next instanceof Promise) throw new Error('Storage updates must be synchronous.');
       const additions = newCases(previous, next, id);
       if (additions.some(item => agencyCases.has(item.caseId))) throw conflict('Case already exists.');
+      const locator = watchLocator(next, id);
+      if (locator && watches.has(locator.watchId) && watches.get(locator.watchId).visitorId !== id) throw conflict('Watch already exists.');
       for (const locator of additions) agencyCases.set(locator.caseId, locator);
+      if (locator) watches.set(locator.watchId, locator);
       documents.set(id, copy(next));
       return copy(next);
     },
@@ -50,7 +65,12 @@ export function createTestMemoryStorage() {
       const locator = agencyCases.get(caseId);
       return locator ? resolvedCase(locator, documents.get(locator.visitorId)) : null;
     },
-    async delete(id) { documents.delete(id); for (const [caseId, locator] of agencyCases) if (locator.visitorId === id) agencyCases.delete(caseId); },
+    async listWatches({ limit, after = null }) {
+      watchPage(limit, after);
+      return [...watches.values()].sort((left, right) => left.watchId.localeCompare(right.watchId))
+        .filter(item => !after || item.watchId > after).slice(0, limit).map(locator => ({ ...copy(locator), state: copy(documents.get(locator.visitorId)) }));
+    },
+    async delete(id) { documents.delete(id); for (const [caseId, locator] of agencyCases) if (locator.visitorId === id) agencyCases.delete(caseId); for (const [watchId, locator] of watches) if (locator.visitorId === id) watches.delete(watchId); },
     async close() {},
   };
 }
@@ -60,6 +80,7 @@ export class FirestoreStorage {
     this.database = database;
     this.collection = database.collection(collection);
     this.agencyCases = database.collection(`${collection}AgencyCases`);
+    this.watches = database.collection(`${collection}PriceWatches`);
     this.mode = emulator ? 'firestore-emulator' : 'firestore';
   }
 
@@ -69,7 +90,11 @@ export class FirestoreStorage {
   }
 
   async create(id, state) {
-    await this.collection.doc(id).create(state);
+    const batch = this.database.batch();
+    batch.create(this.collection.doc(id), state);
+    const locator = watchLocator(state, id);
+    if (locator) batch.create(this.watches.doc(locator.watchId), locator);
+    await batch.commit();
     return copy(state);
   }
 
@@ -83,6 +108,8 @@ export class FirestoreStorage {
       if (next instanceof Promise) throw new Error('Storage updates must be synchronous.');
       transaction.set(reference, next);
       for (const locator of newCases(previous, next, id)) transaction.create(this.agencyCases.doc(locator.caseId), locator);
+      const locator = watchLocator(next, id);
+      if (locator && !watchLocator(previous, id)) transaction.create(this.watches.doc(locator.watchId), locator);
       return next;
     });
   }
@@ -105,11 +132,24 @@ export class FirestoreStorage {
     return resolvedCase(locator, await this.get(locator.visitorId));
   }
 
+  async listWatches({ limit, after = null }) {
+    watchPage(limit, after);
+    let query = this.watches.orderBy('watchId').limit(limit);
+    if (after) query = query.startAfter(after);
+    const snapshot = await query.get();
+    return Promise.all(snapshot.docs.map(async document => {
+      const locator = document.data();
+      return { watchId: locator.watchId, visitorId: locator.visitorId, state: await this.get(locator.visitorId) };
+    }));
+  }
+
   async delete(id) {
     const cases = await this.agencyCases.where('visitorId', '==', id).get();
+    const watches = await this.watches.where('visitorId', '==', id).get();
     const batch = this.database.batch();
     batch.delete(this.collection.doc(id));
     for (const document of cases.docs) batch.delete(document.ref);
+    for (const document of watches.docs) batch.delete(document.ref);
     await batch.commit();
   }
   async close() { await this.database.terminate(); }
