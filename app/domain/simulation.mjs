@@ -7,7 +7,7 @@ const scenarios = [
   { id: 'uncertain-cancellation', label: 'Uncertain cancellation and recovery' },
 ];
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
-const approvalOffers = ['DEMO_EQUIVALENT', 'DEMO_DIFFERENT_ROOM', 'DEMO_DIFFERENT_HOTEL'];
+const approvalOffers = ['DEMO_EQUIVALENT', 'DEMO_DIFFERENT_ROOM', 'DEMO_DIFFERENT_HOTEL', 'DEMO_NON_REFUNDABLE'];
 const requestHash = body => digest(Object.fromEntries(Object.keys(body).sort().map(key => [key, body[key]])));
 export class SimulationError extends Error {
   constructor(status, code, message, details) { super(message); Object.assign(this, { status, code, details }); }
@@ -28,6 +28,7 @@ export function offerDecision(state, offer, fixture) {
 }
 export function monitoringState(state) {
   const cancellation = state.booking.cancellation;
+  if (cancellation.refundability === 'non-refundable') return { bookingVersion: state.booking.version, status: 'ended', reason: 'NON_REFUNDABLE_BASELINE', freeUntil: null };
   if (!state.enrolled) return { bookingVersion: state.booking.version, status: 'paused', reason: 'NOT_ENROLLED', freeUntil: cancellation.freeUntil };
   if (state.bookingHistory?.length && !state.preferences.continueMonitoring) return { bookingVersion: state.booking.version, status: 'paused', reason: 'CONTINUATION_DISABLED', freeUntil: cancellation.freeUntil };
   if (cancellation.refundability !== 'refundable' || Date.parse(cancellation.freeUntil) <= Date.parse(state.demoNow)) {
@@ -53,15 +54,15 @@ function approvalKeyFor(visitorId, body, bookingId) {
   return digest(['selected-offer-switch-v1', visitorId, bookingId, body.bookingVersion, body.offerId, body.offerVersion]);
 }
 function approvalEligible(state, offer, fixture) {
-  return approvalOffers.includes(offer.offerId) && offer.cancellation?.refundability === 'refundable'
+  return approvalOffers.includes(offer.offerId) && (offer.cancellation?.refundability === 'refundable' || offer.offerId === 'DEMO_NON_REFUNDABLE')
     && state.booking.cancellation?.refundability === 'refundable' && offerDecision(state, offer, fixture).action !== 'blocked';
 }
 function publicOperation(operation) {
   if (!operation) return null;
-  const { intentHash, idempotencyKey, commands, sourceOffer, permissionSnapshot, offerApproval, ...safe } = operation;
+  const { intentHash, idempotencyKey, commands, sourceOffer, permissionSnapshot, offerApproval, agencyCaseId, ...safe } = operation;
   const receiptKeys = ['approvalId', 'type', 'scope', 'bookingId', 'bookingVersion', 'preferenceVersion',
-    'offerId', 'offerVersion', 'materialFingerprint', 'confirmed', 'confirmedAt', 'expiresAt', 'revokedAt'];
-  return structuredClone({ ...safe, ...(offerApproval ? { offerApproval: Object.fromEntries(receiptKeys.map(key => [key, offerApproval[key]])) } : {}) });
+    'offerId', 'offerVersion', 'materialFingerprint', 'confirmed', 'confirmedAt', 'expiresAt', 'revokedAt', 'acceptReducedFlexibility'];
+  return structuredClone({ ...safe, ...(offerApproval ? { offerApproval: Object.fromEntries(receiptKeys.filter(key => key in offerApproval).map(key => [key, offerApproval[key]])) } : {}) });
 }
 export function simulationView(state, visitorId, fixture) {
   const offer = state.offers.find(item => item.offerId === 'DEMO_EQUIVALENT');
@@ -74,7 +75,8 @@ export function simulationView(state, visitorId, fixture) {
   const offerApprovalIntents = Object.fromEntries(state.offers.map(candidate => {
     if (state.reservedBookingVersions.includes(state.booking.version) || !approvalEligible(state, candidate, fixture)) return [candidate.offerId, null];
     const body = { offerId: candidate.offerId, offerVersion: candidate.version, bookingVersion: state.booking.version,
-      preferenceVersion: state.preferences.version, materialFingerprint: materialFingerprint({ booking: state.booking, offer: candidate, preferences: state.preferences }), confirmed: true };
+      preferenceVersion: state.preferences.version, materialFingerprint: materialFingerprint({ booking: state.booking, offer: candidate, preferences: state.preferences }), confirmed: true,
+      ...(candidate.offerId === 'DEMO_NON_REFUNDABLE' ? { acceptReducedFlexibility: true } : {}) };
     return [candidate.offerId, { ...body, idempotencyKey: approvalKeyFor(visitorId, body, state.booking.bookingId) }];
   }));
   return { scenarioId: operation?.scenarioId ?? 'equivalent-saving',
@@ -93,6 +95,7 @@ function authorityReasons(state, offer, fixture, operation) {
   if (operation && operation.preferenceVersion !== state.preferences.version) reasons.push('PREFERENCES_VERSION_CHANGED');
   const decision = operationDecision(state, offer, fixture, operation);
   if (selectedApproval) {
+    if (offer.offerId === 'DEMO_NON_REFUNDABLE' && operation.offerApproval?.acceptReducedFlexibility !== true) reasons.push('REDUCED_FLEXIBILITY_ACKNOWLEDGMENT_REQUIRED');
     const currentOffer = state.offers.find(item => item.offerId === operation.offerId);
     if (!currentOffer || !isApprovalValid(operation.offerApproval, { booking: state.booking, offer: currentOffer, preferences: state.preferences, now: state.demoNow })) {
       reasons.push('OFFER_MATERIAL_CHANGED');
@@ -109,7 +112,35 @@ function operationDecision(state, offer, fixture, operation) {
   return evaluateOffer({ booking: state.booking, offer, preferences: state.preferences,
     agencyMinimumSavingMinor: fixture.agencyMinimumSavingMinor, approvals: [operation.offerApproval], now: state.demoNow });
 }
-export function startSwitch(value, { body, idempotencyKey, visitorId, fixture, recordedAt }) {
+export function agencyCaseView({ caseId, state: value, operation }, fixture) {
+  const state = initialiseSimulation(value, fixture);
+  const approval = operation.authority === 'offer-approval' ? operation.offerApproval : operation.permissionSnapshot;
+  const reasons = authorityReasons(state, operation.revalidatedOffer ?? operation.sourceOffer, fixture, operation);
+  const cancellation = operation.cancellation;
+  const replacement = operation.replacementBooking;
+  return { caseId, isSimulated: true, status: operation.status, stage: operation.stage, revision: operation.revision,
+    reasonCodes: [...operation.reasonCodes], sourceBooking: { version: operation.originalBooking.version,
+      hotelName: operation.originalBooking.hotel.name, roomName: operation.originalBooking.room.name,
+      refundability: operation.originalBooking.cancellation.refundability },
+    replacement: replacement ? { hotelName: replacement.hotel.name, roomName: replacement.room.name,
+      refundability: replacement.cancellation.refundability, fulfilmentStatus: replacement.fulfilment.status,
+      fulfilmentVerified: replacement.fulfilment.status === 'simulated-fulfilled' && Boolean(replacement.fulfilment.receiptId) } : null,
+    authority: { type: operation.authority, scope: approval?.scope ?? null, confirmed: approval?.confirmed === true,
+      bookingVersion: approval?.bookingVersion ?? null, offerVersion: approval?.offerVersion ?? null,
+      preferenceVersion: approval?.preferenceVersion ?? null,
+      ...(Object.hasOwn(approval ?? {}, 'acceptReducedFlexibility') ? { acceptReducedFlexibility: approval.acceptReducedFlexibility === true } : {}),
+      expiresAt: approval?.expiresAt ?? null, revokedAt: approval?.revokedAt ?? null, valid: reasons.length === 0, reasonCodes: reasons },
+    cancellation: cancellation ? { status: cancellation.status, originalActive: state.booking.version === operation.bookingVersion,
+      proofPresent: cancellation.status === 'verified' && cancellation.observations.some(item => item.status === 'cancelled' && Boolean(item.receiptId)),
+      observations: cancellation.observations.map(item => ({ status: item.status, demoAt: item.demoAt, recordedAt: item.recordedAt,
+        isSimulated: item.isSimulated === true, proofPresent: Boolean(item.receiptId) })) } : null,
+    savingSecured: operation.savingSecured === true,
+    refund: { status: operation.refund.status, amountMinor: operation.refund.amountMinor, currency: operation.refund.currency },
+    monitoring: { status: state.monitoring.status, reason: state.monitoring.reason },
+    history: operation.history.map(item => ({ sequence: item.sequence, stage: item.stage, status: item.status,
+      demoAt: item.demoAt, recordedAt: item.recordedAt, message: item.message })) };
+}
+export function startSwitch(value, { body, idempotencyKey, visitorId, fixture, recordedAt, agencyCaseId }) {
   const state = initialiseSimulation(value, fixture);
   const hash = requestHash(body);
   const existing = Object.values(state.operations).find(item => item.idempotencyKey === idempotencyKey);
@@ -127,12 +158,12 @@ export function startSwitch(value, { body, idempotencyKey, visitorId, fixture, r
   if (state.reservedBookingVersions.includes(state.booking.version)) fail(409, 'SWITCH_IN_PROGRESS', 'This original booking already has a recorded switch journey.');
   const reasons = authorityReasons(state, offer, fixture);
   if (reasons.length) fail(409, 'SWITCH_NOT_AUTHORISED', 'Current standing permission and eligible facts are required.', { reasonCodes: reasons });
-  return recordOperation(state, { body, idempotencyKey, hash, offer, recordedAt, authority: 'standing' });
+  return recordOperation(state, { body, idempotencyKey, hash, offer, recordedAt, authority: 'standing', agencyCaseId });
 }
-function recordOperation(state, { body, idempotencyKey, hash, offer, recordedAt, authority, offerApproval = null }) {
+function recordOperation(state, { body, idempotencyKey, hash, offer, recordedAt, authority, offerApproval = null, agencyCaseId }) {
   const operationId = `sim-${idempotencyKey}`;
   const operation = { operationId, ...body, bookingId: state.booking.bookingId,
-    authority, offerApproval,
+    authority, offerApproval, ...(agencyCaseId ? { agencyCaseId } : {}),
     revision: 0, stage: 'ready', status: 'running', isSimulated: true,
     originalBooking: structuredClone(state.booking), revalidatedOffer: null, finalCheckReceipt: null,
     replacementBooking: null, cancellation: null,
@@ -147,7 +178,7 @@ function recordOperation(state, { body, idempotencyKey, hash, offer, recordedAt,
   state.updatedAt = recordedAt;
   return { state, replayed: false };
 }
-export function approveOffer(value, { body, idempotencyKey, visitorId, fixture, recordedAt }) {
+export function approveOffer(value, { body, idempotencyKey, visitorId, fixture, recordedAt, agencyCaseId }) {
   const state = initialiseSimulation(value, fixture);
   const hash = requestHash(body);
   const existing = Object.values(state.operations).find(item => item.idempotencyKey === idempotencyKey);
@@ -156,6 +187,9 @@ export function approveOffer(value, { body, idempotencyKey, visitorId, fixture, 
     return { state, replayed: true };
   }
   if (body.confirmed !== true) fail(422, 'VALIDATION_ERROR', 'Explicitly confirm the current versioned offer comparison.');
+  if (body.offerId === 'DEMO_NON_REFUNDABLE' ? body.acceptReducedFlexibility !== true : Object.hasOwn(body, 'acceptReducedFlexibility')) {
+    fail(422, 'VALIDATION_ERROR', 'Separately accept reduced flexibility only for the non-refundable offer.');
+  }
   if (!approvalOffers.includes(body.offerId)) fail(404, 'OFFER_NOT_FOUND', 'This offer is unavailable for selected-offer approval.');
   if (idempotencyKey !== approvalKeyFor(visitorId, body, state.booking.bookingId)) fail(422, 'INVALID_IDEMPOTENCY_KEY', 'Use the saved offer approval intent key.');
   if (body.bookingVersion !== state.booking.version) fail(409, 'BOOKING_VERSION_CHANGED', 'Reload the active booking before continuing.');
@@ -170,17 +204,17 @@ export function approveOffer(value, { body, idempotencyKey, visitorId, fixture, 
   const offerApproval = { approvalId: `approval-${idempotencyKey}`, type: 'offer', scope: 'selected-offer',
     bookingId: state.booking.bookingId, bookingVersion: body.bookingVersion, preferenceVersion: body.preferenceVersion,
     offerId: body.offerId, offerVersion: body.offerVersion, materialFingerprint: body.materialFingerprint,
-    confirmed: true, confirmedAt: state.demoNow, expiresAt: offer.expiresAt, revokedAt: null };
+    confirmed: true, confirmedAt: state.demoNow, expiresAt: offer.expiresAt, revokedAt: null,
+    ...(body.offerId === 'DEMO_NON_REFUNDABLE' ? { acceptReducedFlexibility: true } : {}) };
   const decision = evaluateOffer({ booking: state.booking, offer, preferences: state.preferences,
     agencyMinimumSavingMinor: fixture.agencyMinimumSavingMinor, approvals: [offerApproval], now: state.demoNow });
   if (!approvalEligible(state, offer, fixture) || decision.authority !== 'offer-approval') {
-    fail(409, 'SWITCH_NOT_AUTHORISED', 'Eligible refundable facts and explicit offer approval are required.',
-      { reasonCodes: [...new Set([...decision.reasons, ...(offer.cancellation?.refundability !== 'refundable' ? ['NON_REFUNDABLE_APPROVAL_UNSUPPORTED'] : [])])] });
+    fail(409, 'SWITCH_NOT_AUTHORISED', 'Eligible current facts and explicit offer approval are required.', { reasonCodes: decision.reasons });
   }
   state.selectedOfferId = offer.offerId;
   return recordOperation(state, { body: { scenarioId: 'selected-offer', offerId: body.offerId, offerVersion: body.offerVersion,
     bookingVersion: body.bookingVersion, preferenceVersion: body.preferenceVersion }, idempotencyKey, hash, offer, recordedAt,
-    authority: 'offer-approval', offerApproval });
+    authority: 'offer-approval', offerApproval, agencyCaseId });
 }
 function stop(operation, reasons) {
   operation.status = operation.replacementBooking ? 'agency-exception' : 'failed';

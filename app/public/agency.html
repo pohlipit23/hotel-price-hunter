@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#FFF9F2">
+  <title>Agency review · RoomDrop</title>
+  <link rel="icon" type="image/png" href="/assets/roomdrop-key-icon.png"><link rel="stylesheet" href="/booking.css"><link rel="stylesheet" href="/agency.css">
+  <script src="/agency.js" type="module"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to agency review</a>
+  <div class="postcard agency-postcard">
+    <header><a class="brand" href="/" aria-label="RoomDrop home"><img src="/assets/roomdrop-logo.png" alt="RoomDrop"></a><span class="demo-tag">Agency · Fictional demo</span></header>
+    <main id="main">
+      <h1>Agency review</h1><p class="muted agency-intro">Read-only review of simulated switches. No real booking, cancellation or refund.</p>
+      <p id="agency-message" class="agency-message" role="status">Checking access…</p>
+      <section id="agency-login" aria-labelledby="agency-login-title" hidden>
+        <h2 id="agency-login-title">Sign in for local review</h2><p class="muted small">Use the passphrase configured for this local demo.</p>
+        <form id="agency-login-form"><label for="agency-passphrase">Agency passphrase</label><input id="agency-passphrase" name="passphrase" type="password" autocomplete="current-password" required maxlength="256"><button id="agency-login-submit" class="primary" type="submit">Sign in</button></form>
+      </section>
+      <section id="agency-session" aria-label="Agency session" hidden><div><strong>Local fixture review</strong><p id="agency-session-expiry" class="muted small"></p></div><button id="agency-logout" class="plain" type="button">Sign out</button></section>
+      <section id="agency-overview" aria-labelledby="agency-cases-title" hidden>
+        <h2 id="agency-cases-title">Saved cases</h2><p class="muted small">Review progress, proof and recorded authority. This view cannot advance a switch.</p>
+        <div id="agency-cases" class="agency-cases"></div>
+        <nav class="agency-pagination" aria-label="Case pages"><button id="agency-first-page" class="plain" type="button" hidden>First page</button><button id="agency-next-page" class="plain" type="button" hidden>Next page</button></nav>
+      </section>
+      <section id="agency-case-detail" class="agency-case-detail" aria-labelledby="agency-detail-title" hidden></section>
+    </main>
+    <footer><p>Fictional demo · Read-only agency review</p><p>Supplier proofs shown here are simulated.</p></footer>
+  </div>
+</body>
+</html>

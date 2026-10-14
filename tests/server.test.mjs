@@ -78,7 +78,7 @@ test('offer approval boundary rejects false/missing confirmation, injected facts
   assert.equal((await app.post('/api/offer-approvals', body, { ...headers, Origin: 'https://elsewhere.example' })).status, 403);
   assert.equal((await app.post('/api/offer-approvals', { ...body, materialFingerprint: '0'.repeat(64) }, headers)).status, 409);
   assert.equal((await app.post('/api/offer-approvals', { ...body, materialFingerprint: 'unknown' }, headers)).status, 422);
-  for (const offerId of ['DEMO_NON_REFUNDABLE', 'DEMO_UNKNOWN_CONDITION', 'DEMO_REVALIDATION_CHANGE']) {
+  for (const offerId of ['DEMO_UNKNOWN_CONDITION', 'DEMO_REVALIDATION_CHANGE']) {
     assert.equal(app.initial.simulation.offerApprovalIntents[offerId], null);
     assert.equal((await app.post('/api/offer-approvals', { ...body, offerId }, headers)).status, 404);
   }
@@ -93,6 +93,40 @@ test('offer approval boundary rejects false/missing confirmation, injected facts
   assert.equal(fresh.simulation.offerApprovalIntents.DEMO_EQUIVALENT, null);
   assert.equal(fresh.simulation.operation, null);
   assert.equal(fresh.enrolled, false);
+});
+
+test('non-refundable approval persists acknowledged terms, atomically replays and ends monitoring only on actual promotion', async t => {
+  const app = await harness(t);
+  const intent = app.initial.simulation.offerApprovalIntents.DEMO_NON_REFUNDABLE;
+  assert.equal(intent.acceptReducedFlexibility, true);
+  const { idempotencyKey, ...body } = intent;
+  const headers = { 'Idempotency-Key': idempotencyKey };
+  for (const accepted of [undefined, false, 'true', 1, null, [], {}, 0]) assert.equal((await app.post('/api/offer-approvals', { ...body, acceptReducedFlexibility: accepted }, headers)).status, 422);
+  const responses = await Promise.all([app.post('/api/offer-approvals', body, headers), app.post('/api/offer-approvals', body, headers)]);
+  assert.deepEqual(responses.map(item => item.status), [200, 200]);
+  const results = await Promise.all(responses.map(item => item.json()));
+  assert.deepEqual(results.map(item => item.replayed).sort(), [false, true]);
+  let state = results[0];
+  assert.equal(state.simulation.operation.offerApproval.acceptReducedFlexibility, true);
+  assert.equal(state.simulation.operation.refund.amountMinor, 11500);
+  assert.equal(state.booking.retail.totalMinor, 60000);
+  assert.equal(state.permissionRecord, null);
+  const indexed = await app.storage.listCases({ limit: 20 });
+  assert.equal(indexed.length, 1);
+  assert.equal(state.simulation.operation.agencyCaseId, undefined);
+  for (let index = 0; index < 6; index++) {
+    const operation = state.simulation.operation;
+    state = await (await app.post(`/api/switches/${operation.operationId}/advances`, { expectedOperationRevision: operation.revision })).json();
+    assert.equal(state.booking.version, index < 4 ? 1 : 2);
+    if (index < 4) assert.equal(state.monitoring.status, 'paused');
+    else assert.equal(state.monitoring.reason, 'NON_REFUNDABLE_BASELINE');
+  }
+  assert.equal(state.booking.retail.totalMinor, 48000);
+  assert.equal(state.monitoring.status, 'ended');
+  assert.equal(state.simulation.operation.refund.status, 'completed');
+  assert.equal((await (await app.post('/api/offer-approvals', body, headers)).json()).replayed, true);
+  const mismatch = await app.post('/api/offer-approvals', { ...body, acceptReducedFlexibility: false }, headers);
+  assert.equal((await mismatch.json()).error.code, 'IDEMPOTENCY_PAYLOAD_MISMATCH');
 });
 
 test('competing selected offers atomically reserve one source and payload changes cannot replay its authority', async t => {
@@ -157,7 +191,7 @@ test('failed approval storage commit and session expiry cannot record successful
   assert.equal((await app.storage.get(app.cookie.split('=')[1])).activeOperationId, null);
 });
 
-test('Firestore selected approval integration: independent servers atomically approve and advance all three alternatives', { skip: !process.env.RUN_FIRESTORE_INTEGRATION }, async t => {
+test('Firestore selected approval integration: independent servers atomically approve and advance all four alternatives', { skip: !process.env.RUN_FIRESTORE_INTEGRATION }, async t => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST || '', /^(localhost|127\.0\.0\.1):\d+$/);
   const firstStorage = await createStorage(process.env);
   const secondStorage = await createStorage(process.env);
@@ -168,7 +202,7 @@ test('Firestore selected approval integration: independent servers atomically ap
   });
   const second = await harness(t, { storage: secondStorage });
   sessions.push(second.cookie);
-  for (const offerId of ['DEMO_EQUIVALENT', 'DEMO_DIFFERENT_ROOM', 'DEMO_DIFFERENT_HOTEL']) {
+  for (const offerId of ['DEMO_EQUIVALENT', 'DEMO_DIFFERENT_ROOM', 'DEMO_DIFFERENT_HOTEL', 'DEMO_NON_REFUNDABLE']) {
     const app = await harness(t, { storage: firstStorage });
     sessions.push(app.cookie);
     const otherPost = (path, body, extra = {}) => second.post(path, body,
@@ -200,6 +234,9 @@ test('Firestore selected approval integration: independent servers atomically ap
     assert.equal((await (await otherPost('/api/offer-approvals', body, { 'Idempotency-Key': idempotencyKey })).json()).replayed, true);
     const stored = await firstStorage.get(app.cookie.split('=')[1]);
     assert.equal(Object.keys(stored.operations).length, 1);
+    const indexed = await secondStorage.getCase(stored.operations[stored.activeOperationId].agencyCaseId);
+    assert.equal(indexed.operation.refund.status, 'completed');
+    if (offerId === 'DEMO_NON_REFUNDABLE') assert.equal(restored.monitoring.reason, 'NON_REFUNDABLE_BASELINE');
   }
   const app = await harness(t, { storage: firstStorage });
   sessions.push(app.cookie);

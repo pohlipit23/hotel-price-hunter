@@ -20,8 +20,23 @@ function specific(input) {
     bookingVersion: input.booking.version, preferenceVersion: input.preferences.version,
     offerId: input.offer.offerId, offerVersion: input.offer.version,
     materialFingerprint: materialFingerprint(input), confirmed: true,
-    confirmedAt: '2026-10-12T02:10:00Z', expiresAt: '2026-10-13T02:00:00Z', revokedAt: null };
+    confirmedAt: '2026-10-12T02:10:00Z', expiresAt: '2026-10-13T02:00:00Z', revokedAt: null,
+    ...(input.offer.cancellation.refundability === 'non-refundable' ? { acceptReducedFlexibility: true } : {}) };
 }
+
+test('canonical non-refundable authority rejects every missing or non-literal reduced-flexibility acknowledgment', () => {
+  for (const accepted of [undefined, false, 'true', 1, null, [], {}, 0]) {
+    const input = context(3);
+    const approval = { ...specific(input), acceptReducedFlexibility: accepted };
+    input.approvals = [approval];
+    assert.equal(isApprovalValid(approval, input), false);
+    assert.equal(evaluateOffer(input).authority, null);
+  }
+  const input = context(3);
+  input.approvals = [specific(input)];
+  assert.equal(isApprovalValid(input.approvals[0], input), true);
+  assert.equal(evaluateOffer(input).authority, 'offer-approval');
+});
 
 test('equivalent saving requires a separately confirmed standing permission', () => {
   const input = context();

@@ -31,16 +31,51 @@ test('emulator configuration is explicit and local only', async () => {
   await assert.rejects(createStorage({ GOOGLE_CLOUD_PROJECT: 'demo-hotel-price-hunter', FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080', K_SERVICE: 'cloud-run' }), /Cloud Run/);
 });
 
+test('agency index exposes only new indexed operations and keeps case lookups separate from visitor credentials', async () => {
+  const storage = createTestMemoryStorage();
+  const caseId = 'case-' + 'a'.repeat(64);
+  await storage.create('private-visitor-credential', { scenarioId: 'jury-booking', operations: { historical: { stage: 'ready' } } });
+  assert.deepEqual(await storage.listCases({ limit: 20 }), []);
+  await storage.update('private-visitor-credential', state => ({ ...state, operations: { ...state.operations, current: { agencyCaseId: caseId, stage: 'ready', isSimulated: true } } }));
+  const cases = await storage.listCases({ limit: 20 });
+  assert.equal(cases.length, 1);
+  assert.equal(cases[0].caseId, caseId);
+  assert.equal((await storage.getCase(caseId)).operation.stage, 'ready');
+  assert.equal(await storage.getCase('private-visitor-credential'), null);
+  await storage.update('private-visitor-credential', state => { state.operations.current.stage = 'revalidated'; return state; });
+  assert.equal((await storage.getCase(caseId)).operation.stage, 'revalidated');
+  assert.deepEqual(await storage.listCases({ limit: 20, after: caseId }), []);
+  await assert.rejects(storage.update('private-visitor-credential', () => { throw new Error('reject'); }));
+  assert.equal((await storage.listCases({ limit: 20 })).length, 1);
+  await storage.update('private-visitor-credential', state => { state.operations.mutated = { agencyCaseId: 'case-' + 'b'.repeat(64), stage: 'ready', isSimulated: true }; return state; });
+  assert.equal((await storage.listCases({ limit: 1 })).length, 1);
+  assert.equal((await storage.listCases({ limit: 20 })).length, 2);
+  await storage.create('another-visitor', { scenarioId: 'jury-booking', operations: {} });
+  await assert.rejects(storage.update('another-visitor', state => ({ ...state, operations: { collision: { agencyCaseId: caseId, stage: 'ready', isSimulated: true } } })), { code: 'ALREADY_EXISTS' });
+  assert.deepEqual((await storage.get('another-visitor')).operations, {});
+  await storage.create('private-other-scenario', { scenarioId: 'private-booking', operations: {} });
+  await storage.update('private-other-scenario', state => ({ ...state, operations: { current: { agencyCaseId: 'case-' + 'c'.repeat(64), isSimulated: true } } }));
+  assert.equal((await storage.listCases({ limit: 20 })).length, 2);
+});
+
 test('Firestore integration: new clients see persisted state and concurrent updates remain atomic', { skip: !process.env.RUN_FIRESTORE_INTEGRATION }, async () => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST || '', /^(localhost|127\.0\.0\.1):\d+$/);
   const first = await createStorage(process.env);
   const second = await createStorage(process.env);
   const id = `integration-${crypto.randomUUID()}`;
   try {
-    await first.create(id, { revision: 0, preferences: { continueMonitoring: true }, selectedOfferId: 'equivalent' });
+    await first.create(id, { scenarioId: 'jury-booking', revision: 0, preferences: { continueMonitoring: true }, selectedOfferId: 'equivalent' });
     assert.equal((await second.get(id)).selectedOfferId, 'equivalent');
     await Promise.all(Array.from({ length: 4 }, () => second.update(id, state => ({ ...state, revision: state.revision + 1 }))));
     assert.equal((await first.get(id)).revision, 4);
+    const caseId = 'case-' + crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+    await Promise.all(Array.from({ length: 4 }, () => second.update(id, state => ({ ...state, revision: state.revision + 1,
+      operations: { current: { agencyCaseId: caseId, stage: 'ready', isSimulated: true } } }))));
+    assert.equal((await first.get(id)).revision, 8);
+    assert.equal((await first.getCase(caseId)).operation.stage, 'ready');
+    assert.equal((await first.listCases({ limit: 50 })).filter(item => item.caseId === caseId).length, 1);
+    await second.update(id, state => { state.operations.current.stage = 'revalidated'; return state; });
+    assert.equal((await first.getCase(caseId)).operation.stage, 'revalidated');
   } finally {
     await first.delete(id);
     await Promise.all([first.close(), second.close()]);

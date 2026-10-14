@@ -31,6 +31,42 @@ function approve(state, offerId = 'DEMO_EQUIVALENT', intent = simulationView(sta
   return simulation.approveOffer(state, { body, idempotencyKey, visitorId: 'visitor', fixture, recordedAt });
 }
 
+test('non-refundable approval requires literal reduced-flexibility acknowledgment and preserves the original watch until promotion', () => {
+  for (const accepted of [false, undefined, 'true', 1, null, [], {}, 0]) {
+    const state = unconfirmed();
+    const intent = { ...simulationView(state, 'visitor', fixture).offerApprovalIntents.DEMO_NON_REFUNDABLE, acceptReducedFlexibility: accepted };
+    assert.throws(() => approve(state, 'DEMO_NON_REFUNDABLE', intent), { code: 'VALIDATION_ERROR' });
+    assert.equal(state.activeOperationId, null);
+  }
+  const refundable = simulationView(unconfirmed(), 'visitor', fixture).offerApprovalIntents.DEMO_EQUIVALENT;
+  assert.throws(() => approve(unconfirmed(), 'DEMO_EQUIVALENT', { ...refundable, acceptReducedFlexibility: true }), { code: 'VALIDATION_ERROR' });
+  const baselines = [false, true].flatMap(continueMonitoring => [unconfirmed(), ready()].map(state => ({
+    ...state, preferences: { ...state.preferences, continueMonitoring },
+  })));
+  for (const initial of baselines) {
+    const intent = simulationView(initial, 'visitor', fixture).offerApprovalIntents.DEMO_NON_REFUNDABLE;
+    let { state } = approve(initial, 'DEMO_NON_REFUNDABLE', intent);
+    const receipt = state.operations[state.activeOperationId].offerApproval;
+    assert.equal(receipt.acceptReducedFlexibility, true);
+    assert.equal(receipt.materialFingerprint, intent.materialFingerprint);
+    for (let index = 0; index < 4; index++) ({ state } = advance(state));
+    assert.equal(state.booking.version, 1);
+    assert.equal(state.monitoring.status, initial.enrolled ? 'active' : 'paused');
+    ({ state } = advance(state));
+    assert.equal(state.booking.retail.totalMinor, 48000);
+    assert.equal(state.monitoring.status, 'ended');
+    assert.equal(state.monitoring.reason, 'NON_REFUNDABLE_BASELINE');
+    assert.equal(state.permissionRecord, null);
+    assert.equal(state.operations[state.activeOperationId].refund.amountMinor, 11500);
+    state.demoNow = '2026-11-11T03:00:00Z';
+    state.operations[state.activeOperationId].offerApproval.revokedAt = state.demoNow;
+    ({ state } = advance(state));
+    assert.equal(state.operations[state.activeOperationId].refund.status, 'completed');
+    assert.equal(approve(state, 'DEMO_NON_REFUNDABLE', intent).replayed, true);
+    assert.throws(() => approve(state, 'DEMO_NON_REFUNDABLE', { ...intent, acceptReducedFlexibility: false }), { code: 'IDEMPOTENCY_PAYLOAD_MISMATCH' });
+  }
+});
+
 test('selected-offer approval atomically starts each customer alternative without standing permission or enrolment', () => {
   for (const offerId of ['DEMO_EQUIVALENT', 'DEMO_DIFFERENT_ROOM', 'DEMO_DIFFERENT_HOTEL']) {
     const initial = unconfirmed();
@@ -76,10 +112,10 @@ test('a changed confirmation under an existing selected-offer key rejects payloa
   assert.equal(Object.keys(state.operations).length, 1);
 });
 
-test('approval intents expose only eligible refundable customer offers; hard unknown facts never gain authority', () => {
+test('approval intents expose eligible customer offers with a separate non-refundable acknowledgment; hard unknown facts never gain authority', () => {
   const state = unconfirmed();
   const intents = simulationView(state, 'visitor', fixture).offerApprovalIntents;
-  assert.equal(intents.DEMO_NON_REFUNDABLE, null);
+  assert.equal(intents.DEMO_NON_REFUNDABLE.acceptReducedFlexibility, true);
   assert.equal(intents.DEMO_REVALIDATION_CHANGE, null);
   assert.equal(intents.DEMO_UNKNOWN_CONDITION, null);
   const savedIntent = intents.DEMO_EQUIVALENT;
@@ -155,7 +191,7 @@ test('selected approval validates stale bindings, missing costs and unsupported 
     if (field === 'offerVersion') stale.offers[0].version++;
     assert.throws(() => approve(stale, 'DEMO_EQUIVALENT', intent), { code });
   }
-  assert.throws(() => approve(initial, 'DEMO_EQUIVALENT', { ...intent, offerId: 'DEMO_NON_REFUNDABLE' }), { code: 'OFFER_NOT_FOUND' });
+  assert.throws(() => approve(initial, 'DEMO_NON_REFUNDABLE', { ...intent, offerId: 'DEMO_NON_REFUNDABLE' }), { code: 'VALIDATION_ERROR' });
   const claimed = approve(initial).state;
   assert.throws(() => approve(claimed, 'DEMO_EQUIVALENT', { ...intent, preferenceVersion: 2 }), { code: 'IDEMPOTENCY_PAYLOAD_MISMATCH' });
   const otherIntent = simulationView(initial, 'visitor', fixture).offerApprovalIntents.DEMO_DIFFERENT_HOTEL;

@@ -79,6 +79,7 @@ export function isApprovalValid(approval, { booking, offer, preferences, now }) 
       || instant(approval.confirmedAt) > time) return false;
   if (approval.type === 'standing') return approval.scope === 'equivalent-only' && approval.permissionVersion === 1;
   return approval.type === 'offer' && approval.scope === 'selected-offer'
+    && (offer?.cancellation?.refundability !== 'non-refundable' || approval.acceptReducedFlexibility === true)
     && approval.offerId === offer?.offerId && approval.offerVersion === offer?.version
     && instant(approval.expiresAt) > time && approval.materialFingerprint === materialFingerprint({ booking, offer, preferences });
 }
