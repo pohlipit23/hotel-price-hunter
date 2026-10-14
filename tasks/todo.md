@@ -89,3 +89,39 @@ Final status: core, runtime and UI independent reviews approve the verified loca
 The complete local suite passed **53/53 with zero skips** using the real Firestore emulator. Core, runtime and UI independent reviews resolved their original findings and approved their bounded scopes. Browser checks verified enrolment, refresh, separate permission confirmation, stale two-tab rejection, honest model-unavailable handling and selected comparison visibility at 320–1440px. See `docs/review-core.md`, `docs/review-runtime.md` `docs/review-ui.md` and `docs/ui-verification.md`; final UI review approved the readable essential choices and compact selected comparison.
 
 Task 2's live Altovo probes remain unchecked. The supplied GCP project is deployed privately and live model response evidence is recorded above; visible billing metadata still cannot establish trial eligibility or remaining credits. No real Altovo transaction, public repository publication, notification delivery or submission occurred. The later simulated switching and operational/submission milestones in `tasks/plan.md` remain future work.
+
+## Next milestone: persisted simulated equivalent switch
+
+Approved by the human's 14 October “go ahead” after the coordinator proposed the next workflow. Root remains coordinator; bounded workers own contract, backend, customer display and verification. Existing City Escape design is preserved. No additional model calls or cloud publication are part of this local implementation slice.
+
+### Task 6: Agree the simulation contract
+
+- [x] Record the existing booking/offer/preference authority bindings, deterministic operation identity, request/replay rules and stage transitions in `docs/simulated-switch-contract.md`.
+- [x] Define unchanged final-check receipts separately from materially changed offer versions, preserving the conservative renewed-approval gate.
+- [x] Document exactly when the active booking changes, saving becomes secured, refund becomes pending/completed, and monitoring rebases or ends.
+
+Verification: coordinator trace against agreed plan §5–7 and current deterministic decision core; inspect the contract before backend/UI parallel implementation. No invented live fulfilment predicate. Depends on the reviewed first customer path contract.
+
+### Task 7: Persist an atomic simulation and recovery history
+
+- [ ] The fictional equivalent offer executes only with current separately confirmed standing permission, valid complete revalidation and sufficient net refund; missing authority or changed material facts do not execute.
+- [ ] Replacement and fulfilment precede original cancellation; verified cancellation secures the saving and leaves refund pending; only a separate simulated settlement marks refund completed.
+- [ ] Same intent/stage retries and simultaneous requests cannot duplicate the replacement, cancellation, refund or history events. Mismatched intent payload fails; stale booking/preference requests cannot restore authority.
+- [ ] State survives a new client/server instance through the real Firestore emulator. Active booking/version and monitoring deadline rebase atomically; old offers cannot be used against the new baseline.
+- [ ] Unknown cancellation creates an unresolved agency exception without secured saving or completed refund; recovery observes the recorded intent before progressing. Ordinary monitoring stops without suppressing required recovery.
+
+Verification: meaningful unit/HTTP concurrency and authority tests plus real emulator persistence tests; no paid model or live supplier requests. Owned backend files are `app/domain/simulation.mjs`, `app/server.mjs`, and relevant tests; reuse `app/storage.mjs` transactions unless a demonstrated need requires an additive change. Depends on Task 6.
+
+### Task 8: Show the simulated switch and refund history
+
+- [ ] A clearly labelled advance-demo control uses the backend transition process and displays persisted progress, distinct saving/refund states and the active booking.
+- [ ] Refresh, repeated clicks and stale tabs preserve the operation and cannot skip stages or execute another switch. Customer wording identifies simulated settlement throughout.
+- [ ] The existing responsive layout, comparison and separate permission confirmation remain usable; errors restore current state and permit safe retry of the same intent.
+
+Verification: real browser at mobile/desktop sizes, keyboard use, refresh at refund-pending, final settlement, no-authority block and cancellation-unknown outcome; capture safe screenshots/evidence. Depends on Task 6 for parallel UI work, Task 7 for integrated acceptance.
+
+### Checkpoint: simulated saving path
+
+- [ ] Full local suite passes against Firestore emulator with no unreported skips; build/container checks appropriate to the changed app pass.
+- [ ] Fresh independent code/contract review resolves actionable findings; browser evidence verifies the implemented scope.
+- [ ] Documentation reports exact simulated coverage and remaining private-deployment/browser, supplier, non-refundable execution, scheduled-job, notification and submission gates.
