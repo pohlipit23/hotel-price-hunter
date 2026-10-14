@@ -2,6 +2,7 @@
 'use strict';
 import { featuredOffer, refundPresentation, isPriceDrop } from './pricing.js';
 import { stayPhoto, offerPhotoIndex, setupStayGallery } from './stay-photos.js';
+import { setupSimulation } from './simulation.js';
 const $ = id => document.getElementById(id);
 const labels = { boardBasis: 'Meals', bedType: 'Bed type', nonSmoking: 'Non-smoking', accessible: 'Accessible room', view: 'View', roomSizeSqm: 'Room size (m²)' };
 const requirementChoices = {
@@ -18,6 +19,8 @@ let state;
 let selectedOffer;
 let lastFocus;
 let busy = false;
+const simulation = setupSimulation({ getState: () => state, request, renderState, money, instant, getBusy: () => busy, setBusy, openPreferences });
+function setBusy(value) { busy = value; simulation.render(); }
 
 function node(tag, text, className) {
   const el = document.createElement(tag);
@@ -45,10 +48,10 @@ function deadline(record) {
   if (c.refundability === 'unknown') return 'Refundability not verified';
   return `Free cancellation until ${instant(c.freeUntil, c.timeZone)}`;
 }
-function errorMessage(error) { return error?.message || 'Something went wrong. Your booking is unchanged. Please try again.'; }
-async function request(path, body) {
+function errorMessage(error) { return error?.message || 'Something went wrong. Refresh to see your latest saved state, then try again.'; }
+async function request(path, body, headers = {}) {
   const response = await fetch(path, body === undefined ? { credentials: 'same-origin' } : {
-    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': state.csrfToken }, body: JSON.stringify(body)
+    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': state.csrfToken, ...headers }, body: JSON.stringify(body)
   });
   let data;
   try { data = await response.json(); } catch { throw new Error('The service returned an unreadable response. Please try again.'); }
@@ -73,9 +76,21 @@ function renderBooking() {
   $('booking-total').textContent = money(b.retail.totalMinor, b.retail.currency);
   $('booking-features').replaceChildren(node('span', valueText(b.room.conditions.boardBasis), 'chip'), node('span', valueText(b.cancellation.refundability), 'chip positive'));
   $('deadline').textContent = deadline(b);
+  const operation = state.simulation?.operation;
+  $('booking-disclaimer').textContent = operation?.savingSecured
+    ? 'Your active demo booking is the verified replacement. No real booking, cancellation or refund happens.'
+    : 'Your original demo booking remains active. No real booking, cancellation or refund happens.';
   $('demo-time').textContent = `Demo time: ${instant(state.demoNow, 'UTC')}. Fictional checks, not live searches.`;
   const p = state.preferences;
-  $('enrolment-summary').textContent = state.enrolled ? `Preferences saved · ${valueText(p.notificationFrequency)} updates · minimum refund ${money(p.minimumSavingMinor)}. ${p.automaticEquivalentSwitches ? 'Equivalent-only permission confirmed.' : 'Automatic switches are off.'}` : 'Set your essentials and decide how we should look for savings.';
+  const permissionCurrent = state.permissionRecord?.confirmed === true && state.permissionRecord.scope === 'equivalent-only' && !state.permissionRecord.revokedAt && state.permissionRecord.bookingVersion === b.version && state.permissionRecord.preferenceVersion === p.version;
+  $('enrolment-summary').textContent = state.enrolled ? `Preferences saved · ${valueText(p.notificationFrequency)} updates · minimum refund ${money(p.minimumSavingMinor)}. ${p.automaticEquivalentSwitches && permissionCurrent ? 'Equivalent-only permission confirmed.' : 'Automatic switches are off.'}` : 'Set your essentials and decide how we should look for savings.';
+  if (state.monitoring) {
+    const monitoring = state.monitoring;
+    const baseline = operation?.savingSecured ? 'replacement' : 'original';
+    const monitoringText = monitoring.status === 'active' ? `Price watch is active for your ${baseline} stay at ${money(b.retail.totalMinor, b.retail.currency)}. ${deadline(b)}.`
+      : monitoring.status === 'ended' ? 'Price watch has ended for this stay. Saved switch and refund progress remain available.' : 'Price watch is paused. Review your permission and stay conditions; saved switch progress remains available.';
+    $('enrolment-summary').append(node('span', monitoringText, 'monitoring-baseline'));
+  }
   $('edit-preferences').textContent = state.enrolled ? 'Edit my price watch ↗' : 'Set up price watch ↗';
 }
 function priceDrop(offer) {
@@ -101,7 +116,7 @@ function renderFeatured() {
   section.replaceChildren();
   if (!offer) {
     section.classList.add('empty');
-    section.append(node('h2', 'Your stay is still yours.'), node('p', 'No verified equivalent refund matches your requirements. Compare the other offers or adjust your price watch.', 'small muted'));
+    section.append(node('h2', state.simulation?.operation?.savingSecured ? 'Your replacement stay is active.' : 'Your stay is still yours.'), node('p', state.simulation?.operation?.savingSecured ? 'The original offers have been retired. Future rates must be checked against your replacement stay before another saving can be shown.' : 'No verified equivalent refund matches your requirements. Compare the other offers or adjust your price watch.', 'small muted'));
     return;
   }
   section.classList.remove('empty');
@@ -128,7 +143,7 @@ function differenceEntries(offer) {
 }
 function authorityText(offer) {
   if (offer.decision?.action === 'blocked') return 'Switch blocked: some required facts or conditions are not verified or do not match. Check the reasons below.';
-  if (offer.decision?.action === 'automatic') return offer.decision.authority === 'offer-approval' ? 'Separate offer permission is recorded. No transaction happens in this milestone.' : 'Qualifies under confirmed equivalent-only permission. No transaction happens in this milestone.';
+  if (offer.decision?.action === 'automatic') return offer.decision.authority === 'offer-approval' ? 'Separate offer permission is recorded. Only fictional equivalent switches are available in this demo.' : 'Qualifies under confirmed equivalent-only permission. Use Advance demo to follow the fictional switch stages.';
   return 'Separate permission is required before a switch. Selecting or discussing this offer gives no permission.';
 }
 function offerCard(offer, index) {
@@ -161,21 +176,25 @@ function renderOffers() {
   $('offers').replaceChildren(...defaults.map(offerCard));
   $('offer-count').textContent = `${defaults.length} offers`;
   $('offer-currency').textContent = state.currency.code;
-  if (!defaults.length) $('offers').append(node('p', 'No refundable offers to compare right now. Your booking is unchanged.', 'empty-offers'));
+  if (!defaults.length) $('offers').append(node('p', 'No fresh refundable offers to compare right now. Your active demo stay is shown alongside the saved switch history.', 'empty-offers'));
   $('extra-offers').replaceChildren(...state.offers.filter(o => o.cancellation.refundability === 'non-refundable').map(offerCard));
   $('extra-offers').hidden = !$('non-refundable-interest').checked;
   $('unknown-offers').replaceChildren(...state.offers.filter(o => o.equivalence === 'unknown' || Object.values(o.room.conditions).some(v => v === null)).map(offerCard));
 }
 function renderState(next) {
   state = next;
+  state.offers = next.offers.filter(offer => offer.bookingVersion === next.booking.version);
   $('content').hidden = false;
   renderBooking();
   renderOffers();
   renderFeatured();
+  selectedOffer = undefined;
   if (state.selectedOfferId) {
     selectedOffer = state.offers.find(o => o.offerId === state.selectedOfferId);
     if (selectedOffer) renderComparison();
   }
+  if (!selectedOffer) { $('comparison').hidden = true; $('messages').replaceChildren(); }
+  simulation.render();
 }
 function openPreferences() {
   const p = state.preferences;
@@ -246,9 +265,9 @@ async function savePreferences(event) {
     if (automaticEquivalentSwitches && !$('permission-confirmed').checked) throw new Error('Confirm equivalent-only standing permission separately, or turn automatic switches off.');
     const body = { bookingVersion: state.booking.version, preferences: { version: state.preferences.version, essentialRequirements, automaticEquivalentSwitches, minimumSavingMinor: parseMinor($('minimum').value), notificationFrequency: $('frequency').value, continueMonitoring: $('continue-monitoring').checked } };
     if (automaticEquivalentSwitches) body.permissionConfirmation = { confirmed: true, bookingVersion: state.booking.version, preferenceVersion: state.preferences.version, scope: 'equivalent-only', version: 1 };
-    busy = true; $('save-preferences').disabled = true;
+    setBusy(true); $('save-preferences').disabled = true;
     renderState(await request('/api/enrolment', body));
-    closePreferences(); setStatus('Your price watch preferences are saved. Your booking is unchanged.');
+    closePreferences(); setStatus('Your price watch preferences are saved. Saving preferences does not change your active demo booking.');
   } catch (error) {
     if (error.status === 409) {
       try {
@@ -258,11 +277,11 @@ async function savePreferences(event) {
       } catch (reloadError) { $('preferences-error').textContent = `Could not refresh the latest preferences. ${errorMessage(reloadError)}`; }
     } else $('preferences-error').textContent = errorMessage(error);
   }
-  finally { busy = false; $('save-preferences').disabled = false; }
+  finally { setBusy(false); $('save-preferences').disabled = false; }
 }
 async function select(offer, trigger) {
   if (busy) return;
-  busy = true; trigger.disabled = true;
+  setBusy(true); trigger.disabled = true;
   try {
     const changed = state.selectedOfferId !== offer.offerId;
     renderState(await request('/api/selection', { offerId: offer.offerId, bookingVersion: state.booking.version }));
@@ -272,7 +291,7 @@ async function select(offer, trigger) {
     $('comparison-title').focus(); $('comparison').scrollIntoView({ block: 'start' });
     setStatus('Comparison saved. Selecting an offer gives no permission to change your booking.');
   } catch (error) { setStatus(errorMessage(error), true); }
-  finally { busy = false; trigger.disabled = false; }
+  finally { setBusy(false); trigger.disabled = false; }
 }
 function renderComparison() {
   const o = selectedOffer;
@@ -321,7 +340,7 @@ async function askAdvice(event) {
   if (busy || !selectedOffer) return;
   const question = $('question').value.trim();
   if (!question) return;
-  busy = true; $('ask').disabled = true; $('ask').textContent = 'Asking Gemini…';
+  setBusy(true); $('ask').disabled = true; $('ask').textContent = 'Asking Gemini…';
   appendMessage('customer', question);
   try {
     const result = await request('/api/advice', { offerId: selectedOffer.offerId, bookingVersion: state.booking.version, message: question });
@@ -333,7 +352,7 @@ async function askAdvice(event) {
     }
     $('question').value = '';
   } catch (error) { appendMessage('assistant', `${errorMessage(error)} Your saved preferences and selected comparison are intact.`, true); }
-  finally { busy = false; $('ask').disabled = false; $('ask').textContent = 'Ask Gemini'; }
+  finally { setBusy(false); $('ask').disabled = false; $('ask').textContent = 'Ask Gemini'; }
 }
 function closeInvitation() { $('invitation').close(); $('edit-preferences').focus(); }
 $('show-enrolment').addEventListener('click', () => { $('invitation').close(); openPreferences(); });
