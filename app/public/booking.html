@@ -18,6 +18,10 @@
             <div class="booking-photo"><div id="booking-photo"></div><span class="photo-tag">Illustrative photo</span></div>
             <div class="ticket-caption"><div class="ticketmain"><p class="eyebrow">Your current booking</p><h1 id="hotel"></h1><p id="room" class="muted"></p><p id="stay" class="muted"></p><p id="guests" class="muted"></p></div><div class="ticketstub"><strong id="booking-total"></strong><span>Whole stay · Taxes included</span></div></div>
           </article>
+          <section id="price-watch" class="price-watch" aria-labelledby="watch-title" aria-busy="false">
+            <div class="watch-copy"><h2 id="watch-title">Watch for better rates</h2><p id="watch-status" role="status" class="small muted"></p><p id="watch-last-check" class="small muted"></p><p id="watch-next-check" class="small muted"></p><p id="watch-frequency" class="small muted"></p></div>
+            <button id="watch-button" class="watch-button" type="button" disabled>Watch for better rates</button>
+          </section>
           <section class="alternatives" aria-labelledby="changes-title"><div class="changehead"><h2 id="changes-title">Other ways to save</h2><span>Illustrative photos</span></div><div id="offers" class="offers"></div><details id="lower-rate" class="lower-rate"><summary>Compare a lower non-refundable rate</summary><div id="lower-rate-offer"></div></details></section>
         </section>
         <section id="comparison" aria-labelledby="comparison-title" hidden>
@@ -36,6 +40,7 @@
           <details id="switch-history-details"><summary>Saved progress</summary><ol id="switch-history"></ol></details>
           <p id="switch-message" role="status" class="small"></p><button id="advance-demo" class="primary" type="button">Continue simulation</button>
         </section>
+        <details id="notification-previews-details" class="notification-previews-details"><summary>Updates <span id="notification-count"></span></summary><p class="small muted">Simulated previews only · No email sent.</p><ol id="notification-previews" class="notification-previews"></ol></details>
         <footer><p>Fictional demo · No real booking, cancellation or refund</p><p>Illustrative photos do not verify hotel or room features.</p></footer>
       </div>
     </main>

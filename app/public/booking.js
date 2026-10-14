@@ -2,6 +2,7 @@
 'use strict';
 import { refundPresentation } from './pricing.js';
 import { stayPhoto, offerPhotoIndex } from './stay-photos.js';
+import { renderWatch, renderNotificationPreviews } from './watch.js';
 const $ = id => document.getElementById(id);
 const customerOffers = ['DEMO_EQUIVALENT', 'DEMO_DIFFERENT_ROOM', 'DEMO_DIFFERENT_HOTEL'];
 const pendingKey = 'roomdrop-selected-command-v1';
@@ -18,6 +19,7 @@ const stages = {
 let state, selectedOffer, lastOfferId, busy = false, refreshRequired = false;
 let pending = loadPending();
 let message = '', messageError = false;
+let watchMessage = '', watchError = false, notifications = { notifications: [] };
 let acknowledgementKey = null;
 function node(tag, text, className) {
   const element = document.createElement(tag);
@@ -83,6 +85,9 @@ function loadPending() {
     if (saved?.kind === 'approval' && typeof saved.body?.offerId === 'string' && /^[a-f0-9]{64}$/.test(saved.key || '')
       && Number.isSafeInteger(saved.body.bookingVersion) && saved.body.confirmed === true) return saved;
     if (saved?.kind === 'advance' && /^sim-[a-f0-9]{64}$/.test(saved.operationId || '') && Number.isSafeInteger(saved.body?.expectedOperationRevision)) return saved;
+    if (saved?.kind === 'watch' && /^[a-f0-9]{64}$/.test(saved.key || '') && Number.isSafeInteger(saved.body?.bookingVersion)
+      && saved.body.bookingVersion > 0 && Number.isSafeInteger(saved.body.watchVersion) && saved.body.watchVersion >= 0
+      && typeof saved.body.enabled === 'boolean' && Object.keys(saved.body).length === 3) return saved;
   } catch { /* Browser storage is optional; retries remain exact in memory. */ }
   return null;
 }
@@ -110,6 +115,13 @@ function setStatus(text, error = false) {
 }
 function reconcilePending() {
   if (!pending) return;
+  if (pending.kind === 'watch') {
+    const intent = state.priceWatch?.consentIntents?.[pending.body.enabled ? 'enable' : 'disable'];
+    if (intent?.idempotencyKey !== pending.key) {
+      remember(null); watchMessage = 'Latest saved watch state restored.'; watchError = false;
+    }
+    return;
+  }
   const operation = state.simulation?.operation;
   if (operation) {
     const matches = pending.kind === 'approval' ? operation.operationId === 'sim-' + pending.key : operation.operationId === pending.operationId;
@@ -214,6 +226,7 @@ function renderComparison() {
   $('review-message').classList.toggle('error', messageError);
   $('approve-offer').disabled = busy || refreshRequired || (!pending && !canApprove(offer))
     || (needsConsent && !$('accept-reduced-flexibility').checked) || pending?.kind === 'advance';
+  if (pending?.kind === 'watch') $('approve-offer').disabled = true;
   $('approve-offer').textContent = busy ? 'Saving approval…' : pending?.kind === 'approval' ? 'Retry the same approval' : 'Approve simulated switch';
 }
 function operationCopy(operation) {
@@ -274,21 +287,22 @@ function renderSimulation() {
   }));
   const canRecover = operation.scenarioId === 'uncertain-cancellation' && operation.status === 'agency-exception' && operation.cancellation?.status === 'unknown';
   const canAdvance = operation.status === 'running' || canRecover;
-  $('advance-demo').disabled = busy || refreshRequired || (!pending && !canAdvance);
+  $('advance-demo').disabled = busy || refreshRequired || (!pending && !canAdvance) || pending?.kind === 'watch';
   $('advance-demo').textContent = busy ? 'Saving progress…' : refreshRequired ? 'Refresh to see latest progress' : pending ? 'Retry the same simulation step'
     : operation.status === 'complete' ? 'Simulation complete' : !canAdvance ? 'Simulation paused' : 'Continue simulation';
   $('switch-message').textContent = message; $('switch-message').classList.toggle('error', messageError);
 }
-function renderState(next) {
+function renderState(next, overview = false) {
   state = { ...next, offers: next.offers.filter(offer => offer.bookingVersion === next.booking.version) };
   reconcilePending();
   $('content').hidden = false;
-  selectedOffer = state.simulation?.operation ? undefined : state.offers.find(offer => offer.offerId === (pending?.kind === 'approval' ? pending.body.offerId : state.selectedOfferId));
+  selectedOffer = overview || state.simulation?.operation ? undefined : state.offers.find(offer => offer.offerId === (pending?.kind === 'approval' ? pending.body.offerId : state.selectedOfferId));
   $('booking-summary').hidden = Boolean(selectedOffer);
   $('comparison').hidden = !selectedOffer;
   renderBooking(); renderOffers();
   if (selectedOffer) renderComparison();
   renderSimulation();
+  renderWatch(state, { busy, pending, refreshRequired, message: watchMessage, messageError: watchError, money, instant });
   $('close-comparison').setAttribute('aria-disabled', String(busy || Boolean(pending)));
   $('keep-booking').disabled = busy || Boolean(pending);
 }
@@ -312,8 +326,8 @@ function keepBooking() {
   const trigger = [...document.querySelectorAll('[data-offer-id]')].find(element => element.dataset.offerId === (lastOfferId || selectedOffer?.offerId));
   trigger?.focus(); window.scrollTo({ top: 0, behavior: 'instant' }); setStatus('');
 }
-async function refreshLatest() {
-  try { renderState(await request('/api/bootstrap?scenario=jury-booking')); }
+async function refreshLatest(overview = false) {
+  try { renderState(await request('/api/bootstrap?scenario=jury-booking'), overview); }
   catch { refreshRequired = true; message = 'Could not refresh the latest saved state. Refresh this page before continuing.'; }
 }
 async function mutate(kind) {
@@ -337,6 +351,7 @@ async function mutate(kind) {
     const result = await request(path, command.body, kind === 'approval' ? { 'Idempotency-Key': command.key } : {});
     remember(null); message = result.replayed ? 'This action was already saved. Latest progress is shown.' : kind === 'approval' ? 'Your selected offer approval is saved.' : 'Progress saved.';
     renderState(result); setStatus('');
+    await refreshNotifications();
     if (kind === 'approval') { $('switch-history-details').open = false; $('switch-stage').focus(); }
   } catch (error) {
     messageError = true;
@@ -349,13 +364,46 @@ async function mutate(kind) {
     if (!selectedOffer && !state.simulation?.operation) setStatus(message, true);
   } finally { busy = false; renderState(state); }
 }
+async function refreshNotifications() {
+  try {
+    notifications = await request('/api/notifications?limit=20');
+    renderNotificationPreviews(notifications, { instant });
+  } catch {
+    renderNotificationPreviews(notifications, { instant, error: 'Saved update previews could not be refreshed. Reload to try again.' });
+  }
+}
+async function mutateWatch() {
+  if (busy || refreshRequired || $('watch-button').disabled) return;
+  let command = pending;
+  if (!command) {
+    const intent = state.priceWatch?.consentIntents?.[state.priceWatch.enabled ? 'disable' : 'enable'];
+    if (!intent) return;
+    command = { kind: 'watch', body: { ...intent.body }, key: intent.idempotencyKey };
+  }
+  if (command.kind !== 'watch') return;
+  remember(command); busy = true; watchMessage = ''; watchError = false; renderState(state, true);
+  try {
+    const result = await request('/api/price-watch', command.body, { 'Idempotency-Key': command.key });
+    remember(null); renderState(result, true); watchMessage = ''; setStatus('');
+    await refreshNotifications();
+  } catch (error) {
+    watchError = true;
+    if (error.status === 409) {
+      remember(null); await refreshLatest(true);
+      watchMessage = refreshRequired ? 'Could not refresh saved watch state. Reload before continuing.' : 'The booking or watch changed. Latest values are shown; review them before trying again.';
+    } else if (error.status && error.status < 500) {
+      remember(null); watchMessage = error.message;
+    } else watchMessage = 'The watch result could not be confirmed. Retry the same action or reload to see saved state.';
+  } finally { busy = false; renderState(state, true); }
+}
 $('close-comparison').addEventListener('click', event => { event.preventDefault(); keepBooking(); });
 $('keep-booking').addEventListener('click', keepBooking);
 $('approve-offer').addEventListener('click', () => mutate('approval'));
 $('accept-reduced-flexibility').addEventListener('change', () => { if (selectedOffer) renderComparison(); });
 $('advance-demo').addEventListener('click', () => mutate('advance'));
+$('watch-button').addEventListener('click', mutateWatch);
 async function bootstrap() {
-  try { renderState(await request('/api/bootstrap?scenario=jury-booking')); setStatus(''); }
+  try { renderState(await request('/api/bootstrap?scenario=jury-booking')); setStatus(''); await refreshNotifications(); }
   catch (error) {
     setStatus('Cannot load the demo booking. ' + error.message, true);
     const retry = node('button', 'Try again', 'plain');
