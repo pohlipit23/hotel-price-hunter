@@ -129,3 +129,34 @@ Verification: real browser at mobile/desktop sizes, keyboard use, refresh at ref
 Verified local simulation checkpoint, 14 October: **87/87** emulator-enabled tests with zero skips, **15** new browser checks with zero runtime errors, both existing browser regressions unchanged and passing, nine new responsive rows at 320/390/1440px, and a successful local Docker build/emulator smoke. Independent backend and UI reviews approved their bounded scopes after fixing monitoring continuation, stale changed-price refund, and fresh-session/competing-journey pending commands. See `docs/simulation-verification.md`, `docs/review-simulation.md` and `docs/review-simulation-ui.md`. The isolated QA browser/container were cleaned up; the local app remains available for review. The pre-existing emulator and unrelated `designs/brand/` are preserved.
 
 This completes the first local simulated equivalent-switch slice, including changed-material stopping and unknown-cancellation reconciliation. Offer-specific approval/non-refundable execution and a separate protected agency view remain next capabilities. No scheduler, email, private supplier retrieval, deployment, public access or additional live inference occurred; the existing cloud revision still contains the earlier customer path. Its deployed browser/live-Gemini checkpoint above remains unchecked rather than being closed by local or API-only proof.
+
+## Approved RoomDrop postcard flow — 15 October
+
+The user approved the booking-first visual direction and selected-alternative review (option 2), then requested the approved RoomDrop wordmark and key icon. This supersedes the customer-facing invitation, requirements/settings form, chat link and scenario-selector layout; it does not remove the underlying booking constraints, versioned permissions or safety tests. The approved composition is retained in `docs/design/booking-postcard-approved-v1.png`; the selected RoomDrop source assets supply identity and palette. The matching ivory icon uses the selected key geometry. Source `designs/brand/` remains untouched.
+
+### Task 9: Selected-offer approval and simulation
+
+- [x] Three refundable alternatives have version/fingerprint-bound approval intents; explicit confirmation saves one immutable offer-specific approval and operation atomically, without creating standing permission, enrolment or preference changes.
+- [x] Equivalent, different-room and different-hotel approvals each complete the shared six-stage simulation with net refunds USD 55, USD 75 and USD 85; replacement promotion and refund completion remain distinct.
+- [x] Stale/missing/changed/unknown facts, false confirmation, mixed currencies and missing costs cannot authorize a switch. Lost acknowledgments/concurrent requests replay safely and reserve one source booking version.
+
+Verification: meaningful domain/API tests and actual Firestore concurrency across clients, preserving existing standing-path tests. See `docs/booking-postcard-contract.md`; no real supplier/model/cloud operation is authorized by this local slice.
+
+### Task 10: Simple branded customer display
+
+- [x] Current booking leads; each alternative is a horizontal landscape-photo card with its hotel name, room subline, relationship/refundability pills and saving. RoomDrop logo and key copies match the approved source bytes.
+- [x] The selected review shows truthful changed facts and whole-stay prices, `Net saving after fees` with `-USD 55` for the equivalent offer, plus potential-refund/fee wording. The marked Ask link and approval-scope note are removed.
+- [x] No opening modal, stay-requirements questionnaire, preferences/settings controls or customer scenario selector is presented. Review/back/keep/reload create no approval or execution.
+- [x] Compact persisted progress preserves pending versus completed refund, safe retries and current booking state. Detailed history is collapsed by default; no mutation automatically resumes on reload.
+
+Verification: replace obsolete DOM-specific browser harnesses only after the comprehensive postcard harness passes; retain all existing domain/API safety tests. Check keyboard use, 320/390/768/1440px, honest photo fallback, fresh-session/competing-journey retries and real per-offer simulation.
+
+### Checkpoint: approved postcard scenarios
+
+- [x] Full emulator-enabled suite and local container checks pass with skips/failures accurately recorded.
+- [x] New comprehensive browser acceptance and fresh independent review resolve actionable findings; captures visually inspected.
+- [x] Local app is available for review; exact evidence/retired-test rationale and remaining deployment/live/supplier gates documented.
+
+Verified RoomDrop checkpoint, 15 October: **102/102** tests passed against the actual Firestore emulator with zero skips/failures. Browser acceptance passed **11 groups**, **21** stage snapshots and **16** responsive checks with zero runtime errors; all three selected offers completed their real local persisted simulation. Approved logo/key copies match original hashes. Fresh independent review passed seven authority/material guards, four stopped-state copy checks and four meaningful safety mutations after repairing literal confirmation and truthful stopped-state reasons. Root and QA inspected mobile/desktop captures. Final local Docker build/emulator smoke and restarted-host different-hotel journey passed; local app is retained in session `79442`.
+
+The three old DOM-specific browser harnesses were retired only after their replacement passed, because the human explicitly removed the modal/questionnaire/settings/chat/scenario UI. Domain/API tests and the standing-path safety scenarios remain intact. See `docs/booking-postcard-verification.md` and `docs/review-booking-postcard.md` for exact run/source boundaries, including copy-only final checks. Source brand files and existing emulator were preserved; owned QA browser/container cleaned up. No Vertex invocation, real transaction, email, source push, cloud deployment or public access change occurred. Non-refundable approval, protected agency view, scheduled checks and notification delivery remain future work; the private cloud still serves its older source.
