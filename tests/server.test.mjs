@@ -251,3 +251,204 @@ test('health aliases return identical liveness without storage or model side eff
   assert.equal(storageCalls, 0);
   assert.equal(modelCalls, 0);
 });
+
+async function enabledSwitch(t, options = {}) {
+  const app = await harness(t, options);
+  const saved = await app.post('/api/enrolment', { ...enrolment({ automaticEquivalentSwitches: true }), permissionConfirmation: permission });
+  assert.equal(saved.status, 200);
+  app.state = await saved.json();
+  app.begin = async (scenarioId = 'equivalent-saving', intent = app.state.simulation.scenarios.find(item => item.id === scenarioId).intent) => {
+    const { idempotencyKey, ...body } = intent;
+    return app.post('/api/switches', body, { 'Idempotency-Key': idempotencyKey });
+  };
+  app.advance = async (operation = app.state.simulation.operation, revision = operation.revision) => app.post(`/api/switches/${operation.operationId}/advances`, { expectedOperationRevision: revision });
+  app.refresh = async () => (await fetch(`${app.origin}/api/bootstrap`, { headers: { Cookie: app.cookie } })).json();
+  return app;
+}
+
+test('switch persists stage and new baseline, exact start/advance replay never duplicates effects', async t => {
+  const app = await enabledSwitch(t);
+  const intent = app.state.simulation.nextIntent;
+  const starts = await Promise.all([app.begin(), app.begin()]);
+  assert.deepEqual(starts.map(item => item.status), [200, 200]);
+  const started = await Promise.all(starts.map(item => item.json()));
+  assert.deepEqual(started.map(item => item.replayed).sort(), [false, true]);
+  app.state = started[0];
+  for (const stage of ['revalidated', 'replacement-secured', 'fulfilment-verified', 'cancellation-requested', 'cancellation-verified', 'refund-completed']) {
+    const operation = app.state.simulation.operation;
+    const responses = await Promise.all([app.advance(operation), app.advance(operation)]);
+    assert.deepEqual(responses.map(item => item.status), [200, 200]);
+    const bodies = await Promise.all(responses.map(item => item.json()));
+    assert.deepEqual(bodies.map(item => item.replayed).sort(), [false, true]);
+    app.state = await app.refresh();
+    assert.equal(app.state.simulation.operation.stage, stage);
+    assert.equal(app.state.simulation.operation.revision, operation.revision + 1);
+  }
+  assert.equal(app.state.booking.version, 2);
+  assert.equal(app.state.booking.retail.totalMinor, 54000);
+  assert.deepEqual(app.state.offers, []);
+  assert.equal(app.state.transactionMode, 'simulated');
+  assert.equal(app.state.simulation.nextIntent, null);
+  assert.equal(app.state.simulation.operation.refund.status, 'completed');
+  assert.equal(app.state.simulation.operation.history.length, 7);
+  const replay = await (await app.begin('equivalent-saving', intent)).json();
+  assert.equal(replay.replayed, true);
+  assert.equal(replay.booking.version, 2);
+  const old = await (await app.advance(app.state.simulation.operation, 0)).json();
+  assert.equal(old.simulation.operation.stage, 'refund-completed');
+  assert.equal(old.replayedCommand.stage, 'revalidated');
+  assert.doesNotMatch(JSON.stringify(app.state.simulation), /intentHash|commands|csrfToken|permissionSnapshot/);
+  assert.equal((await app.post('/api/selection', { offerId: fixture.offers[0].offerId, bookingVersion: 1 })).status, 409);
+  assert.equal((await app.post('/api/selection', { offerId: fixture.offers[0].offerId, bookingVersion: 2 })).status, 404);
+  assert.equal((await app.post('/api/advice', { offerId: fixture.offers[0].offerId, bookingVersion: 1, message: 'Explain' })).status, 409);
+  assert.equal((await app.post('/api/enrolment', enrolment({ version: app.state.preferences.version }))).status, 409);
+  assert.equal((await app.post('/api/enrolment', { ...enrolment({ version: app.state.preferences.version }), bookingVersion: 2 })).status, 200);
+});
+
+test('switch routes reject forged input, missing authority, stale facts and visitor isolation', async t => {
+  const app = await enabledSwitch(t);
+  const { idempotencyKey, ...body } = app.state.simulation.nextIntent;
+  assert.equal((await app.post('/api/switches', body)).status, 422);
+  assert.equal((await app.post('/api/switches', { ...body, price: 1 }, { 'Idempotency-Key': idempotencyKey })).status, 422);
+  assert.equal((await app.post('/api/switches', body, { 'Idempotency-Key': idempotencyKey, 'X-CSRF-Token': 'bad' })).status, 403);
+  assert.equal((await app.post('/api/switches', { ...body, scenarioId: 'live-booking' }, { 'Idempotency-Key': idempotencyKey })).status, 404);
+  const unauthorised = await harness(t);
+  const { idempotencyKey: noKey, ...noAuthority } = unauthorised.initial.simulation.nextIntent;
+  const denied = await unauthorised.post('/api/switches', noAuthority, { 'Idempotency-Key': noKey });
+  assert.equal(denied.status, 409);
+  assert.equal((await denied.json()).error.code, 'SWITCH_NOT_AUTHORISED');
+  await app.post('/api/enrolment', enrolment({ version: app.state.preferences.version, automaticEquivalentSwitches: false }));
+  assert.equal((await app.post('/api/switches', body, { 'Idempotency-Key': idempotencyKey })).status, 409);
+  const second = await enabledSwitch(t);
+  second.state = await (await second.begin()).json();
+  const id = second.state.simulation.operation.operationId;
+  assert.equal((await app.post(`/api/switches/${id}/advances`, { expectedOperationRevision: 0 })).status, 404);
+  assert.equal((await second.post(`/api/switches/${id}/advances`, { expectedOperationRevision: -1 })).status, 422);
+  assert.equal((await second.post(`/api/switches/${id}/advances`, { expectedOperationRevision: 99 })).status, 409);
+});
+
+test('competing scenario claims reserve one baseline and changed payload does not reuse an intent', async t => {
+  const app = await enabledSwitch(t);
+  const responses = await Promise.all([app.begin('equivalent-saving'), app.begin('material-change')]);
+  assert.deepEqual(responses.map(item => item.status).sort(), [200, 409]);
+  const winning = await responses.find(item => item.status === 200).json();
+  const scenarioId = winning.simulation.operation.scenarioId;
+  const { idempotencyKey, ...body } = app.state.simulation.scenarios.find(item => item.id === scenarioId).intent;
+  const mismatch = await app.post('/api/switches', { ...body, preferenceVersion: body.preferenceVersion + 1 }, { 'Idempotency-Key': idempotencyKey });
+  assert.equal(mismatch.status, 422);
+  assert.equal((await mismatch.json()).error.code, 'IDEMPOTENCY_PAYLOAD_MISMATCH');
+});
+
+test('material change and unknown cancellation use trusted scripts and distinct safety stops', async t => {
+  const changed = await enabledSwitch(t);
+  changed.state = await (await changed.begin('material-change')).json();
+  changed.state = await (await changed.advance()).json();
+  assert.equal(changed.state.simulation.operation.status, 'awaits-renewed-approval');
+  assert.equal(changed.state.simulation.operation.revalidatedOffer.version, 2);
+  assert.equal(changed.state.simulation.operation.replacementBooking, null);
+  assert.equal(changed.state.booking.version, 1);
+  const uncertain = await enabledSwitch(t);
+  uncertain.state = await (await uncertain.begin('uncertain-cancellation')).json();
+  for (let index = 0; index < 5; index++) uncertain.state = await (await uncertain.advance()).json();
+  const operation = uncertain.state.simulation.operation;
+  assert.equal(operation.status, 'agency-exception');
+  assert.equal(operation.savingSecured, false);
+  assert.equal(operation.refund.status, 'not-started');
+  assert.equal(uncertain.state.booking.version, 1);
+  await uncertain.post('/api/enrolment', enrolment({ version: uncertain.state.preferences.version, automaticEquivalentSwitches: false, continueMonitoring: false }));
+  uncertain.state = await (await uncertain.advance()).json();
+  assert.equal(uncertain.state.simulation.operation.cancellation.intentId, operation.cancellation.intentId);
+  assert.equal(uncertain.state.booking.version, 2);
+  assert.equal(uncertain.state.permissionRecord, null);
+  assert.equal(uncertain.state.simulation.operation.refund.status, 'pending');
+  uncertain.state = await (await uncertain.advance()).json();
+  assert.equal(uncertain.state.simulation.operation.refund.status, 'completed');
+});
+
+test('storage failure and expired session between pre-read and commit cannot claim simulated success', async t => {
+  const app = await enabledSwitch(t);
+  const update = app.storage.update.bind(app.storage);
+  let failed = true;
+  app.storage.update = async (...args) => { if (failed) { failed = false; throw new Error('private storage details'); } return update(...args); };
+  assert.equal((await app.begin()).status, 503);
+  assert.equal((await app.refresh()).simulation.operation, null);
+  app.state = await (await app.begin()).json();
+  const expiryRace = app.storage.update.bind(app.storage);
+  app.storage.update = async (id, change) => {
+    await expiryRace(id, state => ({ ...state, expiresAt: '2026-10-01T00:00:00Z' }));
+    return expiryRace(id, change);
+  };
+  assert.equal((await app.advance()).status, 401);
+});
+
+test('lost storage acknowledgment replays the committed intent and stage without another effect', async t => {
+  const app = await enabledSwitch(t);
+  const update = app.storage.update.bind(app.storage);
+  let loseAcknowledgment = true;
+  app.storage.update = async (...args) => {
+    const saved = await update(...args);
+    if (loseAcknowledgment) { loseAcknowledgment = false; throw new Error('Simulated acknowledgment timeout.'); }
+    return saved;
+  };
+  assert.equal((await app.begin()).status, 503);
+  app.state = await (await app.begin()).json();
+  assert.equal(app.state.replayed, true);
+  assert.equal(app.state.simulation.operation.revision, 0);
+  assert.equal(app.state.simulation.operation.history.length, 1);
+  const operation = app.state.simulation.operation;
+  loseAcknowledgment = true;
+  assert.equal((await app.advance(operation)).status, 503);
+  app.state = await (await app.advance(operation)).json();
+  assert.equal(app.state.replayed, true);
+  assert.equal(app.state.simulation.operation.revision, 1);
+  assert.equal(app.state.simulation.operation.history.length, 2);
+  assert.equal(app.state.replayedCommand.stage, 'revalidated');
+});
+
+test('in-flight advice does not return a stale successful comparison after preferences change', async t => {
+  let release;
+  let entered;
+  const active = new Promise(resolve => { entered = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  const advisor = { available: true, status: 'test-injected', async advise() { entered(); await gate; return { summary: 'Keep flexibility.', recommendation: 'keep-booking', tradeoffs: [], uncertainties: [] }; } };
+  const app = await enabledSwitch(t, { advisor });
+  const advice = app.post('/api/advice', { offerId: fixture.offers[0].offerId, bookingVersion: 1, message: 'Explain this saving.' });
+  await active;
+  await app.post('/api/enrolment', enrolment({ version: app.state.preferences.version, automaticEquivalentSwitches: false }));
+  release();
+  assert.equal((await advice).status, 409);
+});
+
+test('Firestore switch integration: independent servers serialize intents/stages and restore promoted baseline', { skip: !process.env.RUN_FIRESTORE_INTEGRATION }, async t => {
+  const firstStorage = await createStorage(process.env);
+  const secondStorage = await createStorage(process.env);
+  const app = await enabledSwitch(t, { storage: firstStorage });
+  const second = await harness(t, { storage: secondStorage });
+  t.after(async () => {
+    await firstStorage.delete(app.cookie.split('=')[1]);
+    await secondStorage.delete(second.cookie.split('=')[1]);
+    await Promise.all([firstStorage.close(), secondStorage.close()]);
+  });
+  const { idempotencyKey, ...body } = app.state.simulation.nextIntent;
+  const otherPost = (path, value, extra = {}) => second.post(path, value, { Cookie: app.cookie, 'X-CSRF-Token': app.initial.csrfToken, ...extra });
+  const starts = await Promise.all([app.begin(), otherPost('/api/switches', body, { 'Idempotency-Key': idempotencyKey })]);
+  assert.deepEqual(starts.map(item => item.status), [200, 200]);
+  const results = await Promise.all(starts.map(item => item.json()));
+  assert.deepEqual(results.map(item => item.replayed).sort(), [false, true]);
+  app.state = results[0];
+  for (let index = 0; index < 6; index++) {
+    const operation = app.state.simulation.operation;
+    const stages = await Promise.all([app.advance(), otherPost(`/api/switches/${operation.operationId}/advances`, { expectedOperationRevision: operation.revision })]);
+    assert.deepEqual(stages.map(item => item.status), [200, 200]);
+    const updates = await Promise.all(stages.map(item => item.json()));
+    assert.deepEqual(updates.map(item => item.replayed).sort(), [false, true]);
+    app.state = updates[0];
+  }
+  const restored = await (await fetch(`${second.origin}/api/bootstrap`, { headers: { Cookie: app.cookie } })).json();
+  assert.equal(restored.booking.version, 2);
+  assert.equal(restored.booking.retail.totalMinor, 54000);
+  assert.equal(restored.simulation.operation.history.length, 7);
+  assert.equal(restored.simulation.operation.refund.status, 'completed');
+  const replay = await otherPost('/api/switches', body, { 'Idempotency-Key': idempotencyKey });
+  assert.equal((await replay.json()).replayed, true);
+});

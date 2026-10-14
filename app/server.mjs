@@ -3,9 +3,10 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { evaluateOffer, validatePreferences } from './domain/decision.mjs';
+import { validatePreferences } from './domain/decision.mjs';
 import { createStorage } from './storage.mjs';
 import { createGeminiAdvisor } from './gemini.mjs';
+import { SimulationError, initialiseSimulation, offerDecision, simulationView, startSwitch, advanceSwitch } from './domain/simulation.mjs';
 
 const PUBLIC_ROOT = resolve(fileURLToPath(new URL('./public/', import.meta.url)));
 const COOKIE_NAME = 'hph_visitor';
@@ -59,7 +60,7 @@ function readJson(request) {
 async function stored(operation) {
   try { return await operation(); }
   catch (error) {
-    if (error instanceof RequestError || error.code === 'INVALID_PREFERENCES') throw error;
+    if (error instanceof RequestError || error instanceof SimulationError || error.code === 'INVALID_PREFERENCES') throw error;
     fail(503, 'STORAGE_UNAVAILABLE', 'Persistent storage is unavailable. Please retry.');
   }
 }
@@ -81,33 +82,22 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
     return `http://${request.headers.host}`;
   }
   function decisions(state) {
-    const record = state.permissionRecord;
-    const hasStandingPermission = record?.confirmed === true && record.scope === 'equivalent-only'
-      && record.bookingVersion === fixture.booking.version && record.preferenceVersion === state.preferences.version;
-    const effectivePreferences = { ...state.preferences, automaticEquivalentSwitches: state.preferences.automaticEquivalentSwitches && hasStandingPermission };
-    const standingApproval = hasStandingPermission ? [{
-      type: 'standing', scope: 'equivalent-only', permissionVersion: record.version,
-      bookingId: fixture.booking.bookingId, bookingVersion: record.bookingVersion,
-      preferenceVersion: record.preferenceVersion, confirmed: true,
-      confirmedAt: record.confirmedAt, revokedAt: null,
-    }] : [];
-    return fixture.offers.map(offer => ({
-      ...offer,
-      decision: evaluateOffer({ booking: fixture.booking, offer, preferences: effectivePreferences, agencyMinimumSavingMinor: fixture.agencyMinimumSavingMinor, approvals: standingApproval, now: state.demoNow }),
-    }));
+    return state.offers.map(offer => ({ ...offer, decision: offerDecision(state, offer, fixture) }));
   }
-  function publicState(state) {
+  function publicState(value, visitorId) {
+    const state = initialiseSimulation(value, fixture);
     // All source facts are the checked-in anonymised fixture. No arbitrary retrieval exists.
     return {
       schemaVersion: 1, scenarioId: state.scenarioId,
-      mode: 'public-jury', transactionMode: 'not-implemented',
+      mode: 'public-jury', transactionMode: 'simulated',
       demoNow: state.demoNow, clockMode: 'fictional-demo', provenance: fixture.provenance,
-      booking: fixture.booking, offers: decisions(state), currency: fixture.currency,
+      booking: state.booking, offers: decisions(state), currency: fixture.currency,
       agencyMinimumSavingMinor: fixture.agencyMinimumSavingMinor,
       preferences: state.preferences, permissionRecord: state.permissionRecord,
       enrolled: state.enrolled, selectedOfferId: state.selectedOfferId,
       approvals: [], revision: state.revision, csrfToken: state.csrfToken,
       model: { available: advisor.available, status: advisor.status },
+      monitoring: state.monitoring, simulation: simulationView(state, visitorId, fixture),
     };
   }
   async function visitor(request, response, create = false) {
@@ -118,25 +108,31 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
     if (!state) {
       const secure = expectedOrigin(request).startsWith('https:');
       id = randomBytes(32).toString('hex');
-      state = {
+      state = initialiseSimulation({
         schemaVersion: 1, scenarioId: fixture.scenarioId, demoNow,
         enrolled: false, preferences: defaults, permissionRecord: null, selectedOfferId: null,
         revision: 0, csrfToken: randomBytes(32).toString('hex'),
         createdAt: now().toISOString(), expiresAt: new Date(now().getTime() + SESSION_MS).toISOString(),
         adviceWindowStartedAt: null, adviceRequestCount: 0,
-      };
+      }, fixture);
       await stored(() => storage.create(id, state));
       response.setHeader('Set-Cookie', `${COOKIE_NAME}=${id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MS / 1000}${secure ? '; Secure' : ''}`);
     }
     return { id, state };
   }
-  function bookingVersion(value) {
-    if (value !== fixture.booking.version) fail(409, 'BOOKING_VERSION_CHANGED', 'Reload the booking before continuing.');
+  function bookingVersion(value, state) {
+    if (value !== state.booking.version) fail(409, 'BOOKING_VERSION_CHANGED', 'Reload the booking before continuing.');
   }
-  function selectedOffer(offerId) {
-    const offer = fixture.offers.find(item => item.offerId === offerId);
+  function selectedOffer(offerId, state) {
+    const offer = state.offers.find(item => item.offerId === offerId);
     if (!offer) fail(404, 'OFFER_NOT_FOUND', 'This offer is not in the public jury scenario.');
     return offer;
+  }
+  async function updateVisitor(id, change) {
+    return stored(() => storage.update(id, value => {
+      if (!Number.isFinite(Date.parse(value.expiresAt)) || Date.parse(value.expiresAt) <= now().getTime()) fail(401, 'SESSION_REQUIRED', 'Load the booking page before making changes.');
+      return initialiseSimulation(change(initialiseSimulation(value, fixture)), fixture);
+    }));
   }
   const server = http.createServer(async (request, response) => {
     response.setHeader('Cache-Control', 'no-store');
@@ -150,28 +146,47 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
       if (request.method === 'GET' && url.pathname === '/api/bootstrap') {
         if ([...url.searchParams.keys()].some(key => key !== 'scenario') || (url.searchParams.get('scenario') || 'jury-booking') !== 'jury-booking') fail(404, 'SCENARIO_NOT_FOUND', 'Only the anonymised jury scenario is available.');
         if (request.headers['sec-fetch-site'] === 'cross-site') fail(403, 'ORIGIN_REJECTED', 'Load the application directly.');
-        const { state } = await visitor(request, response, true);
-        return sendJson(response, 200, publicState(state));
+        const { id, state } = await visitor(request, response, true);
+        return sendJson(response, 200, publicState(state, id));
       }
-      const routes = ['/api/enrolment', '/api/selection', '/api/advice'];
-      if (request.method === 'POST' && routes.includes(url.pathname)) {
+      const routes = ['/api/enrolment', '/api/selection', '/api/advice', '/api/switches'];
+      const advanceRoute = /^\/api\/switches\/(sim-[a-f0-9]{64})\/advances$/.exec(url.pathname);
+      if (request.method === 'POST' && (routes.includes(url.pathname) || advanceRoute)) {
         if (request.headers.origin !== expectedOrigin(request) || request.headers['sec-fetch-site'] === 'cross-site') fail(403, 'ORIGIN_REJECTED', 'Request origin was rejected.');
         const body = await readJson(request);
         const { id, state } = await visitor(request, response);
         if (!safeEqual(request.headers['x-csrf-token'], state.csrfToken)) fail(403, 'CSRF_REJECTED', 'Reload the page before making changes.');
+        if (url.pathname === '/api/switches' || advanceRoute) {
+          object(body, advanceRoute ? ['expectedOperationRevision'] : ['scenarioId', 'offerId', 'offerVersion', 'bookingVersion', 'preferenceVersion'], 'simulated switch request');
+          if (advanceRoute) {
+            if (!Number.isSafeInteger(body.expectedOperationRevision) || body.expectedOperationRevision < 0) fail(422, 'VALIDATION_ERROR', 'Send the current non-negative operation revision.');
+          } else {
+            if (typeof body.scenarioId !== 'string' || typeof body.offerId !== 'string' || ['offerVersion', 'bookingVersion', 'preferenceVersion'].some(key => !Number.isSafeInteger(body[key]) || body[key] < 1)) fail(422, 'VALIDATION_ERROR', 'Send the complete current simulated intent.');
+            if (!/^[a-f0-9]{64}$/.test(request.headers['idempotency-key'] || '')) fail(422, 'INVALID_IDEMPOTENCY_KEY', 'Use the saved switch intent key.');
+          }
+          let result;
+          const saved = await updateVisitor(id, current => {
+            result = advanceRoute
+              ? advanceSwitch(current, { operationId: advanceRoute[1], expectedOperationRevision: body.expectedOperationRevision, fixture, recordedAt: now().toISOString() })
+              : startSwitch(current, { body, idempotencyKey: request.headers['idempotency-key'], visitorId: id, fixture, recordedAt: now().toISOString() });
+            return result.state;
+          });
+          return sendJson(response, 200, { ...publicState(saved, id), replayed: result.replayed,
+            ...(result.replayedCommand ? { replayedCommand: result.replayedCommand } : {}) });
+        }
         if (url.pathname === '/api/enrolment') {
           object(body, ['bookingVersion', 'preferences', 'permissionConfirmation'], 'enrolment');
-          bookingVersion(body.bookingVersion);
           object(body.preferences, ['version', 'essentialRequirements', 'automaticEquivalentSwitches', 'minimumSavingMinor', 'notificationFrequency', 'continueMonitoring'], 'preferences');
-          const result = await stored(() => storage.update(id, current => {
+          const result = await updateVisitor(id, current => {
+            bookingVersion(body.bookingVersion, current);
             if (!Number.isSafeInteger(body.preferences.version) || body.preferences.version < 1) fail(422, 'VALIDATION_ERROR', 'Send the current positive preference version.');
             if (body.preferences.version !== current.preferences.version) fail(409, 'PREFERENCES_VERSION_CHANGED', 'Preferences changed. Reload and review them before confirming again.');
-            const preferences = validatePreferences({ ...body.preferences, version: current.preferences.version + 1 }, { booking: fixture.booking, agencyMinimumSavingMinor: fixture.agencyMinimumSavingMinor });
+            const preferences = validatePreferences({ ...body.preferences, version: current.preferences.version + 1 }, { booking: current.booking, agencyMinimumSavingMinor: fixture.agencyMinimumSavingMinor });
             let permissionRecord = null;
             if (preferences.automaticEquivalentSwitches) {
               object(body.permissionConfirmation, ['confirmed', 'version', 'bookingVersion', 'preferenceVersion', 'scope'], 'permission confirmation');
               const confirmation = body.permissionConfirmation;
-              if (confirmation.confirmed !== true || confirmation.version !== 1 || confirmation.bookingVersion !== fixture.booking.version || confirmation.scope !== 'equivalent-only') fail(422, 'PERMISSION_CONFIRMATION_REQUIRED', 'Separately confirm permission for equivalent switches on this booking.');
+              if (confirmation.confirmed !== true || confirmation.version !== 1 || confirmation.bookingVersion !== current.booking.version || confirmation.scope !== 'equivalent-only') fail(422, 'PERMISSION_CONFIRMATION_REQUIRED', 'Separately confirm permission for equivalent switches on this booking.');
               if (!Number.isSafeInteger(confirmation.preferenceVersion) || confirmation.preferenceVersion < 1) fail(422, 'PERMISSION_CONFIRMATION_REQUIRED', 'Confirm permission against the current preference version.');
               if (confirmation.preferenceVersion !== current.preferences.version) fail(409, 'PREFERENCES_VERSION_CHANGED', 'Preferences changed. Reload and review them before confirming again.');
               permissionRecord = { ...confirmation, sourcePreferenceVersion: confirmation.preferenceVersion, preferenceVersion: preferences.version, confirmedAt: current.demoNow, recordedAt: now().toISOString(), clockMode: 'fictional-demo' };
@@ -179,26 +194,36 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
               fail(422, 'VALIDATION_ERROR', 'Permission confirmation applies only when equivalent switches are enabled.');
             }
             return { ...current, enrolled: true, preferences, permissionRecord, revision: current.revision + 1, updatedAt: now().toISOString() };
-          }));
-          return sendJson(response, 200, publicState(result));
+          });
+          return sendJson(response, 200, publicState(result, id));
         }
         object(body, url.pathname === '/api/selection' ? ['offerId', 'bookingVersion'] : ['offerId', 'bookingVersion', 'message'], 'comparison request');
-        bookingVersion(body.bookingVersion);
-        const offer = selectedOffer(body.offerId);
         if (url.pathname === '/api/selection') {
-          const result = await stored(() => storage.update(id, current => ({ ...current, selectedOfferId: offer.offerId, revision: current.revision + 1, updatedAt: now().toISOString() })));
-          return sendJson(response, 200, publicState(result));
+          const result = await updateVisitor(id, current => {
+            bookingVersion(body.bookingVersion, current);
+            const offer = selectedOffer(body.offerId, current);
+            return { ...current, selectedOfferId: offer.offerId, revision: current.revision + 1, updatedAt: now().toISOString() };
+          });
+          return sendJson(response, 200, publicState(result, id));
         }
         if (typeof body.message !== 'string' || !body.message.trim() || body.message.length > 1200) fail(422, 'VALIDATION_ERROR', 'Question must contain 1–1200 characters.');
-        const current = await stored(() => storage.update(id, value => {
+        const current = await updateVisitor(id, value => {
+          bookingVersion(body.bookingVersion, value);
+          const offer = selectedOffer(body.offerId, value);
           const started = Date.parse(value.adviceWindowStartedAt);
           const reset = !Number.isFinite(started) || now().getTime() - started >= 60 * 1000;
           const count = reset ? 0 : value.adviceRequestCount;
           if (count >= adviceLimit) fail(429, 'ADVICE_RATE_LIMIT', 'Please wait a minute before requesting more advice.');
           return { ...value, selectedOfferId: offer.offerId, adviceWindowStartedAt: reset ? now().toISOString() : value.adviceWindowStartedAt, adviceRequestCount: count + 1 };
-        }));
+        });
+        const offer = selectedOffer(body.offerId, current);
         const decision = decisions(current).find(item => item.offerId === offer.offerId).decision;
-        const advice = await advisor.advise({ booking: fixture.booking, offer, preferences: current.preferences, decision, currency: fixture.currency, message: body.message });
+        const advice = await advisor.advise({ booking: current.booking, offer, preferences: current.preferences, decision, currency: fixture.currency, message: body.message });
+        const latest = await stored(() => storage.get(id));
+        if (!latest || Date.parse(latest.expiresAt) <= now().getTime()) fail(401, 'SESSION_REQUIRED', 'Reload the booking page before continuing.');
+        const fresh = initialiseSimulation(latest, fixture);
+        if (fresh.booking.version !== current.booking.version || fresh.preferences.version !== current.preferences.version
+            || fresh.revision !== current.revision) fail(409, 'COMPARISON_CHANGED', 'The booking or preferences changed while advice was being prepared. Reload the comparison.');
         return sendJson(response, 200, { advice, decision, offerId: offer.offerId, source: 'vertex-gemini', permissionsChanged: false });
       }
       if (url.pathname.startsWith('/api/')) fail(404, 'ROUTE_NOT_FOUND', 'This public route is unavailable.');
@@ -217,7 +242,7 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
       if (response.headersSent) return response.end();
       if (error.code === 'INVALID_PREFERENCES') return sendJson(response, 422, { error: { code: error.code, message: 'Check your preferences.', details: error.details } });
       if (error.code === 'ADVICE_UNAVAILABLE') return sendJson(response, 503, { error: { code: error.code, message: error.message } });
-      const known = error instanceof RequestError;
+      const known = error instanceof RequestError || error instanceof SimulationError;
       sendJson(response, known ? error.status : 500, { error: { code: known ? error.code : 'INTERNAL_ERROR', message: known ? error.message : 'Unable to complete this request.', ...(error.details ? { details: error.details } : {}) } });
     }
   });
