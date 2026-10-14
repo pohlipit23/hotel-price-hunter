@@ -93,6 +93,8 @@ All errors use `{error:{code,message,details?}}`. JSON bodies are limited to 16 
 | `POST /api/switches/:operationId/advances` | `{expectedOperationRevision}`; commits one next simulated stage or reconciles a recorded unknown cancellation. Repeating a committed command returns current saved state without repeating the effect. |
 | `POST /api/offer-approvals` | `{offerId,offerVersion,bookingVersion,preferenceVersion,materialFingerprint,confirmed:true}` with the server-issued `Idempotency-Key`; atomically records approval for this selected refundable offer and one simulated operation. It grants no standing permission or preference changes. |
 
+The optional non-refundable alternative uses the same versioned approval request with an additional literal `acceptReducedFlexibility:true`. Its review requires a separate acknowledgement of lost free cancellation and the end of normal monitoring after successful promotion. Refundable requests reject that extra field. The original remains active until cancellation proof; non-refundable promotion ends monitoring even if continuation was enabled. Reconciliation and refund recovery continue independently.
+
 Enrolment and selection return the full bootstrap state. Enrolment compares both incoming source preference versions inside the Firestore transaction; a concurrent update or replay fails with `409 PREFERENCES_VERSION_CHANGED` and preserves the newer state. Reload and review the current preferences and separately reconfirm permission; never automatically resubmit a stale request. Standing records retain `sourcePreferenceVersion`, bind the booking and newly saved `preferenceVersion`, use the public fictional `confirmedAt` and actual `recordedAt`, and are invalidated by later preference/permission changes. An offer-specific approval cannot be submitted through these endpoints.
 
 ### Simulated switch
@@ -104,6 +106,20 @@ The successful journey records revalidation, replacement, fulfilment verificatio
 Continued monitoring applies to the replacement baseline after a successful switch. Turning it off leaves the original enrolled watch active until its deadline. Original offers are removed after promotion rather than presented as new savings against the replacement. This slice adds no live supplier adapter, automated scheduler or real payment. See [the simulation contract](docs/simulated-switch-contract.md) and [local verification setup](docs/simulation-verification-setup.md).
 
 The final RoomDrop checks passed 102/102 tests against the Firestore emulator, 11 real-browser acceptance groups with 21 stage snapshots and 16 responsive checks, and local Docker/restarted-host journey checks. [The postcard contract](docs/booking-postcard-contract.md), [verification report](docs/booking-postcard-verification.md) and [independent review](docs/review-booking-postcard.md) record exact evidence and boundaries. The user-requested removal of the old modal/questionnaire/settings/chat/scenario UI supersedes its three DOM-specific browser harnesses; `tests/postcard.browser.mjs` covers the replacement flow, and all domain/API tests remain. Run it in the isolated Playwright CLI session documented in the report. Earlier [simulation evidence](docs/simulation-verification.md) remains historical. This new simulation/UI has not been deployed to the existing private cloud service. The local review configuration keeps Gemini unconfigured; earlier live cloud advice evidence is separate in [private-cloud-verification.md](docs/private-cloud-verification.md).
+
+## Local agency review and non-refundable scenario
+
+The subsequent local slice passed 113/113 emulator-enabled Node tests, the new non-refundable/operator browser checks and the unchanged postcard regression. [Its verification record](docs/flexibility-agency-verification.md) and [independent review](docs/review-flexibility-agency.md) distinguish actual browser/emulator evidence from source-only checks.
+
+`/agency` is a read-only view of newly indexed fictional operations, including unresolved cancellation, fulfilment/authority gaps, and saving/refund states. It requires a separate operator session. The login shell contains no credentials; protected APIs deny access by default. Only local fixture review is supported: production, Cloud Run, non-loopback binding and non-emulator activation are rejected. Existing historical operations are not backfilled.
+
+Create the ignored local access configuration once, without printing its generated passphrase:
+
+```powershell
+node scripts/setup-agency-review.mjs
+```
+
+To run local review, use the documented emulator/demo environment, set `AGENCY_AUTH_MODE=local-review`, `BIND_HOST=127.0.0.1` and `APP_ORIGIN=http://localhost:8080`, then start the app. Retrieve the passphrase manually from ignored `.local/agency-review.json` and enter it at `/agency`; never paste it into tracked files, command arguments or reports. Operator sessions last 30 minutes and invalidate on restart/reauthentication. The case APIs are read-only, paginated and strip all visitor/session credentials and internal mutation identifiers. A real verified production identity provider and deployment remain separate gates.
 
 Relevant primary documentation: [Cloud Run container contract](https://docs.cloud.google.com/run/docs/container-contract), [Firestore server library](https://docs.cloud.google.com/firestore/native/docs/create-database-server-client-library), [Firestore emulator](https://docs.cloud.google.com/firestore/native/docs/emulator), [Google emulator Docker image](https://github.com/GoogleCloudPlatform/cloud-sdk-docker), [Google Gen AI SDK](https://github.com/googleapis/js-genai), and [structured model output](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/multimodal/control-generated-output).
 

@@ -160,3 +160,33 @@ Verification: replace obsolete DOM-specific browser harnesses only after the com
 Verified RoomDrop checkpoint, 15 October: **102/102** tests passed against the actual Firestore emulator with zero skips/failures. Browser acceptance passed **11 groups**, **21** stage snapshots and **16** responsive checks with zero runtime errors; all three selected offers completed their real local persisted simulation. Approved logo/key copies match original hashes. Fresh independent review passed seven authority/material guards, four stopped-state copy checks and four meaningful safety mutations after repairing literal confirmation and truthful stopped-state reasons. Root and QA inspected mobile/desktop captures. Final local Docker build/emulator smoke and restarted-host different-hotel journey passed; local app is retained in session `79442`.
 
 The three old DOM-specific browser harnesses were retired only after their replacement passed, because the human explicitly removed the modal/questionnaire/settings/chat/scenario UI. Domain/API tests and the standing-path safety scenarios remain intact. See `docs/booking-postcard-verification.md` and `docs/review-booking-postcard.md` for exact run/source boundaries, including copy-only final checks. Source brand files and existing emulator were preserved; owned QA browser/container cleaned up. No Vertex invocation, real transaction, email, source push, cloud deployment or public access change occurred. Non-refundable approval, protected agency view, scheduled checks and notification delivery remain future work; the private cloud still serves its older source.
+
+## Non-refundable consent and protected local agency review — 15 October
+
+Approved continuation of the remaining plan after the RoomDrop postcard slice. See `docs/flexibility-agency-contract.md`. Earlier evidence above remains historical; this slice adds the previously excluded non-refundable approval and agency inspection locally.
+
+### Task 11: Reduced-flexibility approval
+
+- [x] The optional fourth offer stays collapsed; normal three-card layout and approved logo/key are preserved. Review explains lost free cancellation and monitoring ending after successful replacement promotion.
+- [x] A separate initially unchecked acknowledgement plus explicit offer approval binds literal reduced-flexibility acceptance to current versions/material terms; invalid/missing acknowledgement and stale facts cannot authorize execution.
+- [x] USD 480 / USD 115 after fees follows the shared six stages; promotion ends monitoring regardless of enrolment/continuation preference, and refund/recovery remain distinct and can continue after monitoring ends.
+
+Verification: canonical decision/domain/API acknowledgement negatives, selected-offer replay and emulator concurrency, plus three actual browser monitoring modes and passive-action/reset/keyboard checks. No new standing permission, model request or real transaction.
+
+### Task 12: Protected read-only agency inspection
+
+- [x] Operator access is denied by default; explicitly configured local review requires loopback bind/origin, a demo emulator namespace and a separately generated credential. Production/cloud enablement is rejected.
+- [x] Operator sessions enforce hard expiry, rotation, logout and CSRF; protected storage reads recheck the original session after asynchronous work. Customer cookies and role/header spoofing grant no access.
+- [x] New fictional operations receive atomic private index entries with independent opaque case IDs. Bounded pagination and detail use safe projections, excluding visitor/session IDs, initiating keys, raw proof IDs, private locators and source data. Historical cases have no backfill claim.
+- [x] Agency pages show actual cancellation/proof/authority/saving/refund and monitoring states, with no action buttons for booking, cancellation, refund or approval. Expired/logged-out access clears protected UI.
+
+Verification: actual emulator index/persistence and rollback coverage; default/unsafe configuration denial; authentication, expiry/rotation/logout and six invalidation-during-storage races; session-bound cursor limits; genuine browser exception cases and read-only inspection. The credential remains only in ignored local configuration or process memory, never test source/arguments/evidence.
+
+### Checkpoint: flexibility and agency review
+
+- [x] Emulator-enabled Node suite passed **113/113**, zero failures/skips; current `/agency` routing was independently verified after its alias was added. Independent copied-source review passed **13/13** and detected **6/6** deliberate regressions.
+- [x] New browser acceptance passed five groups, three non-refundable journeys, 24 indexed cases and 27 geometry checks; original postcard regression passed all eleven groups unchanged. No browser runtime errors or Vertex requests. Root and QA inspected review, login and case detail captures.
+- [x] Local Docker/default-denial/emulator smoke passed; owned QA containers and browsers were cleaned up, existing emulator preserved. Retained host app session `53012` serves `http://localhost:8080` and `/agency`, Gemini unconfigured.
+- [x] Exact boundaries documented in `docs/flexibility-agency-verification.md` and `docs/review-flexibility-agency.md`: local fixture operator authentication only, no deployed identity, no historical index completeness, actual expiry/injected proof failures remain domain/API evidence, intercepted browser 401 is UI-clearing proof only.
+
+Next: scheduled checks and retry-safe monitoring, notification records/previews, production operator identity and separately approved deployment/submission. No real supplier action, email, source push, cloud change, public access or additional Vertex generation occurred.
