@@ -18,7 +18,7 @@
             <div class="booking-photo"><div id="booking-photo"></div><span class="photo-tag">Illustrative photo</span></div>
             <div class="ticket-caption"><div class="ticketmain"><p class="eyebrow">Your current booking</p><h1 id="hotel"></h1><p id="room" class="muted"></p><p id="stay" class="muted"></p><p id="guests" class="muted"></p></div><div class="ticketstub"><strong id="booking-total"></strong><span>Whole stay · Taxes included</span></div></div>
           </article>
-          <section class="alternatives" aria-labelledby="changes-title"><div class="changehead"><h2 id="changes-title">Other ways to save</h2><span>Illustrative photos</span></div><div id="offers" class="offers"></div></section>
+          <section class="alternatives" aria-labelledby="changes-title"><div class="changehead"><h2 id="changes-title">Other ways to save</h2><span>Illustrative photos</span></div><div id="offers" class="offers"></div><details id="lower-rate" class="lower-rate"><summary>Compare a lower non-refundable rate</summary><div id="lower-rate-offer"></div></details></section>
         </section>
         <section id="comparison" aria-labelledby="comparison-title" hidden>
           <a id="close-comparison" class="back" href="#booking-summary"><span aria-hidden="true">‹</span> Your booking</a>
@@ -27,6 +27,7 @@
           <div class="price-comparison"><div><span>Currently booked</span><strong id="before-price"></strong></div><div><span id="after-price-label">Same-stay alternative</span><strong id="after-price"></strong></div><p id="selected-summary" class="muted"></p></div>
           <div id="saving-box" class="saving-box"><h2>Net saving after fees</h2><strong id="comparison-saving"></strong><p id="saving-caption"></p></div>
           <details id="price-details" class="price-details"><summary>Price & cancellation details</summary><dl id="differences"></dl><p id="selected-checked" class="muted small"></p></details>
+          <section id="flexibility-warning" class="flexibility-warning" aria-labelledby="flexibility-title" hidden><h2 id="flexibility-title">This rate is non-refundable</h2><p>You will lose free cancellation. Normal price monitoring ends once original cancellation is verified and the replacement becomes your active booking.</p><label class="flexibility-consent" for="accept-reduced-flexibility"><input id="accept-reduced-flexibility" type="checkbox"><span>I understand that this booking is non-refundable and price monitoring will end after the replacement becomes active.</span></label></section>
           <p id="review-message" role="status" class="small"></p><div class="review-actions"><button id="approve-offer" class="primary" type="button">Approve simulated switch</button><button id="keep-booking" class="plain" type="button">Keep my booking</button></div>
         </section>
         <section id="simulated-switch" class="simulation" aria-labelledby="switch-stage" hidden>

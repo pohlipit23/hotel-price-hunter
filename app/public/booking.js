@@ -18,6 +18,7 @@ const stages = {
 let state, selectedOffer, lastOfferId, busy = false, refreshRequired = false;
 let pending = loadPending();
 let message = '', messageError = false;
+let acknowledgementKey = null;
 function node(tag, text, className) {
   const element = document.createElement(tag);
   if (text !== undefined) element.textContent = text;
@@ -59,7 +60,13 @@ function verifiedSaving(offer) {
   const refund = refundPresentation(offer);
   const intent = offerIntent(offer);
   return refund.available && intent && offer.bookingVersion === state.booking.version
-    && offer.cancellation?.refundability === 'refundable' ? refund : { available: false, minor: null };
+    && (offer.cancellation?.refundability === 'refundable'
+      || (offer.offerId === 'DEMO_NON_REFUNDABLE' && offer.cancellation?.refundability === 'non-refundable' && intent.acceptReducedFlexibility === true))
+    ? refund : { available: false, minor: null };
+}
+function needsFlexibilityConsent(offer) { return offer?.cancellation?.refundability === 'non-refundable'; }
+function canApprove(offer) {
+  return verifiedSaving(offer).available && (!needsFlexibilityConsent(offer) || $('accept-reduced-flexibility').checked);
 }
 function pills(offer) {
   const list = node('div', undefined, 'pills');
@@ -155,10 +162,22 @@ function renderOffers() {
   const offers = customerOffers.map(id => state.offers.find(offer => offer.offerId === id)).filter(Boolean);
   $('offers').replaceChildren(...offers.map(offerCard));
   if (!offers.length) $('offers').append(node('p', 'There are no fresh alternatives for your current booking.', 'empty-offers'));
+  const lowerRate = state.offers.find(offer => offer.offerId === 'DEMO_NON_REFUNDABLE');
+  $('lower-rate').hidden = !lowerRate;
+  $('lower-rate-offer').replaceChildren(...(lowerRate ? [offerCard(lowerRate, -1)] : []));
   document.querySelector('.alternatives').hidden = Boolean(state.simulation?.operation) && !state.simulation.operation.savingSecured;
 }
 function renderComparison() {
   const offer = selectedOffer;
+  const needsConsent = needsFlexibilityConsent(offer);
+  const intent = offerIntent(offer);
+  const currentKey = JSON.stringify([offer.offerId, offer.version, state.booking.version, state.preferences.version, intent?.materialFingerprint]);
+  if (acknowledgementKey !== currentKey) {
+    $('accept-reduced-flexibility').checked = false;
+    acknowledgementKey = currentKey;
+  }
+  $('flexibility-warning').hidden = !needsConsent;
+  $('accept-reduced-flexibility').disabled = busy || refreshRequired || !verifiedSaving(offer).available;
   $('comparison-title').textContent = offer.hotel.name;
   $('comparison-pills').replaceChildren(...pills(offer).children);
   $('comparison-photo').replaceChildren(stayPhoto(offerPhotoIndex(offer)));
@@ -168,7 +187,8 @@ function renderComparison() {
   $('before-price').textContent = money(state.booking.retail.totalMinor, state.booking.retail.currency);
   $('after-price').textContent = money(offer.retail.totalMinor, offer.retail.currency);
   $('after-price-label').textContent = offer.category === 'equivalent' ? 'Same-stay alternative' : 'Selected alternative';
-  $('selected-summary').textContent = offer.category === 'equivalent' ? 'Same hotel, equivalent room, breakfast and free-cancellation deadline.'
+  $('selected-summary').textContent = needsConsent ? 'Same hotel and room at a lower non-refundable rate. Review the loss of flexibility below.'
+    : offer.category === 'equivalent' ? 'Same hotel, equivalent room, breakfast and free-cancellation deadline.'
     : offer.category === 'different-room' ? 'Same hotel, a different room. Review the room and cancellation terms below.'
       : 'A different hotel. Review its room and cancellation terms below.';
   const refund = verifiedSaving(offer);
@@ -192,7 +212,8 @@ function renderComparison() {
   $('selected-checked').textContent = 'Simulated check: ' + instant(offer.checkedAt) + ' · Offer expires ' + instant(offer.expiresAt) + '.';
   $('review-message').textContent = message;
   $('review-message').classList.toggle('error', messageError);
-  $('approve-offer').disabled = busy || refreshRequired || (!pending && !refund.available) || pending?.kind === 'advance';
+  $('approve-offer').disabled = busy || refreshRequired || (!pending && !canApprove(offer))
+    || (needsConsent && !$('accept-reduced-flexibility').checked) || pending?.kind === 'advance';
   $('approve-offer').textContent = busy ? 'Saving approval…' : pending?.kind === 'approval' ? 'Retry the same approval' : 'Approve simulated switch';
 }
 function operationCopy(operation) {
@@ -245,6 +266,9 @@ function renderSimulation() {
   const amount = money(refund?.amountMinor, refund?.currency);
   const refundStatus = refund?.status === 'completed' ? amount + ' · completed (simulated)' : refund?.status === 'pending' ? amount + ' · pending' : 'Not started';
   $('switch-money').replaceChildren(node('dt', operation.savingSecured ? 'Saving secured · simulated' : 'Potential refund after fees'), node('dd', amount), node('dt', 'Refund'), node('dd', refundStatus));
+  if (state.booking.cancellation?.refundability === 'non-refundable' && state.monitoring?.status === 'ended') {
+    $('switch-money').append(node('dt', 'Normal price monitoring'), node('dd', 'Ended · non-refundable booking'));
+  }
   $('switch-history').replaceChildren(...(state.simulation.history || operation.history || []).map(item => {
     const row = node('li'); row.append(node('strong', operationCopy(item)[0]), node('p', item.message), node('time', instant(item.demoAt))); return row;
   }));
@@ -282,6 +306,8 @@ async function select(offer) {
 }
 function keepBooking() {
   if (busy || pending) return;
+  $('accept-reduced-flexibility').checked = false;
+  acknowledgementKey = null;
   $('comparison').hidden = true; $('booking-summary').hidden = false;
   const trigger = [...document.querySelectorAll('[data-offer-id]')].find(element => element.dataset.offerId === (lastOfferId || selectedOffer?.offerId));
   trigger?.focus(); window.scrollTo({ top: 0, behavior: 'instant' }); setStatus('');
@@ -292,10 +318,11 @@ async function refreshLatest() {
 }
 async function mutate(kind) {
   if (busy || refreshRequired) return;
+  if (kind === 'approval' && needsFlexibilityConsent(selectedOffer) && !$('accept-reduced-flexibility').checked) return;
   let command = pending;
   if (!command && kind === 'approval') {
     const intent = offerIntent(selectedOffer);
-    if (!intent || !verifiedSaving(selectedOffer).available) return;
+    if (!intent || !canApprove(selectedOffer)) return;
     const { idempotencyKey, ...body } = intent;
     command = { kind, body, key: idempotencyKey };
   } else if (!command && kind === 'advance') {
@@ -314,7 +341,7 @@ async function mutate(kind) {
   } catch (error) {
     messageError = true;
     if (error.status === 409) {
-      remember(null); await refreshLatest();
+      remember(null); acknowledgementKey = null; await refreshLatest();
       if (!refreshRequired) message = 'The booking, offer or saved progress changed. Latest values are shown. Review them before continuing.';
     } else if (error.status && error.status < 500) {
       remember(null); message = error.message;
@@ -325,6 +352,7 @@ async function mutate(kind) {
 $('close-comparison').addEventListener('click', event => { event.preventDefault(); keepBooking(); });
 $('keep-booking').addEventListener('click', keepBooking);
 $('approve-offer').addEventListener('click', () => mutate('approval'));
+$('accept-reduced-flexibility').addEventListener('change', () => { if (selectedOffer) renderComparison(); });
 $('advance-demo').addEventListener('click', () => mutate('advance'));
 async function bootstrap() {
   try { renderState(await request('/api/bootstrap?scenario=jury-booking')); setStatus(''); }
