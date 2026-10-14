@@ -133,4 +133,3 @@ Tests inject offers-found/no-saving/failure providers. A separate explicit local
 - Browser-check one unobtrusive opt-in, persisted check result and collapsed safe previews at mobile/desktop, keyboard/status announcements, original three-card/non-refundable/selected-switch/agency regressions and no automatic mutation on render/reload. Name any unavailable coverage explicitly.
 
 Verification records must distinguish source facts, simulated provider observations, actual-time check records, frozen fictional operation clock and existing cloud/historical evidence. None proves a live price, real email, deployed scheduler or production operator identity.
-
