@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { validatePreferences } from './domain/decision.mjs';
 import { createStorage } from './storage.mjs';
 import { createGeminiAdvisor } from './gemini.mjs';
-import { SimulationError, initialiseSimulation, offerDecision, simulationView, startSwitch, advanceSwitch } from './domain/simulation.mjs';
+import { SimulationError, initialiseSimulation, offerDecision, simulationView, startSwitch, approveOffer, advanceSwitch } from './domain/simulation.mjs';
 
 const PUBLIC_ROOT = resolve(fileURLToPath(new URL('./public/', import.meta.url)));
 const COOKIE_NAME = 'hph_visitor';
@@ -149,26 +149,31 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
         const { id, state } = await visitor(request, response, true);
         return sendJson(response, 200, publicState(state, id));
       }
-      const routes = ['/api/enrolment', '/api/selection', '/api/advice', '/api/switches'];
+      const routes = ['/api/enrolment', '/api/selection', '/api/advice', '/api/switches', '/api/offer-approvals'];
       const advanceRoute = /^\/api\/switches\/(sim-[a-f0-9]{64})\/advances$/.exec(url.pathname);
       if (request.method === 'POST' && (routes.includes(url.pathname) || advanceRoute)) {
         if (request.headers.origin !== expectedOrigin(request) || request.headers['sec-fetch-site'] === 'cross-site') fail(403, 'ORIGIN_REJECTED', 'Request origin was rejected.');
         const body = await readJson(request);
         const { id, state } = await visitor(request, response);
         if (!safeEqual(request.headers['x-csrf-token'], state.csrfToken)) fail(403, 'CSRF_REJECTED', 'Reload the page before making changes.');
-        if (url.pathname === '/api/switches' || advanceRoute) {
-          object(body, advanceRoute ? ['expectedOperationRevision'] : ['scenarioId', 'offerId', 'offerVersion', 'bookingVersion', 'preferenceVersion'], 'simulated switch request');
+        const offerApprovalRoute = url.pathname === '/api/offer-approvals';
+        if (url.pathname === '/api/switches' || offerApprovalRoute || advanceRoute) {
+          const startFields = offerApprovalRoute
+            ? ['offerId', 'offerVersion', 'bookingVersion', 'preferenceVersion', 'materialFingerprint', 'confirmed']
+            : ['scenarioId', 'offerId', 'offerVersion', 'bookingVersion', 'preferenceVersion'];
+          object(body, advanceRoute ? ['expectedOperationRevision'] : startFields, 'simulated switch request');
           if (advanceRoute) {
             if (!Number.isSafeInteger(body.expectedOperationRevision) || body.expectedOperationRevision < 0) fail(422, 'VALIDATION_ERROR', 'Send the current non-negative operation revision.');
           } else {
-            if (typeof body.scenarioId !== 'string' || typeof body.offerId !== 'string' || ['offerVersion', 'bookingVersion', 'preferenceVersion'].some(key => !Number.isSafeInteger(body[key]) || body[key] < 1)) fail(422, 'VALIDATION_ERROR', 'Send the complete current simulated intent.');
+            if ((!offerApprovalRoute && typeof body.scenarioId !== 'string') || typeof body.offerId !== 'string' || ['offerVersion', 'bookingVersion', 'preferenceVersion'].some(key => !Number.isSafeInteger(body[key]) || body[key] < 1)) fail(422, 'VALIDATION_ERROR', 'Send the complete current simulated intent.');
+            if (offerApprovalRoute && (body.confirmed !== true || typeof body.materialFingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(body.materialFingerprint))) fail(422, 'VALIDATION_ERROR', 'Explicitly confirm the current versioned offer comparison.');
             if (!/^[a-f0-9]{64}$/.test(request.headers['idempotency-key'] || '')) fail(422, 'INVALID_IDEMPOTENCY_KEY', 'Use the saved switch intent key.');
           }
           let result;
           const saved = await updateVisitor(id, current => {
             result = advanceRoute
               ? advanceSwitch(current, { operationId: advanceRoute[1], expectedOperationRevision: body.expectedOperationRevision, fixture, recordedAt: now().toISOString() })
-              : startSwitch(current, { body, idempotencyKey: request.headers['idempotency-key'], visitorId: id, fixture, recordedAt: now().toISOString() });
+              : (offerApprovalRoute ? approveOffer : startSwitch)(current, { body, idempotencyKey: request.headers['idempotency-key'], visitorId: id, fixture, recordedAt: now().toISOString() });
             return result.state;
           });
           return sendJson(response, 200, { ...publicState(saved, id), replayed: result.replayed,

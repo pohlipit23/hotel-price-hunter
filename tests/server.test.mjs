@@ -29,6 +29,188 @@ const enrolment = (preferences = {}) => ({
 });
 const permission = { confirmed: true, version: 1, bookingVersion: fixture.booking.version, preferenceVersion: fixture.preferences.version, scope: 'equivalent-only' };
 
+function approveSelected(app, offerId = 'DEMO_EQUIVALENT', intent = app.initial.simulation.offerApprovalIntents[offerId]) {
+  const { idempotencyKey, ...body } = intent;
+  return app.post('/api/offer-approvals', body, { 'Idempotency-Key': idempotencyKey });
+}
+
+test('offer approval routes create genuine scoped authority for each customer choice without a preferences form', async t => {
+  for (const offerId of ['DEMO_EQUIVALENT', 'DEMO_DIFFERENT_ROOM', 'DEMO_DIFFERENT_HOTEL']) {
+    const app = await harness(t);
+    const responses = await Promise.all([approveSelected(app, offerId), approveSelected(app, offerId)]);
+    assert.deepEqual(responses.map(item => item.status), [200, 200]);
+    const results = await Promise.all(responses.map(item => item.json()));
+    assert.deepEqual(results.map(item => item.replayed).sort(), [false, true]);
+    let state = results[0];
+    assert.equal(state.enrolled, false);
+    assert.deepEqual(state.preferences, app.initial.preferences);
+    assert.equal(state.permissionRecord, null);
+    assert.equal(state.selectedOfferId, offerId);
+    assert.equal(state.simulation.operation.authority, 'offer-approval');
+    assert.equal(state.simulation.operation.offerApproval.scope, 'selected-offer');
+    for (const stage of ['revalidated', 'replacement-secured', 'fulfilment-verified', 'cancellation-requested', 'cancellation-verified', 'refund-completed']) {
+      const operation = state.simulation.operation;
+      const next = await app.post(`/api/switches/${operation.operationId}/advances`, { expectedOperationRevision: operation.revision });
+      assert.equal(next.status, 200);
+      state = await next.json();
+      assert.equal(state.simulation.operation.stage, stage);
+      if (stage === 'cancellation-verified') assert.equal(state.simulation.operation.refund.status, 'pending');
+    }
+    const refresh = await (await fetch(`${app.origin}/api/bootstrap`, { headers: { Cookie: app.cookie } })).json();
+    assert.equal(refresh.simulation.operation.refund.status, 'completed');
+    assert.equal(refresh.booking.version, 2);
+    assert.deepEqual(refresh.offers, []);
+    assert.equal(refresh.permissionRecord, null);
+    assert.equal((await (await approveSelected(app, offerId)).json()).replayed, true);
+    assert.doesNotMatch(JSON.stringify(refresh.simulation.operation), /intentHash|idempotencyKey|commands|permissionSnapshot|sourceOffer/);
+  }
+});
+
+test('offer approval boundary rejects false/missing confirmation, injected facts and stale material authority', async t => {
+  const app = await harness(t);
+  const { idempotencyKey, ...body } = app.initial.simulation.offerApprovalIntents.DEMO_EQUIVALENT;
+  const headers = { 'Idempotency-Key': idempotencyKey };
+  for (const invalid of [{ ...body, confirmed: false }, { ...body, confirmed: undefined }, { ...body, price: 1 }, { ...body, scenarioId: 'equivalent-saving' }, { ...body, materialFingerprint: [body.materialFingerprint] }]) {
+    assert.equal((await app.post('/api/offer-approvals', invalid, headers)).status, 422);
+  }
+  assert.equal((await app.post('/api/offer-approvals', body)).status, 422);
+  assert.equal((await app.post('/api/offer-approvals', body, { ...headers, 'X-CSRF-Token': 'bad' })).status, 403);
+  assert.equal((await app.post('/api/offer-approvals', body, { ...headers, Origin: 'https://elsewhere.example' })).status, 403);
+  assert.equal((await app.post('/api/offer-approvals', { ...body, materialFingerprint: '0'.repeat(64) }, headers)).status, 409);
+  assert.equal((await app.post('/api/offer-approvals', { ...body, materialFingerprint: 'unknown' }, headers)).status, 422);
+  for (const offerId of ['DEMO_NON_REFUNDABLE', 'DEMO_UNKNOWN_CONDITION', 'DEMO_REVALIDATION_CHANGE']) {
+    assert.equal(app.initial.simulation.offerApprovalIntents[offerId], null);
+    assert.equal((await app.post('/api/offer-approvals', { ...body, offerId }, headers)).status, 404);
+  }
+  await app.storage.update(app.cookie.split('=')[1], state => {
+    state.offers[0].room.conditions.bedType = null;
+    return state;
+  });
+  const denied = await app.post('/api/offer-approvals', body, headers);
+  assert.equal(denied.status, 409);
+  assert.equal((await denied.json()).error.code, 'OFFER_MATERIAL_CHANGED');
+  const fresh = await (await fetch(`${app.origin}/api/bootstrap`, { headers: { Cookie: app.cookie } })).json();
+  assert.equal(fresh.simulation.offerApprovalIntents.DEMO_EQUIVALENT, null);
+  assert.equal(fresh.simulation.operation, null);
+  assert.equal(fresh.enrolled, false);
+});
+
+test('competing selected offers atomically reserve one source and payload changes cannot replay its authority', async t => {
+  const app = await harness(t);
+  const offers = ['DEMO_EQUIVALENT', 'DEMO_DIFFERENT_HOTEL'];
+  const responses = await Promise.all(offers.map(offerId => approveSelected(app, offerId)));
+  assert.deepEqual(responses.map(item => item.status).sort(), [200, 409]);
+  const winner = await responses.find(item => item.status === 200).json();
+  const { idempotencyKey, ...body } = app.initial.simulation.offerApprovalIntents[winner.selectedOfferId];
+  const mismatch = await app.post('/api/offer-approvals', { ...body, preferenceVersion: body.preferenceVersion + 1 }, { 'Idempotency-Key': idempotencyKey });
+  assert.equal(mismatch.status, 422);
+  assert.equal((await mismatch.json()).error.code, 'IDEMPOTENCY_PAYLOAD_MISMATCH');
+  const outsider = await harness(t);
+  assert.equal((await outsider.post(`/api/switches/${winner.simulation.operation.operationId}/advances`, { expectedOperationRevision: 0 })).status, 404);
+});
+
+test('lost approval and advance acknowledgments require an exact replay and never create another receipt', async t => {
+  const app = await harness(t);
+  const update = app.storage.update.bind(app.storage);
+  let loseAcknowledgment = true;
+  app.storage.update = async (...args) => {
+    const saved = await update(...args);
+    if (loseAcknowledgment) { loseAcknowledgment = false; throw new Error('Simulated lost acknowledgment'); }
+    return saved;
+  };
+  assert.equal((await approveSelected(app)).status, 503);
+  let state = await (await approveSelected(app)).json();
+  assert.equal(state.replayed, true);
+  assert.equal(state.simulation.operation.revision, 0);
+  assert.equal(state.simulation.operation.history.length, 1);
+  const operation = state.simulation.operation;
+  loseAcknowledgment = true;
+  const advance = () => app.post(`/api/switches/${operation.operationId}/advances`, { expectedOperationRevision: operation.revision });
+  assert.equal((await advance()).status, 503);
+  state = await (await advance()).json();
+  assert.equal(state.replayed, true);
+  assert.equal(state.simulation.operation.revision, 1);
+  assert.equal(state.simulation.operation.history.length, 2);
+  assert.equal(state.replayedCommand.stage, 'revalidated');
+  const stored = await app.storage.get(app.cookie.split('=')[1]);
+  assert.equal(Object.keys(stored.operations).length, 1);
+  assert.deepEqual(stored.reservedBookingVersions, [1]);
+});
+
+test('failed approval storage commit and session expiry cannot record successful scoped authority', async t => {
+  const app = await harness(t);
+  const update = app.storage.update.bind(app.storage);
+  let failOnce = true;
+  app.storage.update = async (...args) => {
+    if (failOnce) { failOnce = false; throw new Error('private storage details'); }
+    return update(...args);
+  };
+  const denied = await approveSelected(app);
+  assert.equal(denied.status, 503);
+  assert.doesNotMatch(await denied.text(), /private/);
+  assert.equal((await app.storage.get(app.cookie.split('=')[1])).activeOperationId, null);
+  app.storage.update = async (id, change) => {
+    await update(id, state => ({ ...state, expiresAt: '2026-10-01T00:00:00Z' }));
+    return update(id, change);
+  };
+  assert.equal((await approveSelected(app)).status, 401);
+  assert.equal((await app.storage.get(app.cookie.split('=')[1])).activeOperationId, null);
+});
+
+test('Firestore selected approval integration: independent servers atomically approve and advance all three alternatives', { skip: !process.env.RUN_FIRESTORE_INTEGRATION }, async t => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST || '', /^(localhost|127\.0\.0\.1):\d+$/);
+  const firstStorage = await createStorage(process.env);
+  const secondStorage = await createStorage(process.env);
+  const sessions = [];
+  t.after(async () => {
+    await Promise.all(sessions.map(cookie => firstStorage.delete(cookie.split('=')[1])));
+    await Promise.all([firstStorage.close(), secondStorage.close()]);
+  });
+  const second = await harness(t, { storage: secondStorage });
+  sessions.push(second.cookie);
+  for (const offerId of ['DEMO_EQUIVALENT', 'DEMO_DIFFERENT_ROOM', 'DEMO_DIFFERENT_HOTEL']) {
+    const app = await harness(t, { storage: firstStorage });
+    sessions.push(app.cookie);
+    const otherPost = (path, body, extra = {}) => second.post(path, body,
+      { Cookie: app.cookie, 'X-CSRF-Token': app.initial.csrfToken, ...extra });
+    const { idempotencyKey, ...body } = app.initial.simulation.offerApprovalIntents[offerId];
+    const starts = await Promise.all([approveSelected(app, offerId), otherPost('/api/offer-approvals', body, { 'Idempotency-Key': idempotencyKey })]);
+    assert.deepEqual(starts.map(item => item.status), [200, 200]);
+    const results = await Promise.all(starts.map(item => item.json()));
+    assert.deepEqual(results.map(item => item.replayed).sort(), [false, true]);
+    let state = results[0];
+    for (let index = 0; index < 6; index++) {
+      const operation = state.simulation.operation;
+      const path = `/api/switches/${operation.operationId}/advances`;
+      const command = { expectedOperationRevision: operation.revision };
+      const advances = await Promise.all([app.post(path, command), otherPost(path, command)]);
+      assert.deepEqual(advances.map(item => item.status), [200, 200]);
+      const stages = await Promise.all(advances.map(item => item.json()));
+      assert.deepEqual(stages.map(item => item.replayed).sort(), [false, true]);
+      state = stages[0];
+    }
+    const restored = await (await fetch(`${second.origin}/api/bootstrap`, { headers: { Cookie: app.cookie } })).json();
+    assert.equal(restored.booking.version, 2);
+    assert.equal(restored.booking.retail.totalMinor, fixture.offers.find(item => item.offerId === offerId).retail.totalMinor);
+    assert.equal(restored.simulation.operation.history.length, 7);
+    assert.equal(restored.simulation.operation.refund.status, 'completed');
+    assert.equal(restored.enrolled, false);
+    assert.equal(restored.permissionRecord, null);
+    assert.deepEqual(restored.preferences, app.initial.preferences);
+    assert.equal((await (await otherPost('/api/offer-approvals', body, { 'Idempotency-Key': idempotencyKey })).json()).replayed, true);
+    const stored = await firstStorage.get(app.cookie.split('=')[1]);
+    assert.equal(Object.keys(stored.operations).length, 1);
+  }
+  const app = await harness(t, { storage: firstStorage });
+  sessions.push(app.cookie);
+  const alternate = app.initial.simulation.offerApprovalIntents.DEMO_DIFFERENT_HOTEL;
+  const { idempotencyKey, ...body } = alternate;
+  const competing = await Promise.all([approveSelected(app), second.post('/api/offer-approvals', body,
+    { Cookie: app.cookie, 'X-CSRF-Token': app.initial.csrfToken, 'Idempotency-Key': idempotencyKey })]);
+  assert.deepEqual(competing.map(item => item.status).sort(), [200, 409]);
+  assert.equal(Object.keys((await firstStorage.get(app.cookie.split('=')[1])).operations).length, 1);
+});
+
 test('bootstrap exposes only allowlisted jury data and isolates visitors', async t => {
   const { initial, origin, cookie } = await harness(t);
   assert.equal(initial.scenarioId, 'jury-booking');

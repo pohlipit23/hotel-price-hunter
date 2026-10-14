@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initialiseSimulation, simulationView, startSwitch, advanceSwitch } from '../app/domain/simulation.mjs';
+import * as simulation from '../app/domain/simulation.mjs';
+import { materialFingerprint } from '../app/domain/decision.mjs';
 
 const fixture = JSON.parse(readFileSync(new URL('../fixtures/jury-booking.json', import.meta.url)));
 const recordedAt = '2026-10-14T03:00:00.000Z';
@@ -19,6 +21,175 @@ function start(state, scenario = 'equivalent-saving') {
 function advance(state, revision = state.operations[state.activeOperationId].revision) {
   return advanceSwitch(state, { operationId: state.activeOperationId, expectedOperationRevision: revision, fixture, recordedAt });
 }
+
+function unconfirmed() {
+  return initialiseSimulation({ demoNow: fixture.demoNow, enrolled: false, revision: 0,
+    preferences: structuredClone(fixture.preferences), permissionRecord: null }, fixture);
+}
+function approve(state, offerId = 'DEMO_EQUIVALENT', intent = simulationView(state, 'visitor', fixture).offerApprovalIntents[offerId]) {
+  const { idempotencyKey, ...body } = intent;
+  return simulation.approveOffer(state, { body, idempotencyKey, visitorId: 'visitor', fixture, recordedAt });
+}
+
+test('selected-offer approval atomically starts each customer alternative without standing permission or enrolment', () => {
+  for (const offerId of ['DEMO_EQUIVALENT', 'DEMO_DIFFERENT_ROOM', 'DEMO_DIFFERENT_HOTEL']) {
+    const initial = unconfirmed();
+    const { state } = approve(initial, offerId);
+    const operation = state.operations[state.activeOperationId];
+    assert.equal(operation.stage, 'ready');
+    assert.equal(operation.authority, 'offer-approval');
+    assert.equal(operation.offerApproval.scope, 'selected-offer');
+    assert.equal(operation.offerApproval.offerId, offerId);
+    assert.equal(state.selectedOfferId, offerId);
+    assert.equal(state.enrolled, false);
+    assert.deepEqual(state.preferences, initial.preferences);
+    assert.equal(state.permissionRecord, null);
+    assert.deepEqual(state.reservedBookingVersions, [1]);
+    assert.equal(Object.keys(state.operations).length, 1);
+  }
+});
+
+test('shared selected-offer approval rejects false, missing and string confirmation before creating authority', () => {
+  for (const confirmed of [false, undefined, 'true']) {
+    const state = unconfirmed();
+    const intent = simulationView(state, 'visitor', fixture).offerApprovalIntents.DEMO_EQUIVALENT;
+    const { idempotencyKey, ...body } = intent;
+    if (confirmed === undefined) delete body.confirmed;
+    else body.confirmed = confirmed;
+    assert.throws(() => simulation.approveOffer(state, { body, idempotencyKey, visitorId: 'visitor', fixture, recordedAt }),
+      { code: 'VALIDATION_ERROR', status: 422 });
+    assert.deepEqual(state.operations, {});
+    assert.deepEqual(state.reservedBookingVersions, []);
+    assert.equal(state.activeOperationId, null);
+    assert.equal(state.permissionRecord, null);
+    assert.deepEqual(state.preferences, fixture.preferences);
+  }
+});
+
+test('a changed confirmation under an existing selected-offer key rejects payload mismatch before fresh validation', () => {
+  const initial = unconfirmed();
+  const intent = simulationView(initial, 'visitor', fixture).offerApprovalIntents.DEMO_EQUIVALENT;
+  const { state } = approve(initial, 'DEMO_EQUIVALENT', intent);
+  assert.throws(() => approve(state, 'DEMO_EQUIVALENT', { ...intent, confirmed: false }),
+    { code: 'IDEMPOTENCY_PAYLOAD_MISMATCH', status: 422 });
+  assert.equal(approve(state, 'DEMO_EQUIVALENT', intent).replayed, true);
+  assert.equal(Object.keys(state.operations).length, 1);
+});
+
+test('approval intents expose only eligible refundable customer offers; hard unknown facts never gain authority', () => {
+  const state = unconfirmed();
+  const intents = simulationView(state, 'visitor', fixture).offerApprovalIntents;
+  assert.equal(intents.DEMO_NON_REFUNDABLE, null);
+  assert.equal(intents.DEMO_REVALIDATION_CHANGE, null);
+  assert.equal(intents.DEMO_UNKNOWN_CONDITION, null);
+  const savedIntent = intents.DEMO_EQUIVALENT;
+  state.offers[0].room.conditions.bedType = null;
+  assert.equal(simulationView(state, 'visitor', fixture).offerApprovalIntents.DEMO_EQUIVALENT, null);
+  assert.throws(() => approve(state, 'DEMO_EQUIVALENT', savedIntent), { code: 'OFFER_MATERIAL_CHANGED' });
+});
+
+test('each explicitly approved alternative uses the six-stage runner, retires offers and never carries selected approval', () => {
+  for (const offerId of ['DEMO_EQUIVALENT', 'DEMO_DIFFERENT_ROOM', 'DEMO_DIFFERENT_HOTEL']) {
+    const initial = unconfirmed();
+    const intent = simulationView(initial, 'visitor', fixture).offerApprovalIntents[offerId];
+    let { state } = approve(initial, offerId, intent);
+    for (const stage of ['revalidated', 'replacement-secured', 'fulfilment-verified', 'cancellation-requested', 'cancellation-verified', 'refund-completed']) {
+      ({ state } = advance(state));
+      const operation = state.operations[state.activeOperationId];
+      assert.equal(operation.stage, stage);
+      assert.equal(operation.status, stage === 'refund-completed' ? 'complete' : 'running');
+      assert.equal(state.booking.version, ['cancellation-verified', 'refund-completed'].includes(stage) ? 2 : 1);
+      if (stage === 'cancellation-verified') assert.equal(operation.refund.status, 'pending');
+    }
+    assert.equal(state.permissionRecord, null);
+    assert.equal(state.enrolled, false);
+    assert.deepEqual(state.preferences, initial.preferences);
+    assert.deepEqual(state.offers, []);
+    assert.deepEqual(simulationView(state, 'visitor', fixture).offerApprovalIntents, {});
+    assert.equal(approve(state, offerId, intent).replayed, true);
+    assert.equal(advance(state, 0).replayed, true);
+    assert.equal(state.operations[state.activeOperationId].history.length, 7);
+  }
+});
+
+test('selected approval cannot survive revocation, expiry, changed facts or customer requirements', () => {
+  const mutations = [
+    state => { state.operations[state.activeOperationId].offerApproval.revokedAt = state.demoNow; },
+    state => { state.demoNow = '2026-10-13T03:00:00Z'; },
+    state => { state.offers[0].room.conditions.roomSizeSqm = 40; },
+    state => { state.offers[0].retail.totalMinor--; },
+    state => { state.booking.room.conditions.view = 'SEA'; },
+    state => { state.preferences.essentialRequirements.accessible = true; },
+    state => { state.preferences.version++; },
+  ];
+  for (const mutate of mutations) {
+    let { state } = approve(unconfirmed());
+    mutate(state);
+    ({ state } = advance(state));
+    const operation = state.operations[state.activeOperationId];
+    assert.equal(operation.status, 'failed');
+    assert.equal(operation.replacementBooking, null);
+    assert.equal(operation.cancellation, null);
+    assert.equal(state.booking.version, 1);
+  }
+  let { state } = approve(unconfirmed());
+  for (let index = 0; index < 3; index++) ({ state } = advance(state));
+  state.operations[state.activeOperationId].offerApproval.revokedAt = state.demoNow;
+  ({ state } = advance(state));
+  assert.equal(state.operations[state.activeOperationId].status, 'agency-exception');
+  assert.equal(state.operations[state.activeOperationId].cancellation, null);
+});
+
+test('selected approval validates stale bindings, missing costs and unsupported offer IDs without changing defaults', () => {
+  const initial = unconfirmed();
+  const intent = simulationView(initial, 'visitor', fixture).offerApprovalIntents.DEMO_EQUIVALENT;
+  const changed = structuredClone(initial);
+  delete changed.offers[0].refundQuote.switchFeesMinor;
+  assert.throws(() => approve(changed, 'DEMO_EQUIVALENT', intent), { code: 'OFFER_MATERIAL_CHANGED' });
+  assert.equal(simulationView(changed, 'visitor', fixture).offerApprovalIntents.DEMO_EQUIVALENT, null);
+  const versions = [['bookingVersion', 'BOOKING_VERSION_CHANGED'], ['preferenceVersion', 'PREFERENCES_VERSION_CHANGED'], ['offerVersion', 'OFFER_VERSION_CHANGED']];
+  for (const [field, code] of versions) {
+    const stale = structuredClone(initial);
+    if (field === 'bookingVersion') stale.booking.version++;
+    if (field === 'preferenceVersion') stale.preferences.version++;
+    if (field === 'offerVersion') stale.offers[0].version++;
+    assert.throws(() => approve(stale, 'DEMO_EQUIVALENT', intent), { code });
+  }
+  assert.throws(() => approve(initial, 'DEMO_EQUIVALENT', { ...intent, offerId: 'DEMO_NON_REFUNDABLE' }), { code: 'OFFER_NOT_FOUND' });
+  const claimed = approve(initial).state;
+  assert.throws(() => approve(claimed, 'DEMO_EQUIVALENT', { ...intent, preferenceVersion: 2 }), { code: 'IDEMPOTENCY_PAYLOAD_MISMATCH' });
+  const otherIntent = simulationView(initial, 'visitor', fixture).offerApprovalIntents.DEMO_DIFFERENT_HOTEL;
+  assert.throws(() => approve(claimed, 'DEMO_DIFFERENT_HOTEL', otherIntent), { code: 'SWITCH_IN_PROGRESS' });
+});
+
+test('an explicit fresh fingerprint cannot bypass unknown conditions, money, cancellation or a non-refundable offer', () => {
+  const changes = [
+    state => { state.offers[0].room.conditions.bedType = null; },
+    state => { delete state.offers[0].refundQuote.switchFeesMinor; },
+    state => { delete state.offers[0].retail.taxesMinor; },
+    state => { state.offers[0].cancellation.schedule = []; },
+    state => { state.offers[0].cancellation = structuredClone(fixture.offers[3].cancellation); },
+    state => { state.preferences.essentialRequirements.accessible = true; },
+    state => { state.offers[0].expiresAt = state.demoNow; },
+  ];
+  for (const change of changes) {
+    const state = unconfirmed();
+    const intent = simulationView(state, 'visitor', fixture).offerApprovalIntents.DEMO_EQUIVALENT;
+    change(state);
+    intent.materialFingerprint = materialFingerprint({ booking: state.booking, offer: state.offers[0], preferences: state.preferences });
+    assert.throws(() => approve(state, 'DEMO_EQUIVALENT', intent), { code: 'SWITCH_NOT_AUTHORISED' });
+    assert.deepEqual(state.reservedBookingVersions, []);
+    assert.equal(state.activeOperationId, null);
+  }
+});
+
+test('public offer approval receipts whitelist safe audit bindings', () => {
+  const { state } = approve(unconfirmed());
+  state.operations[state.activeOperationId].offerApproval.privateSupplierReference = 'hidden';
+  const operation = simulationView(state, 'visitor', fixture).operation;
+  assert.equal(operation.offerApproval.privateSupplierReference, undefined);
+  assert.equal(operation.offerApproval.materialFingerprint.length, 64);
+});
 
 test('six persisted advances secure replacement before cancelling, then promote and settle refund separately', () => {
   let { state } = start(ready());
