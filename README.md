@@ -111,7 +111,7 @@ The final RoomDrop checks passed 102/102 tests against the Firestore emulator, 1
 
 The subsequent local slice passed 113/113 emulator-enabled Node tests, the new non-refundable/operator browser checks and the unchanged postcard regression. [Its verification record](docs/flexibility-agency-verification.md) and [independent review](docs/review-flexibility-agency.md) distinguish actual browser/emulator evidence from source-only checks.
 
-`/agency` is a read-only view of newly indexed fictional operations, including unresolved cancellation, fulfilment/authority gaps, and saving/refund states. It requires a separate operator session. The login shell contains no credentials; protected APIs deny access by default. Only local fixture review is supported: production, Cloud Run, non-loopback binding and non-emulator activation are rejected. Existing historical operations are not backfilled.
+`/agency` is a read-only view of newly indexed fictional operations, including unresolved cancellation, fulfilment/authority gaps, and saving/refund states. It requires separate operator access. The login shell contains no credentials; protected APIs deny access by default. The `local-review` passphrase provider supports local fixture review only: production, Cloud Run, non-loopback binding and non-emulator activation are rejected. Existing historical operations are not backfilled.
 
 Create the ignored local access configuration once, without printing its generated passphrase:
 
@@ -119,7 +119,13 @@ Create the ignored local access configuration once, without printing its generat
 node scripts/setup-agency-review.mjs
 ```
 
-To run local review, use the documented emulator/demo environment, set `AGENCY_AUTH_MODE=local-review`, `BIND_HOST=127.0.0.1` and `APP_ORIGIN=http://localhost:8080`, then start the app. Retrieve the passphrase manually from ignored `.local/agency-review.json` and enter it at `/agency`; never paste it into tracked files, command arguments or reports. Operator sessions last 30 minutes and invalidate on restart/reauthentication. The case APIs are read-only, paginated and strip all visitor/session credentials and internal mutation identifiers. A real verified production identity provider and deployment remain separate gates.
+To run local review, use the documented emulator/demo environment, set `AGENCY_AUTH_MODE=local-review`, `BIND_HOST=127.0.0.1` and `APP_ORIGIN=http://localhost:8080`, then start the app. Retrieve the passphrase manually from ignored `.local/agency-review.json` and enter it at `/agency`; never paste it into tracked files, command arguments or reports. Operator sessions last 30 minutes and invalidate on restart/reauthentication. The case APIs are read-only, paginated and strip all visitor/session credentials and internal mutation identifiers.
+
+### Google IAP operator identity
+
+An opt-in Google IAP provider is prepared for a **separate agency-only service**, using `APP_SURFACE=agency`, `AGENCY_AUTH_MODE=iap`, an exact `AGENCY_IAP_AUDIENCE` and JSON `AGENCY_IAP_ALLOWED_SUBJECTS`. The customer service cannot activate this mode. Agency APIs verify Google's signed assertion and explicit subject membership on every request; customer mutations and advice are unavailable on that surface. Google manages sign-in, so the agency page offers an access recheck instead of a local passphrase or application logout. Cases remain fictional and read-only.
+
+See [the identity contract](docs/agency-iap-contract.md) and [private deployment proposal](docs/agency-iap-deployment.md) for exact configuration, strict expiry, key retrieval, allowlist rollout and separate release gates. Local tests do not establish actual Google browser sign-in, deployed IAM or production supplier access. The existing private cloud release has not been updated.
 
 ## Price watch and notification previews
 

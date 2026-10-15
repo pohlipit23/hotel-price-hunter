@@ -221,3 +221,19 @@ Verification: currency-minor-unit/large-integer tests, notification policy and s
 - [x] Local app session `57889`, local worker session `84005` and existing emulator remain for review. Owned QA browsers/container are cleaned; access credentials remain ignored and never enter evidence.
 
 See `docs/price-watch-verification.md` and `docs/review-price-watch.md` for exact source/run boundaries. This completes checks and previews locally; production scheduler/task provisioning, delivery provider/real email, production operator identity, fresh supplier access and separately approved deployment/submission remain. No Vertex generation, real transaction, email, source push or cloud access change occurred.
+
+## Google IAP operator identity preparation — 15 October
+
+The user selected Google IAP sign-in as the next bounded development slice. The separate agency-only service, application allowlist, Google-managed session display and offline deployment proposal are specified in `docs/agency-iap-contract.md`. No deployment or access change is authorized by this selection.
+
+### Task 15: Verify operator assertions on an agency-only surface
+
+- [x] Explicit production configuration binds IAP audience to the agency service and exact operator subjects; invalid/default/mixed local or customer configuration fails closed.
+- [x] Actual pinned Google verifier plus strict algorithm/claims/time checks rejects forged or stale assertions, and hides credential-bearing library errors. Bounded key refresh coalesces concurrent requests and fails closed on expired/unavailable keys.
+- [x] Read-only case routes recheck access after storage waits; cursors bind verified access and expiry. Customer bootstrap/mutations/advice cannot execute on the agency surface.
+- [x] Google-managed UI never falls back to a passphrase, clears protected data after denial/expiry and ignores stale delayed responses. Existing local-review and customer behavior remain verified.
+- [x] Fresh independent review, regression suite, browser checks and local packaging checks have recorded proof; the private deployment proposal names remaining operator/OAuth/IAM/source verification gates.
+
+Verified locally: **159/159** emulator-enabled Node tests with zero skips, seven mocked-IAP browser groups plus the preserved **11+5+17** integrated groups, **82** total geometry checks, actual-library offline signature verification, independent **24/24** probes and an allowlist mutation detected by existing tests. A production-mode local container with no network/credentials/mounts verified packaging and default denial; it made no database or identity call. Only the exact task-owned app was restarted; retained session **58369** serves the local demo with Gemini unconfigured. See `docs/agency-iap-verification.md`, `docs/review-agency-iap.md` and `docs/agency-iap-deployment.md`.
+
+Actual cloud sign-in, IAM verification and deployment remain separate unchecked release gates even after these local criteria pass. Scheduled trigger/task provisioning, delivery, supplier access and public submission are subsequent work.
