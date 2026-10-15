@@ -1,8 +1,10 @@
 # Customer clarity private release proposal
 
-15 October 2026. The UI is implemented, locally verified and packaged. This new
-candidate has not been uploaded or deployed. The earlier approval covered the
-`c9a7d7f` rollout; approval for this customer-only image update is pending.
+Prepared 15 October 2026; approved and executed 16 October, Asia/Kuala_Lumpur.
+The user explicitly **Approved** this exact customer-only image update. It is now
+ready as `hotel-price-hunter-00008-87j`; see the
+[execution and acceptance record](customer-clarity-execution.md). The scope below
+is preserved as the approved release contract.
 
 [Local preview](http://localhost:8080/) ·
 [UI evidence and review](customer-clarity-verification.md)
@@ -17,7 +19,7 @@ candidate has not been uploaded or deployed. The earlier approval covered the
 | Local image | `roomdrop-customer-ui:16adf72b26d4-180c227be439` |
 | Local build manifest / image ID | `sha256:9f6f5c33d904139e166f842fde496f79431e229085dbd7bb9b4a2e5eef01e38f` |
 | Build config digest | `sha256:fbc81073aa0f0ae9857ba04cebc29cc30b1c355e2e5f0b9ab647a2bd50299615` |
-| Uploaded registry digest | Not observed; no upload performed |
+| Uploaded registry digest | `sha256:9f6f5c33d904139e166f842fde496f79431e229085dbd7bb9b4a2e5eef01e38f` |
 
 The network-disabled, read-only container passed customer page/bootstrap checks
 using explicitly injected memory storage with Gemini unconfigured. All four changed
@@ -40,7 +42,7 @@ substitute for independently observed registry bytes after approved upload.
    environment/limits and private IAP policies, anonymous denial and preserved data.
    Check the signed customer's revised UI without repeating booking transactions.
 
-The current customer revision is `hotel-price-hunter-00007-lrm`; its old image is
+The pre-update customer revision was `hotel-price-hunter-00007-lrm`; its old image is
 `sha256:16340ebd837d00988d4ef0779e2ae8a0579011f8813f4b577d23099723c6a4d0`.
 Retain before-state metadata for restoration and stop on source/digest/policy drift.
 

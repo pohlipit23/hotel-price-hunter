@@ -1,9 +1,11 @@
 # Customer clarity verification
 
 15 October 2026. Local UI improvement requested after the user completed the live
-functional customer/watch/switch/refund/agency check. The deployed customer and watch
-job remain the frozen `c9a7d7f` image; no new UI image has been uploaded or deployed.
-Scope and authority are in [the contract](customer-clarity-contract.md).
+functional customer/watch/switch/refund/agency check. At this local verification
+checkpoint the deployed customer and watch job still used `c9a7d7f`. The subsequent
+approved customer-only release on 16 October is recorded separately in
+[customer-clarity-execution.md](customer-clarity-execution.md); the watch job remains
+on its frozen source. Scope and authority are in [the contract](customer-clarity-contract.md).
 
 ## Customer-facing changes
 
@@ -94,18 +96,21 @@ and final-heading focus plus silent/read-only reload are preserved.
 
 ## Release boundary
 
-The retained `http://localhost:8080/` serves the new markup with Firestore emulator
-storage and Gemini `unconfigured`; it was checked read-only without restarting it.
-This is the local preview, distinct from the unchanged live customer image.
+At the local verification checkpoint, `http://localhost:8080/` served the new markup
+with Firestore emulator storage and Gemini `unconfigured`; it was checked read-only
+without restarting it. This historical preview check does not assert that the local
+process remains available. The live customer was subsequently updated as below.
 
 The packaged candidate pins are recorded after completion in the ignored local
-result/pin files. A new private-customer release requires approval
-of its exact source/image, upload and customer update. Existing IAP, identities,
-agency service, watch job/ledger and absent Scheduler are preserved. No further job
-execution, model call, supplier action, email or publication is included.
+result/pin files. The exact source/image, upload and customer update received
+separate user approval on 16 October. Existing IAP, identities, agency service,
+watch job/ledger and absent Scheduler were preserved. No further job execution,
+model call, supplier action, email or publication was included.
 
 Packaging is complete: the network-disabled container passed page/bootstrap checks,
 Gemini was unconfigured and all four changed frontend files match the clean source
-bytes. The exact source/image and narrow approval scope are in
+bytes. The exact source/image and narrow approved scope are in
 [customer-clarity-release.md](customer-clarity-release.md). The candidate checkout
 is retained separately so this final evidence update does not change its source pin.
+The subsequent live release passed 40/40 machine checks; its signed browser
+acceptance remains pending in [the execution record](customer-clarity-execution.md).

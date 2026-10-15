@@ -303,7 +303,13 @@ approved terms, brand/photo-card structure and manual transitions remain protect
   accessibility checks. Completed-state duplicate text/dead-end action are removed.
   Initial/review wording is 19%/11% shorter with material terms retained. See
   `docs/customer-clarity-verification.md` for exact source/run boundaries.
-- [ ] Obtain approval for the new exact UI image and customer-only private update.
-  Keep agency, IAM, watch job/spent execution ledger and absent Scheduler unchanged.
-  The built candidate and requested scope are in `docs/customer-clarity-release.md`;
-  clean source `16adf72b` is retained in `.local/roomdrop-ui-release`.
+- [x] User **Approved** the exact UI image and customer-only private update on
+  16 October. Source `16adf72b` is retained in `.local/roomdrop-ui-release`;
+  uploaded registry bytes match the pins and revision `hotel-price-hunter-00008-87j`
+  is ready with full traffic. All **40/40** release checks pass, including preserved
+  booking/watch/case data, private access and unchanged agency/IAM/watch-job state.
+  Scheduler remains absent and the spent execution was not rerun. See
+  `docs/customer-clarity-execution.md` for evidence and coverage limits.
+- [ ] Human-confirm the revised signed-in customer UI by refresh only. Browser
+  connection failed before page access; no booking/watch/simulation actions need
+  repeating. Keep this separate from the earlier human functional acceptance.
