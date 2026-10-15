@@ -31,10 +31,37 @@ focused worker verification passed **28/28** with the emulator. The fresh review
 also passed the cloud suite **6/6**, two independent emulator probes and copied-source
 activation/cleanliness guard mutations. See [the review](review-daily-watch-cloud.md).
 
-Packaging/source pins will be retained in ignored `.local/roomdrop-local-image.json`
-after the production container build and network-disabled smoke. That record's
-source checkout, commit, actual context hash and image config digest identify the
-candidate; a local image ID is not an observed uploaded registry digest.
+The production container build passed. Network-disabled, read-only containers with
+no credentials, mounts or published ports proved default job denial, preserved local
+worker production denial, the job's explicitly injected empty-memory pass, and the
+customer page/bootstrap with explicitly injected memory and Gemini `unconfigured`.
+These packaging checks establish no deployed Firestore or IAP behavior. Safe outputs
+are in `.local/roomdrop-job-default-denial.log`, `roomdrop-local-worker-denial.log`,
+`roomdrop-packaged-job-smoke.json` and `roomdrop-packaged-customer-smoke.json`.
+
+Exact pins are retained in ignored `.local/roomdrop-local-image.json`:
+
+| Pin | Value |
+| --- | --- |
+| Clean source | `c9a7d7f139309763b0f5133fdb647eff0a85a462` |
+| Retained source checkout | `C:/Users/pohli/Sites/hotel-price-hunter/.local/roomdrop-watch-release` |
+| Actual 32-file context SHA-256 | `6c49c8eef25752206e5e860480375f88b5d4fd43e7ac85ac212c6af8e787325c` |
+| Local image tag | `roomdrop-daily-watch:c9a7d7f13930-6c49c8eef257` |
+| Local build manifest / image ID | `sha256:16340ebd837d00988d4ef0779e2ae8a0579011f8813f4b577d23099723c6a4d0` |
+| Build-reported config digest | `sha256:d3c7556ba51898e1a1e6e081509ea246999c9d78c324914f9ce9dda96733c46d` |
+| Uploaded registry digest | Not observed; no upload authorised or performed |
+
+OCI source/context labels and user `node` were checked in the local image. The build
+manifest is a local candidate pin, not an independently observed registry digest.
+After approved upload, independently retrieve/hash registry bytes; any digest or
+source/config mismatch blocks deployment. The frozen release checkout remains clean
+even as the main checkout gains this final evidence record. Do not use a later main
+HEAD as the candidate source or loosen a source guard.
+
+The concrete offline plan `.local/roomdrop-cloud-plan.json` was generated from that
+retained checkout with its exact source pin. It reports zero executed cloud commands
+and `readyForDeploymentReview:false` until independent uploaded registry-byte evidence
+exists. The default plan excludes one-shot execution and recurring activation.
 
 ## Pending release acceptance
 

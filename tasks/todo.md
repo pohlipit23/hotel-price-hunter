@@ -270,8 +270,11 @@ in `docs/roomdrop-cloud-setup.md` and `docs/daily-watch-cloud-verification.md`.
   separate customer IAP, dedicated writer/trigger identities, bounded job settings,
   and separately gated one-shot/recurring activation commands. Historical verifiers
   remain unchanged; Scheduler stays absent through acceptance.
-- [ ] Complete full regression, independent review and packaging proof; record exact
-  source and local image before requesting any cloud execution approval.
+- [x] Full regression passed **194/194**, zero failures/skips; independent review and
+  two copied-source guard mutations pass. Exact-500 daily pagination and local worker
+  failure diagnostics are corrected with regressions. Network-disabled packaging
+  checks pass; source `c9a7d7f` and the local image are pinned in the verification
+  record and retained clean `.local/roomdrop-watch-release` checkout.
 - [ ] Obtain separately scoped cloud approval, deploy privately and verify genuine
   signed customer/agency data flow and one-shot job execution. Recurring activation
   remains an additional gate after acceptance.

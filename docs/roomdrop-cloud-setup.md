@@ -6,6 +6,30 @@ executed by this bundle.** The authoritative scope is
 single-operator fictional demo, restricted to `pete@altovo.com`, with simulated
 checks and no model, email, payment or supplier call.
 
+## Requested next execution scope
+
+The locally verified candidate is source `c9a7d7f139309763b0f5133fdb647eff0a85a462`
+and local build manifest
+`sha256:16340ebd837d00988d4ef0779e2ae8a0579011f8813f4b577d23099723c6a4d0`.
+[The verification record](daily-watch-cloud-verification.md) pins its retained clean
+checkout, actual build context and local image. No uploaded digest is yet observed.
+
+The requested approval bundle is: upload this candidate to the fixed immutable image
+path below; verify its exact registry bytes; update the existing customer privately
+behind IAP for `pete@altovo.com`; create the two named watch identities and exact grants;
+enable only the Scheduler API if needed; deploy the bounded watch job; and execute
+that job **once** after genuine customer consent and customer/agency acceptance.
+One execution permits at most two task attempts because the job has one retry.
+Stop on any image/source/identity/policy mismatch. Preserve the agency service and
+both historical release checkouts. The known inherited-IAM visibility limit remains
+explicit, rather than requiring a broader organization grant.
+
+This request excludes creating/activating the recurring schedule. That needs a later
+approval after acceptance. Watch writer access is project-wide Firestore read/write;
+the trigger gets only job-scoped invocation. The exact resources, identities and
+limits are listed below. No supplier/model/email/real transaction, source push,
+public access or billing upgrade is proposed.
+
 Every proposed cloud command explicitly selects account `pete@altovo.com`, project
 `sincere-apex-511418-p0` (number `977401667230`, organization `222849345270`) and
 the Singapore resource location `asia-southeast1`. Global API/IAM commands have no
@@ -16,7 +40,7 @@ fallback in the generator.
 ## Reviewable offline output
 
 ```powershell
-powershell.exe -NoProfile -File scripts/prepare-roomdrop-cloud.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-roomdrop-cloud.ps1
 ```
 
 The result is JSON with argument arrays, named phases, explicit approval gates,
@@ -45,7 +69,7 @@ exhaustive secret scan. Git cleanliness alone is not a substitute for reviewing
 the actual context bytes.
 
 ```powershell
-powershell.exe -NoProfile -File scripts/prepare-roomdrop-cloud.ps1 -Phase Build -SourceCommit '<reviewed 40-character HEAD>'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-roomdrop-cloud.ps1 -Phase Build -SourceCommit '<reviewed 40-character HEAD>'
 ```
 
 The immutable image path is
@@ -86,7 +110,7 @@ agency source guard. The observed timestamp and local files record the reviewer'
 observation; local byte verification does not perform or prove a new registry read.
 
 ```powershell
-powershell.exe -NoProfile -File scripts/prepare-roomdrop-cloud.ps1 -SourceCommit '<reviewed 40-character HEAD>' -ImageDigest 'sha256:<observed 64 hex characters>' -RegistryEvidenceFile '.local/roomdrop-registry-evidence.json'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-roomdrop-cloud.ps1 -SourceCommit '<reviewed 40-character HEAD>' -ImageDigest 'sha256:<observed 64 hex characters>' -RegistryEvidenceFile '.local/roomdrop-registry-evidence.json'
 ```
 
 A digest without source and evidence is rejected. Source mismatch, dirty tracked
