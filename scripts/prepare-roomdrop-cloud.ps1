@@ -96,7 +96,7 @@ $taskSteps = [ordered]@{
     )
     DeployJob = @(
         (Cloud-Step 'Deploy non-running bounded watch job using dedicated writer' @('run','jobs','deploy',$taskJob,"--region=$taskRegion","--image=${taskImage}@$taskDigest","--service-account=$taskWatchWriter",'--tasks=1','--parallelism=1','--max-retries=1','--task-timeout=300s','--cpu=1','--memory=512Mi','--command=node','--args=scripts/run-price-watch-job.mjs',"--set-env-vars=NODE_ENV=production,GOOGLE_CLOUD_PROJECT=$taskProject,PRICE_WATCH_JOB_ENABLED=true,PRICE_WATCH_PROVIDER_MODE=simulated-fixture",'--clear-secrets','--clear-volumes','--clear-volume-mounts','--labels=app=roomdrop,purpose=simulated-watch') $taskDeployGate),
-        (Cloud-Step 'Grant trigger only job-scoped invoker' @('run','jobs','add-iam-policy-binding',$taskJob,"--region=$taskRegion","--member=serviceAccount:$taskTrigger",'--role=roles/run.invoker','--condition=None') 'No project-wide run.invoker, datastore, model or run.jobs.runWithOverrides role; verify trigger has no other direct grants.'),
+        (Cloud-Step 'Grant trigger only job-scoped invoker' @('run','jobs','add-iam-policy-binding',$taskJob,"--region=$taskRegion","--member=serviceAccount:$taskTrigger",'--role=roles/run.invoker') 'No project-wide run.invoker, datastore, model or run.jobs.runWithOverrides role; verify trigger has no other direct grants.'),
         (Cloud-Step 'Inspect exact job without executing it' @('run','jobs','describe',$taskJob,"--region=$taskRegion",'--format=json') 'Verify exact image/identity/env/command, one task, parallelism one, retry one and 300-second timeout. CLOUD_RUN_JOB is supplied by Cloud Run; never configure reserved runtime variables.')
     )
     GrantAccess = @(

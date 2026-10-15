@@ -61,6 +61,19 @@ test('private customer and bounded watch job use separate identities and exact l
   const iap = plan.phases.GrantAccess[0].arguments; assert.ok(iap.includes('--service=hotel-price-hunter')); assert.ok(iap.includes('--member=user:' + account));
 });
 
+test('job invoker uses supported unconditional binding arguments while other IAM commands retain their condition flag', () => {
+  const result = bundle(); assert.equal(result.status, 0, result.stderr);
+  const plan = JSON.parse(result.stdout);
+  const bindings = Object.values(plan.phases).flat().filter(step => step.program === 'gcloud' && step.arguments.includes('add-iam-policy-binding'));
+  const jobBindings = bindings.filter(step => step.arguments.slice(0, 3).join(' ') === 'run jobs add-iam-policy-binding');
+  assert.equal(jobBindings.length, 1);
+  assert.deepEqual(jobBindings[0].arguments, ['run','jobs','add-iam-policy-binding','roomdrop-price-watch',`--region=${region}`,`--member=serviceAccount:roomdrop-watch-trigger@${project}.iam.gserviceaccount.com`,'--role=roles/run.invoker',`--account=${account}`,`--project=${project}`,'--quiet','--verbosity=error']);
+  assert.equal(jobBindings[0].arguments.some(value => value === '--condition' || value.startsWith('--condition=')), false);
+  const otherBindings = bindings.filter(step => !jobBindings.includes(step));
+  assert.equal(otherBindings.length, 3);
+  for (const binding of otherBindings) assert.ok(binding.arguments.includes('--condition=None'), binding.name);
+});
+
 test('bundle rejects execution switches, invalid pins and unsubstantiated image digests', () => {
   for (const args of [['-Execute'], ['-Phase','Unknown'], ['-SourceCommit','short'], ['-ImageDigest','sha256:' + 'a'.repeat(64)], ['-RegistryEvidenceFile','missing.json']]) {
     const result = bundle(args); assert.notEqual(result.status, 0, args.join(' '));
