@@ -103,3 +103,9 @@ result/pin files. A new private-customer release requires approval
 of its exact source/image, upload and customer update. Existing IAP, identities,
 agency service, watch job/ledger and absent Scheduler are preserved. No further job
 execution, model call, supplier action, email or publication is included.
+
+Packaging is complete: the network-disabled container passed page/bootstrap checks,
+Gemini was unconfigured and all four changed frontend files match the clean source
+bytes. The exact source/image and narrow approval scope are in
+[customer-clarity-release.md](customer-clarity-release.md). The candidate checkout
+is retained separately so this final evidence update does not change its source pin.

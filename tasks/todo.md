@@ -305,3 +305,5 @@ approved terms, brand/photo-card structure and manual transitions remain protect
   `docs/customer-clarity-verification.md` for exact source/run boundaries.
 - [ ] Obtain approval for the new exact UI image and customer-only private update.
   Keep agency, IAM, watch job/spent execution ledger and absent Scheduler unchanged.
+  The built candidate and requested scope are in `docs/customer-clarity-release.md`;
+  clean source `16adf72b` is retained in `.local/roomdrop-ui-release`.
