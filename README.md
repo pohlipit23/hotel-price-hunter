@@ -8,6 +8,8 @@ The initial RoomDrop customer release `c9a7d7f` established its own private Goog
 
 The [private customer app](https://hotel-price-hunter-2qbcpylngq-as.a.run.app/) now runs the approved clarity revision `hotel-price-hunter-00008-87j`, with shorter watch copy, one three-step guide, explicit next-action labels and a clean completed state. [Local verification](docs/customer-clarity-verification.md) records the UI, keyboard and refund/consent regressions. [Release checks](docs/customer-clarity-execution.md) pass **40/40**, including preserved data, private access and unchanged agency/watch configuration. Signed-in visual confirmation of this new revision remains pending; browser automation could not connect.
 
+The subsequent [selected option B](docs/offer-band-integration.md) is integrated in local source and the temporary phone preview: full-width hotel/room category bands and explicit **Save USD …** amounts. It awaits the user's separate UX review and any later scoped cloud release. The simulated transaction steps remain manual.
+
 The public fixture uses a labelled frozen `demoNow` for decisions. Its original `checkedAt` and `expiresAt` stay intact; displaying a snapshot does not perform a live supplier check. Visitor expiry, request limits, and audit `recordedAt` use actual wall time. Any future private/live flow must use actual time for offer and permission validity.
 
 ## Local application

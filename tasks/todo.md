@@ -313,3 +313,16 @@ approved terms, brand/photo-card structure and manual transitions remain protect
 - [ ] Human-confirm the revised signed-in customer UI by refresh only. Browser
   connection failed before page access; no booking/watch/simulation actions need
   repeating. Keep this separate from the earlier human functional acceptance.
+
+## Selected results labels — 16 October
+
+- [x] Integrate the user's chosen option B: full-width relationship bands and
+  explicit Save amounts, preserving fee/refund wording, landscape photographs,
+  review consent and the manual simulated transaction flow. Prototype alternatives
+  remain on their separate branch. See `docs/offer-band-integration.md`.
+- [x] Browser verification passes 8 clarity + 11 postcard + 17 watch groups;
+  inspected mobile and desktop screenshots. The full emulator Node suite passes
+  195/195, zero failures/skips. Refresh only the isolated phone
+  preview after committing; the private cloud release remains unchanged.
+- [ ] Separate agent UX review requested by the user; the delivery includes a
+  self-contained prompt with the exact commit, phone URL and evidence boundaries.

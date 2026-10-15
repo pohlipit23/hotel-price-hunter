@@ -130,7 +130,9 @@ async originalPage => {
         assert(text.includes(`USD ${item.refund/100}`) && text.includes('Potential refund after USD 5 fees'), `${item.id}: card net refund is wrong`);
         const heading = await card.locator('h2,h3').first().textContent();
         assert(heading.trim() === before.offers.find(offer=>offer.offerId===item.id).hotel.name, `${item.id}: card hotel is not primary heading`);
-        for (const pill of item.pills) assert(text.includes(pill), `${item.id}: missing card pill ${pill}`);
+        const category = item.id==='DEMO_EQUIVALENT' ? 'Same hotel · Matches your room' : item.id==='DEMO_DIFFERENT_ROOM' ? 'Same hotel · Different room' : 'Different hotel';
+        assert(await card.locator('.offer-category').textContent()===category, `${item.id}: incorrect relationship band`);
+        assert(text.includes('Save USD '+item.refund/100) && text.includes('Refundable'), `${item.id}: savings or cancellation label missing`);
       }
       if (choice.id==='DEMO_EQUIVALENT') { await widths(page,'booking'); await page.setViewportSize({width:390,height:900}); await capture(page,'booking-390'); }
       checkpoint=choice.id+': review';await review(page,choice,{keyboard:true});

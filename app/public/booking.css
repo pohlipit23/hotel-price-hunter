@@ -35,3 +35,11 @@
 .flexibility-consent{margin-top:8px}
 @media(max-width:479px){.customer-steps{gap:10px;font-size:11px;margin-bottom:12px}.customer-steps li+li{padding-left:10px}.customer-steps span{width:20px;height:20px}.price-watch{gap:0 12px}.watch-button{padding:10px 12px;font-size:12px}.has-switch .booking-photo{height:88px}.has-switch .ticket-caption{padding:12px}.has-switch .ticketmain h1{font-size:22px}.has-switch .ticketstub{margin-top:6px}}
 @media(max-width:359px){.customer-steps{gap:8px;font-size:10px}.customer-steps li+li{padding-left:8px}.customer-steps li{gap:4px}.watch-button{padding:10px}}
+
+/* Selected results design: category bands identify changes; amounts name savings. */
+.changehead{display:block}.savings-explanation{font-size:12px;color:var(--muted);margin-top:4px}
+.offer-category{padding:9px 14px;background:#215c46;color:#fff;font-size:13px;font-weight:650;line-height:1.4}
+.offer[data-category="room"] .offer-category{background:#294b71}.offer[data-category="hotel"] .offer-category{background:#943e33}.offer[data-category="unverified"] .offer-category{background:var(--muted)}
+.offer-saving{font-size:27px;letter-spacing:-.5px}.offer-caption{font-size:12px;line-height:1.45;margin-top:3px}
+@media(max-width:479px){.offer-category{padding:9px 11px;font-size:12px}.offer-body h3{font-size:17px}.offer-saving{font-size:24px;line-height:1.25}.offer-caption{font-size:11px}.offer-arrow{padding:0;font-size:22px}}
+@media(max-width:359px){.offer-body h3{font-size:16px}.offer-saving{font-size:22px}}

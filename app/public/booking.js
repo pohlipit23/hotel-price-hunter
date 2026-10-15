@@ -75,12 +75,14 @@ function needsFlexibilityConsent(offer) { return offer?.cancellation?.refundabil
 function canApprove(offer) {
   return verifiedSaving(offer).available && (!needsFlexibilityConsent(offer) || $('accept-reduced-flexibility').checked);
 }
-function pills(offer) {
+function pills(offer, includeRelationship = true) {
   const list = node('div', undefined, 'pills');
-  const relationship = offer.hotel.id === state.booking.hotel.id ? 'Same hotel' : 'Different hotel';
-  list.append(node('span', relationship, 'pill' + (relationship === 'Same hotel' ? ' positive' : '')));
-  if (offer.category === 'equivalent' && offer.equivalence === 'verified') list.append(node('span', 'Equivalent room', 'pill positive'));
-  else if (offer.category === 'different-room') list.append(node('span', 'Different room', 'pill'));
+  if (includeRelationship) {
+    const relationship = offer.hotel.id === state.booking.hotel.id ? 'Same hotel' : 'Different hotel';
+    list.append(node('span', relationship, 'pill' + (relationship === 'Same hotel' ? ' positive' : '')));
+    if (offer.category === 'equivalent' && offer.equivalence === 'verified') list.append(node('span', 'Equivalent room', 'pill positive'));
+    else if (offer.category === 'different-room') list.append(node('span', 'Different room', 'pill'));
+  }
   list.append(node('span', valueText(offer.cancellation.refundability), 'pill' + (offer.cancellation.refundability === 'refundable' ? ' positive' : '')));
   return list;
 }
@@ -152,26 +154,32 @@ function offerCard(offer, index) {
   const featured = index === 0 && offer.category === 'equivalent';
   const article = node('article', undefined, 'offer' + (featured ? ' featured' : ''));
   article.dataset.offer = offer.offerId;
+  const sameHotel = offer.hotel.id === state.booking.hotel.id;
+  const matchingRoom = offer.category === 'equivalent' && offer.equivalence === 'verified';
+  const differentRoom = offer.category === 'different-room';
+  const category = !sameHotel ? 'Different hotel' : matchingRoom ? 'Same hotel · Matches your room'
+    : differentRoom ? 'Same hotel · Different room' : 'Same hotel · Review room details';
+  article.dataset.category = !sameHotel ? 'hotel' : matchingRoom ? 'match' : differentRoom ? 'room' : 'unverified';
   const card = node(featured ? 'div' : 'button', undefined, 'offer-card');
   const body = node('div', undefined, 'offer-body');
   const refund = verifiedSaving(offer);
   const quote = offer.refundQuote;
   const feeMinor = quote && [quote.originalCancellationMinor, quote.switchFeesMinor, quote.refundProcessingMinor].every(Number.isSafeInteger)
     ? quote.originalCancellationMinor + quote.switchFeesMinor + quote.refundProcessingMinor : null;
-  body.append(node('h3', offer.hotel.name), node('p', roomText(offer), 'room-subline'), pills(offer),
-    node('strong', refund.available ? money(refund.minor, offer.refundQuote?.currency) : 'Saving unavailable', 'offer-saving' + (refund.available ? '' : ' unavailable')),
+  body.append(node('h3', offer.hotel.name), node('p', roomText(offer), 'room-subline'), pills(offer, false),
+    node('strong', refund.available ? 'Save ' + money(refund.minor, offer.refundQuote?.currency) : 'Saving unavailable', 'offer-saving' + (refund.available ? '' : ' unavailable')),
     node('p', refund.available ? 'Potential refund after ' + money(feeMinor, quote.currency) + ' fees' : 'Current conditions need verification', 'offer-caption'));
   card.append(stayPhoto(offerPhotoIndex(offer)), body);
   const review = featured ? node('button', 'Review saving', 'primary') : card;
   review.type = 'button'; review.dataset.offerId = offer.offerId;
-  review.setAttribute('aria-label', 'Review saving at ' + offer.hotel.name + ', ' + roomText(offer));
+  review.setAttribute('aria-label', 'Review saving at ' + offer.hotel.name + ', ' + roomText(offer) + '. ' + category);
   review.disabled = busy || Boolean(pending);
   review.addEventListener('click', () => select(offer));
   if (!featured) {
     const arrow = node('span', '›', 'offer-arrow'); arrow.setAttribute('aria-hidden', 'true'); card.append(arrow);
     card.append(node('span', 'Review saving', 'sr-only'));
   }
-  article.append(card);
+  article.append(node('p', category, 'offer-category'), card);
   if (featured) article.append(review);
   return article;
 }

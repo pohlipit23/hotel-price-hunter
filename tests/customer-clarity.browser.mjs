@@ -24,7 +24,7 @@ const server = createAppServer({ storage: createTestMemoryStorage(), advisor: { 
   fixture: JSON.parse(await readFile(new URL('../fixtures/jury-booking.json', import.meta.url), 'utf8')) });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const origin = 'http://127.0.0.1:' + server.address().port;
-const evidence = new URL('../.local/customer-clarity/', import.meta.url);
+const evidence = new URL(process.argv.includes('--offer-band') ? '../.local/offer-band/' : '../.local/customer-clarity/', import.meta.url);
 await mkdir(evidence, { recursive: true });
 let browser;
 const checks = [], screenshots = [], measurements = [], errors = [], regressions = [], external = [];
@@ -83,6 +83,11 @@ try {
   for (const width of [375, 1280]) {
     const test = await fresh(width), { page } = test;
     assert.equal(await page.locator('#customer-steps [aria-current]').innerText(), '1\nChoose');
+    assert.deepEqual(await page.locator('#offers .offer-category').allTextContents(), ['Same hotel · Matches your room', 'Same hotel · Different room', 'Different hotel']);
+    assert.deepEqual(await page.locator('#offers .offer-saving').allTextContents(), ['Save USD 55', 'Save USD 75', 'Save USD 85']);
+    assert.equal(await page.locator('#changes-title').textContent(), 'Compare your savings');
+    assert.equal(await page.locator('.savings-explanation').textContent(), 'Potential refunds after fees, for the whole stay.');
+    assert.equal(await page.locator('.prototype-switcher,.prototype-ribbon,.prototype-facts').count(), 0, 'Prototype controls shipped into the customer UI');
     for (const id of ['watch-details', 'lower-rate', 'notification-previews-details']) assert(!await page.locator('#' + id).evaluate(el => el.open), `${id} starts open`);
     await capture(page, 'initial', width); await geometry(page, 'initial');
     await page.locator('#watch-details summary').focus(); await page.keyboard.press('Enter');
