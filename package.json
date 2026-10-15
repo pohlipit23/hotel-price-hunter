@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@google-cloud/firestore": "9.3.1",
-    "@google/genai": "2.28.0"
+    "@google/genai": "2.28.0",
+    "google-auth-library": "10.9.1"
   }
 }

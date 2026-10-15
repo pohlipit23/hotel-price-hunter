@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#FFF9F2">
+  <meta name="agency-auth-mode" content="unavailable">
   <title>Agency review · RoomDrop</title>
   <link rel="icon" type="image/png" href="/assets/roomdrop-key-icon.png"><link rel="stylesheet" href="/booking.css"><link rel="stylesheet" href="/agency.css">
   <script src="/agency.js" type="module"></script>
@@ -13,11 +14,13 @@
     <main id="main">
       <h1>Agency review</h1><p class="muted agency-intro">Read-only review of simulated switches. No real booking, cancellation or refund.</p>
       <p id="agency-message" class="agency-message" role="status">Checking access…</p>
+      <p id="agency-managed-access" class="muted small" hidden>Agency access uses your approved Google account. Contact your administrator if access is unavailable.</p>
+      <button id="agency-check-access" class="plain" type="button" hidden>Check access again</button>
       <section id="agency-login" aria-labelledby="agency-login-title" hidden>
         <h2 id="agency-login-title">Sign in for local review</h2><p class="muted small">Use the passphrase configured for this local demo.</p>
         <form id="agency-login-form"><label for="agency-passphrase">Agency passphrase</label><input id="agency-passphrase" name="passphrase" type="password" autocomplete="current-password" required maxlength="256"><button id="agency-login-submit" class="primary" type="submit">Sign in</button></form>
       </section>
-      <section id="agency-session" aria-label="Agency session" hidden><div><strong>Local fixture review</strong><p id="agency-session-expiry" class="muted small"></p></div><button id="agency-logout" class="plain" type="button">Sign out</button></section>
+      <section id="agency-session" aria-label="Agency session" hidden><div><strong id="agency-session-title">Local fixture review</strong><p id="agency-session-expiry" class="muted small"></p></div><button id="agency-logout" class="plain" type="button">Sign out</button></section>
       <section id="agency-overview" aria-labelledby="agency-cases-title" hidden>
         <h2 id="agency-cases-title">Saved cases</h2><p class="muted small">Review progress, proof and recorded authority. This view cannot advance a switch.</p>
         <div id="agency-cases" class="agency-cases"></div>

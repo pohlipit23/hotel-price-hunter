@@ -7,6 +7,7 @@ import { validatePreferences } from './domain/decision.mjs';
 import { createStorage } from './storage.mjs';
 import { createGeminiAdvisor } from './gemini.mjs';
 import { AgencyAuthError, AGENCY_COOKIE, createLocalAgencyAuth } from './agency-auth.mjs';
+import { createIapAgencyAuth } from './agency-iap-auth.mjs';
 import { SimulationError, initialiseSimulation, offerDecision, simulationView, agencyCaseView, startSwitch, approveOffer, advanceSwitch } from './domain/simulation.mjs';
 import { priceWatchView, notificationView, changePriceWatch, appendWatchOperationEvents, watchAliases, fixtureWatchProvider } from './domain/price-watch.mjs';
 
@@ -68,7 +69,11 @@ async function stored(operation) {
 }
 
 /** Dependencies are injectable for tests; executable startup always uses Firestore. */
-export function createAppServer({ storage, advisor, fixture, origin, now = () => new Date(), adviceLimit = 8, agencyAuth = null, watchProvider = fixtureWatchProvider } = {}) {
+export function createAppServer({ storage, advisor, fixture, origin, now = () => new Date(), adviceLimit = 8, agencyAuth = null, appSurface = 'customer', watchProvider = fixtureWatchProvider } = {}) {
+  const iap = agencyAuth?.mode === 'google-iap';
+  if (!['customer', 'agency'].includes(appSurface) || (appSurface === 'agency') !== iap) throw new Error('The agency surface requires Google IAP and its own service.');
+  const authMode = iap ? 'google-iap' : agencyAuth ? 'local-review' : 'unavailable';
+  const agencyStaticPaths = new Set(['/', '/agency', '/agency.html', '/agency.js', '/agency.css', '/booking.css', '/assets/roomdrop-logo.png', '/assets/roomdrop-key-icon.png']);
   if (!storage || !advisor || !fixture) throw new Error('Storage, advisor and allowlisted jury fixture are required.');
   if (fixture.scenarioId !== 'jury-booking') throw new Error('Only the anonymised jury-booking scenario is allowlisted.');
   const demoNow = fixture.demoNow;
@@ -148,6 +153,7 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
     if (!agencyAuth) fail(503, 'AGENCY_UNAVAILABLE', 'Local agency review is not enabled.');
     if (request.headers['sec-fetch-site'] === 'cross-site') fail(403, 'ORIGIN_REJECTED', 'Load local agency review directly.');
     const token = cookieId(request, AGENCY_COOKIE);
+    if (iap && request.method !== 'GET') fail(405, 'METHOD_NOT_ALLOWED', 'Google IAP manages operator sign-in. Agency access is read-only.');
     if (url.pathname === '/api/agency/session' && request.method === 'POST') {
       if (url.search || request.headers.origin !== expectedOrigin(request)) fail(403, 'ORIGIN_REJECTED', 'Request origin was rejected.');
       const body = await readJson(request);
@@ -156,7 +162,9 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
       response.setHeader('Set-Cookie', agencySessionCookie(request, freshToken, 30 * 60));
       return sendJson(response, 200, { authenticated: true, ...session });
     }
-    const session = agencyAuth.authenticate(token);
+    const session = await agencyAuth.authenticate(iap ? request : token);
+    const cursorBinding = iap ? session.cursorBinding : token;
+    const recheckSession = () => iap ? agencyAuth.recheck(session) : agencyAuth.authenticate(token);
     if (url.pathname === '/api/agency/session') {
       if (url.search) fail(422, 'VALIDATION_ERROR', 'Agency session does not accept query parameters.');
       if (request.method === 'GET') return sendJson(response, 200, { authenticated: true, ...session });
@@ -179,15 +187,15 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
       const time = now().getTime();
       for (const [id, cursor] of agencyCursors) if (cursor.expiresAt <= time) agencyCursors.delete(id);
       const cursor = cursorToken ? agencyCursors.get(cursorToken) : null;
-      if (url.searchParams.has('cursor') && (!cursor || cursor.sessionToken !== token || cursor.limit !== limit)) fail(422, 'INVALID_AGENCY_CURSOR', 'Reload the current reviewer case page.');
+      if (url.searchParams.has('cursor') && (!cursor || cursor.sessionToken !== cursorBinding || cursor.limit !== limit)) fail(422, 'INVALID_AGENCY_CURSOR', 'Reload the current reviewer case page.');
       const records = await stored(() => storage.listCases({ limit: limit + 1, after: cursor?.after ?? null }));
-      agencyAuth.authenticate(token);
+      recheckSession();
       const page = records.slice(0, limit);
       let nextCursor = null;
       if (records.length > limit) {
         nextCursor = randomBytes(32).toString('hex');
         if (agencyCursors.size >= 200) agencyCursors.delete(agencyCursors.keys().next().value);
-        agencyCursors.set(nextCursor, { after: page.at(-1).caseId, limit, sessionToken: token,
+        agencyCursors.set(nextCursor, { after: page.at(-1).caseId, limit, sessionToken: cursorBinding,
           expiresAt: Math.min(time + 5 * 60 * 1000, Date.parse(session.expiresAt)) });
       }
       return sendJson(response, 200, { cases: page.filter(eligibleCase).map(record => {
@@ -201,7 +209,7 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
     const detail = /^\/api\/agency\/cases\/(case-[a-f0-9]{64})$/.exec(url.pathname);
     if (detail && !url.search) {
       const record = await stored(() => storage.getCase(detail[1]));
-      agencyAuth.authenticate(token);
+      recheckSession();
       if (!eligibleCase(record)) fail(404, 'AGENCY_CASE_NOT_FOUND', 'This fictional review case is unavailable.');
       return sendJson(response, 200, { case: agencyCaseView(record, fixture) });
     }
@@ -217,6 +225,9 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
       const url = new URL(request.url, 'http://local.invalid');
       if (request.method === 'GET' && ['/health', '/healthz'].includes(url.pathname)) return sendJson(response, 200, { status: 'ok', storage: storage.mode, model: advisor.status });
       if (url.pathname.startsWith('/api/agency/')) return await agencyRoute(request, response, url);
+      if (appSurface === 'agency' && (!(request.method === 'GET' || request.method === 'HEAD') || !agencyStaticPaths.has(url.pathname))) {
+        fail(404, 'ROUTE_NOT_FOUND', 'This route is unavailable on the agency service.');
+      }
       if (request.method === 'GET' && url.pathname === '/api/bootstrap') {
         if ([...url.searchParams.keys()].some(key => key !== 'scenario') || (url.searchParams.get('scenario') || 'jury-booking') !== 'jury-booking') fail(404, 'SCENARIO_NOT_FOUND', 'Only the anonymised jury scenario is available.');
         if (request.headers['sec-fetch-site'] === 'cross-site') fail(403, 'ORIGIN_REJECTED', 'Load the application directly.');
@@ -332,13 +343,14 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
       if (url.pathname.startsWith('/api/')) fail(404, 'ROUTE_NOT_FOUND', 'This public route is unavailable.');
       if (request.method === 'GET' && url.pathname === '/favicon.ico') { response.writeHead(204); return response.end(); }
       if (request.method !== 'GET' && request.method !== 'HEAD') fail(405, 'METHOD_NOT_ALLOWED', 'Method is not supported.');
-      const pathname = url.pathname === '/' ? '/booking.html' : url.pathname === '/agency' ? '/agency.html' : decodeURIComponent(url.pathname);
+      const pathname = url.pathname === '/' ? (appSurface === 'agency' ? '/agency.html' : '/booking.html') : url.pathname === '/agency' ? '/agency.html' : decodeURIComponent(url.pathname);
       const extension = extname(pathname);
       const filename = resolve(PUBLIC_ROOT, `.${pathname}`);
       if (!/^\/[a-zA-Z0-9/_\-.]+$/.test(pathname) || pathname.split('/').includes('..') || !MIME[extension] || !filename.startsWith(PUBLIC_ROOT + sep)) fail(404, 'NOT_FOUND', 'Page not found.');
       let content;
       try { content = await readFile(filename); }
       catch { fail(404, 'NOT_FOUND', 'Page not found.'); }
+      if (pathname === '/agency.html') content = Buffer.from(content.toString('utf8').replace('<meta name="agency-auth-mode" content="unavailable">', `<meta name="agency-auth-mode" content="${authMode}">`));
       response.writeHead(200, { 'Content-Type': MIME[extension] });
       response.end(request.method === 'HEAD' ? undefined : content);
     } catch (error) {
@@ -346,7 +358,7 @@ export function createAppServer({ storage, advisor, fixture, origin, now = () =>
       if (error.code === 'INVALID_PREFERENCES') return sendJson(response, 422, { error: { code: error.code, message: 'Check your preferences.', details: error.details } });
       if (error.code === 'ADVICE_UNAVAILABLE') return sendJson(response, 503, { error: { code: error.code, message: error.message } });
       const known = error instanceof RequestError || error instanceof SimulationError || error instanceof AgencyAuthError;
-      sendJson(response, known ? error.status : 500, { error: { code: known ? error.code : 'INTERNAL_ERROR', message: known ? error.message : 'Unable to complete this request.', ...(error.details ? { details: error.details } : {}) } });
+      sendJson(response, known ? error.status : 500, { ...(request.url?.startsWith('/api/agency/') ? { authMode } : {}), error: { code: known ? error.code : 'INTERNAL_ERROR', message: known ? error.message : 'Unable to complete this request.', ...(error.details ? { details: error.details } : {}) } });
     }
   });
   server.requestTimeout = 15000;
@@ -360,10 +372,11 @@ export async function startServer(environment = process.env) {
   if ((environment.K_SERVICE || environment.NODE_ENV === 'production') && !environment.APP_ORIGIN) throw new Error('APP_ORIGIN is required in production.');
   const origin = environment.APP_ORIGIN || `http://localhost:${port}`;
   const fixture = JSON.parse(await readFile(new URL('../fixtures/jury-booking.json', import.meta.url), 'utf8'));
-  const agencyAuth = await createLocalAgencyAuth({ environment });
+  const appSurface = environment.APP_SURFACE || 'customer';
+  const agencyAuth = createIapAgencyAuth({ environment }) || await createLocalAgencyAuth({ environment });
   const storage = await createStorage(environment);
-  const advisor = await createGeminiAdvisor({ environment });
-  const server = createAppServer({ storage, advisor, fixture, origin, agencyAuth });
+  const advisor = appSurface === 'agency' ? { available: false, status: 'unconfigured' } : await createGeminiAdvisor({ environment });
+  const server = createAppServer({ storage, advisor, fixture, origin, agencyAuth, appSurface });
   server.listen(port, environment.BIND_HOST || '0.0.0.0', () => console.log(`Hotel Price Hunter listening on port ${port}; ${storage.mode}; Gemini ${advisor.status}.`));
   const stop = () => server.close(async () => { await storage.close(); process.exit(0); });
   process.once('SIGTERM', stop);
