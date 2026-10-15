@@ -275,6 +275,27 @@ in `docs/roomdrop-cloud-setup.md` and `docs/daily-watch-cloud-verification.md`.
   failure diagnostics are corrected with regressions. Network-disabled packaging
   checks pass; source `c9a7d7f` and the local image are pinned in the verification
   record and retained clean `.local/roomdrop-watch-release` checkout.
-- [ ] Obtain separately scoped cloud approval, deploy privately and verify genuine
-  signed customer/agency data flow and one-shot job execution. Recurring activation
-  remains an additional gate after acceptance.
+- [x] Obtain separately scoped cloud approval (**go ahead**), upload the exact
+  candidate and deploy the private customer service plus non-running watch job.
+  Independent registry and **44+4** supported metadata/direct-access checks passed;
+  agency fingerprints/grants are unchanged and Scheduler remains absent. The exact
+  job-binding CLI correction has a regression and **7/7** focused tests pass. Final
+  full emulator regression passes **195/195**, zero failures/skips.
+- [x] User confirmed all live customer/agency checks. One approved job execution
+  `roomdrop-price-watch-vm4f2` completed; independent **20/20** checks prove one task/
+  attempt, durable checkpoint and truthful `SOURCE_UNAVAILABLE` for the promoted
+  fixture baseline (no search/offers, one preview-only event). Human acceptance has
+  no automated signed capture. The execution approval is spent; Scheduler remains
+  absent and separately gated. See `docs/roomdrop-cloud-execution.md`.
+
+## Customer clarity follow-up — 15 October
+
+The user reported many UI issues, too much text and unclear customer steps after
+the functional live check. `docs/customer-clarity-contract.md` bounds the local UX
+change: shorter default copy, one customer step guide, clear stage-specific actions,
+compact watch evidence and truthful pending/completed refunds. Domain authority,
+approved terms, brand/photo-card structure and manual transitions remain protected.
+
+- [ ] Implement and independently browser-review the local revision at mobile and
+  desktop, preserve the customer/watch/non-refundable regressions and record honest
+  word counts and screenshots. A new exact cloud candidate needs new approval.

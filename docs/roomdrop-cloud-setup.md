@@ -1,5 +1,10 @@
 # Private RoomDrop customer and daily watch proposal
 
+The user subsequently approved this scope with **go ahead**. Actual rollout,
+the corrected job IAM command and pending live acceptance are recorded in
+[roomdrop-cloud-execution.md](roomdrop-cloud-execution.md). Recurring activation
+remains separately gated. This document preserves the original proposal.
+
 Prepared 15 October 2026. **Offline only; no cloud operation is authorised or
 executed by this bundle.** The authoritative scope is
 [daily-watch-cloud-contract.md](daily-watch-cloud-contract.md). This is a private,

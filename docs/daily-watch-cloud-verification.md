@@ -1,5 +1,9 @@
 # Daily watch cloud preparation verification
 
+Subsequent approved deployment and remaining acceptance are recorded in
+[roomdrop-cloud-execution.md](roomdrop-cloud-execution.md). The checks below describe
+the earlier local preparation, not the current deployment status.
+
 15 October 2026. This record covers local source, emulator and packaging checks for
 [the daily job contract](daily-watch-cloud-contract.md). It does not record a cloud
 deployment or an active schedule. Supplier observations remain simulated and all
