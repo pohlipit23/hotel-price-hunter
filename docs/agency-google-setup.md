@@ -1,6 +1,6 @@
 # Google setup checkpoint and approval scope
 
-15 October 2026, Asia/Kuala_Lumpur. This checkpoint continues [the private agency deployment proposal](agency-iap-deployment.md). Cloud setup is awaiting approval of the exact API/IAM/service scope below.
+15 October 2026, Asia/Kuala_Lumpur. This checkpoint continues [the private agency deployment proposal](agency-iap-deployment.md). The user explicitly approved the full API/IAM/service scope below, and it has been executed. See [the private agency execution record](agency-cloud-execution.md) for actual revision, source/image pins, runtime permission proof, cleanup and remaining acceptance limits. The preflight observations below describe the state before execution.
 
 ## Verified access and current state
 
@@ -30,7 +30,7 @@ The existing customer service and its IAM, production supplier access, emails, b
 
 An attempted combined enable-IAP/create-reader/grant-viewer command was rejected **before launch** by automatic approval review. The reason was that the exact persistent cloud mutations and the project-wide Firestore grant had not been explicitly approved. No API, account, role, image upload or service mutation occurred. The rejected command was not split or retried through another path.
 
-The next human decision is approval of the concrete scope above, including project-wide Firestore read access and the limited new service/job costs. The setup bundle and verifier remain offline/read-only unless their explicit modes and separately approved external actions are selected.
+The user subsequently replied **approve all**, explicitly authorizing the concrete scope above, including project-wide Firestore read access and the limited new service/job costs. Execution then proceeded under that authorization. The earlier rejection was not bypassed. The setup bundle itself remains default-offline and the release verifier read-only.
 
 ## Prepared verification
 

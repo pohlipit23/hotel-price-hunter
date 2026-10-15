@@ -1,6 +1,6 @@
 # Hotel Price Hunter: proposed starting plan
 
-Status: approved; RoomDrop postcard, four selected-offer simulations, protected local agency review, explicit price-watch checks and notification previews are verified locally on `codex/customer-flow`. Google IAP operator identity is now prepared and verified offline for a separate agency service. Earlier enrolment/advice remains deployed privately with bounded live Gemini evidence. Actual cloud identity/scheduling/delivery, the new source's deployment, deployed browser acceptance, live Altovo probes and submission remain outstanding.
+Status: approved; RoomDrop postcard, four selected-offer simulations, protected local agency review, explicit price-watch checks and notification previews are verified locally on `codex/customer-flow`. The separate Google IAP agency service is now privately deployed, with source/configuration/direct-access and actual reader behavior proof; signed browser acceptance is recorded in `docs/agency-cloud-execution.md`. Earlier customer enrolment/advice remains deployed privately with bounded live Gemini evidence. Organization-policy audit coverage, scheduling/delivery, updated customer deployment/browser acceptance, live Altovo probes and submission remain outstanding.
 Reviewed: 12 October 2026, Asia/Kuala_Lumpur.
 
 ## Recommendation

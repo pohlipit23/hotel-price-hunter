@@ -127,7 +127,7 @@ An opt-in Google IAP provider is prepared for a **separate agency-only service**
 
 See [the identity contract](docs/agency-iap-contract.md) and [private deployment proposal](docs/agency-iap-deployment.md) for exact configuration, strict expiry, key retrieval, allowlist rollout and separate release gates. Local tests do not establish actual Google browser sign-in, deployed IAM or production supplier access. The existing private cloud release has not been updated.
 
-[Google setup checkpoint](docs/agency-google-setup.md): `pete@altovo.com` is now signed into the CLI and independently verified as the operator identity. The cloud command bundle, separate read-only deployment verifier and guarded reader probe are prepared. Persistent API/IAM/image/service changes await explicit scoped approval after automatic review rejected the combined command before launch. No API key or service-account key is required.
+[Google setup checkpoint](docs/agency-google-setup.md): after explicit scoped approval, the separate [private agency service](https://hotel-price-hunter-agency-2qbcpylngq-as.a.run.app/agency) is deployed with IAP, the dedicated Firestore reader and a direct operator grant for `pete@altovo.com`. Image/source/configuration and unchanged customer-service checks pass within the documented organization-IAM coverage limit. The one-shot reader probe verified actual reads and guarded update/delete denials, then its job was removed. See [the execution record](docs/agency-cloud-execution.md) for signed-browser acceptance status and exact evidence. No API key or service-account key is required.
 
 ## Price watch and notification previews
 
