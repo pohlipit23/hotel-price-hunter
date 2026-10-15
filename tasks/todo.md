@@ -237,3 +237,17 @@ The user selected Google IAP sign-in as the next bounded development slice. The 
 Verified locally: **159/159** emulator-enabled Node tests with zero skips, seven mocked-IAP browser groups plus the preserved **11+5+17** integrated groups, **82** total geometry checks, actual-library offline signature verification, independent **24/24** probes and an allowlist mutation detected by existing tests. A production-mode local container with no network/credentials/mounts verified packaging and default denial; it made no database or identity call. Only the exact task-owned app was restarted; retained session **58369** serves the local demo with Gemini unconfigured. See `docs/agency-iap-verification.md`, `docs/review-agency-iap.md` and `docs/agency-iap-deployment.md`.
 
 Actual cloud sign-in, IAM verification and deployment remain separate unchecked release gates even after these local criteria pass. Scheduled trigger/task provisioning, delivery, supplier access and public submission are subsequent work.
+
+## Google setup and private agency rollout — 15 October
+
+The user requested Google setup, completed browser sign-in as the corrected account `pete@altovo.com`, and confirmed trial credits. See `docs/agency-google-setup.md` for observed account/project state, the exact proposed scope and the automatic approval boundary.
+
+- [x] Verify the actual CLI account, target project/organization/billing metadata and independent Google operator identity without saving or printing credentials.
+- [x] Prepare a default-offline concrete setup bundle, separately pinned read-only agency verifier, and a guarded one-shot reader behavior probe; retain the old verifier unchanged.
+- [x] Resolve the inherited Node entrypoint and unavailable beta SDK assumptions; independent 17-test review and two isolated guard mutations pass.
+- [x] Full local regression passes **176/176**, zero skips, in the isolated demo emulator namespace; application Docker allowlist and historical verifier remain unchanged.
+- [ ] Obtain explicit approval for enabling IAP, creating the reader/service agent, project-wide Firestore viewer access, image upload, private agency service, exact IAP invocation/operator grants and one temporary verification job. Automatic approval review rejected the bundled mutation before execution.
+- [ ] Execute only the approved scope, establish digest/source/config/customer-preservation proof and run the guarded reader behavior probe.
+- [ ] Complete genuine Google IAP browser sign-in and protected read-only API acceptance; record organization-policy audit limits separately.
+
+Organization IAM reads are denied to the user. This is not hidden by the verifier or solved with a broad new grant. No cloud setup mutation, model generation, real transaction or email has occurred in this slice.

@@ -127,6 +127,8 @@ An opt-in Google IAP provider is prepared for a **separate agency-only service**
 
 See [the identity contract](docs/agency-iap-contract.md) and [private deployment proposal](docs/agency-iap-deployment.md) for exact configuration, strict expiry, key retrieval, allowlist rollout and separate release gates. Local tests do not establish actual Google browser sign-in, deployed IAM or production supplier access. The existing private cloud release has not been updated.
 
+[Google setup checkpoint](docs/agency-google-setup.md): `pete@altovo.com` is now signed into the CLI and independently verified as the operator identity. The cloud command bundle, separate read-only deployment verifier and guarded reader probe are prepared. Persistent API/IAM/image/service changes await explicit scoped approval after automatic review rejected the combined command before launch. No API key or service-account key is required.
+
 ## Price watch and notification previews
 
 Use **Watch for better rates** to save checks-and-alerts consent and the first simulated check in one action; **Stop watching** revokes it. This grants no switch permission and changes no booking, enrolment or saved stay requirements. Updates are collapsed by default and explicitly preview-only: none are emailed. Daily/weekly/offers-only record policy uses existing saved preferences; manual refund progress and agency-attention records remain evidence-bound.
