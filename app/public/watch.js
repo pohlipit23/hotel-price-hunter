@@ -5,7 +5,7 @@ const reasons = {
   SWITCH_IN_PROGRESS: 'A simulated switch is in progress.', NON_REFUNDABLE_BOOKING: 'Your current booking is non-refundable.',
   NON_REFUNDABLE_BASELINE: 'Your current booking is non-refundable.', CANCELLATION_WINDOW_EXPIRED: 'The free-cancellation deadline has passed.',
   CANCELLATION_WINDOW_ENDED: 'The free-cancellation deadline has passed.', UNKNOWN_CANCELLATION_POLICY: 'Cancellation terms need verification.',
-  UNKNOWN_CANCELLATION: 'Cancellation terms need verification.', SOURCE_UNAVAILABLE: 'The simulated provider does not support this booking.',
+  UNKNOWN_CANCELLATION: 'Cancellation terms need verification.', SOURCE_UNAVAILABLE: 'Demo rates are unavailable for this stay.',
   SESSION_EXPIRED: 'The saved demo session has expired.', BOOKING_VERSION_CHANGED: 'The booking changed.',
   WATCH_VERSION_CHANGED: 'Watch consent changed.', PREFERENCES_VERSION_CHANGED: 'Stay requirements changed.',
   PROVIDER_UNAVAILABLE: 'The simulated provider was unavailable.', PROVIDER_FAILED: 'The simulated provider check failed.',
@@ -22,8 +22,14 @@ export function renderWatch(state, { busy, pending, refreshRequired, message, me
   $('price-watch').hidden = !watch;
   if (!watch) return;
   $('price-watch').setAttribute('aria-busy', String(busy));
-  const status = { active: 'Watching for better rates', stopped: 'Watch stopped', paused: 'Watch paused', ended: 'Watch ended' }[watch.status] || 'Watch status unavailable';
-  $('watch-status').textContent = status + (watch.reason ? ' · ' + reasonText([watch.reason]) : '') + (message ? ' ' + message : '');
+  const status = { active: 'Watching · You approve every switch.', stopped: 'Watch stopped', paused: 'Watch paused', ended: 'Watch ended' }[watch.status] || 'Watch status unavailable';
+  const ordinaryReason = ['NOT_OPTED_IN', 'REFUNDABLE_BASELINE', 'WATCH_STOPPED', 'SWITCH_IN_PROGRESS'].includes(watch.reason);
+  $('watch-status').textContent = (watch.reason === 'NOT_OPTED_IN' ? 'Daily checks. You approve every switch.' : watch.reason === 'SWITCH_IN_PROGRESS' ? 'Paused during your switch.' : status)
+    + (watch.reason && !ordinaryReason ? ' · ' + reasonText([watch.reason]) : '') + (message ? ' ' + message : '');
+  if (watch.status === 'active' && watch.lastCheck?.status === 'failed' && !message) {
+    $('watch-status').textContent = watch.lastCheck.reasonCodes?.includes('SOURCE_UNAVAILABLE')
+      ? 'Latest check failed · Demo rates unavailable for this stay.' : 'Latest check failed. See watch details.';
+  }
   $('watch-status').classList.toggle('error', messageError);
   const check = watch.lastCheck;
   let checkText = 'No recorded simulated check yet.';

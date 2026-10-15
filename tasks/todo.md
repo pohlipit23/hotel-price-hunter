@@ -296,6 +296,12 @@ change: shorter default copy, one customer step guide, clear stage-specific acti
 compact watch evidence and truthful pending/completed refunds. Domain authority,
 approved terms, brand/photo-card structure and manual transitions remain protected.
 
-- [ ] Implement and independently browser-review the local revision at mobile and
-  desktop, preserve the customer/watch/non-refundable regressions and record honest
-  word counts and screenshots. A new exact cloud candidate needs new approval.
+- [x] Implement and independently browser-review the local revision at mobile and
+  desktop. Final browser regression passes **8 clarity + 11 postcard + 17 watch**
+  groups; the emulator Node suite passes **195/195**, zero skips. Independent review
+  covers 26 captured states, a killed non-refundable gate mutation and nine focused
+  accessibility checks. Completed-state duplicate text/dead-end action are removed.
+  Initial/review wording is 19%/11% shorter with material terms retained. See
+  `docs/customer-clarity-verification.md` for exact source/run boundaries.
+- [ ] Obtain approval for the new exact UI image and customer-only private update.
+  Keep agency, IAM, watch job/spent execution ledger and absent Scheduler unchanged.

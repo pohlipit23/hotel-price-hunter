@@ -11,3 +11,27 @@
 .offer-card .stay-photo{aspect-ratio:3/2;height:auto}.selected-photo{aspect-ratio:3/2;height:auto}@media(max-width:799px){.offer-card .stay-photo{height:88px}.selected-photo{height:auto}}@media(max-width:479px){.offer-card .stay-photo{height:64px}.selected-photo{height:auto}}@media(max-width:359px){.offer-card .stay-photo{height:52px}}
 .lower-rate{border-top:1px solid var(--line);margin-top:16px}.lower-rate>summary{color:var(--ink);font-size:14px}.lower-rate .offer{margin:4px 0 12px}.flexibility-warning{border:1px solid #d7b98f;background:#fff4e4;border-radius:12px;padding:20px;margin-top:20px}.flexibility-warning h2{font-size:19px;margin-bottom:8px}.flexibility-warning>p{font-size:14px}.flexibility-consent{display:flex;gap:12px;align-items:flex-start;font-size:14px;font-weight:600;margin-top:16px;cursor:pointer}.flexibility-consent input{width:20px;height:20px;flex-shrink:0;margin:2px 0 0;accent-color:var(--ink)}input:focus-visible{outline:3px solid var(--focus);outline-offset:4px}@media(max-width:479px){.flexibility-warning{padding:16px}.flexibility-consent{font-size:13px}}
 .price-watch{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding:16px 0}.watch-copy{min-width:0}.watch-copy h2{font-size:16px;margin-bottom:4px}.watch-copy p{font-size:12px;overflow-wrap:anywhere}.watch-copy p:empty{display:none}.watch-copy p+p:not(:empty){margin-top:4px}.watch-button{flex-shrink:0;border:1px solid var(--line);border-radius:24px;background:var(--surface);color:var(--ink);padding:10px 16px;min-height:44px;font-size:13px;font-weight:650;max-width:100%}.watch-button:hover:not(:disabled){background:var(--mint)}.watch-button.stopping{border-color:transparent;color:var(--muted);font-weight:400;padding:10px 0}.watch-button.stopping:hover:not(:disabled){background:transparent;text-decoration:underline}.notification-previews-details{border-top:1px solid var(--line);margin-top:20px}.notification-previews-details>summary{font-size:14px;color:var(--ink)}.notification-previews-details>summary span{color:var(--muted);font-size:12px}.notification-previews{list-style:none;padding:0;margin:12px 0 0}.notification-previews li{padding:12px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}.notification-previews h3{font:650 14px/1.4 'Segoe UI',Arial,sans-serif;margin-bottom:4px}.notification-previews p{font-size:12px;color:var(--muted);margin-top:4px}.notification-previews time{display:block;font-size:11px;color:var(--muted);margin-top:6px}.notification-previews .preview-policy{font-size:11px}.notification-previews .preview-amount{color:var(--green);font-weight:650}@media(max-width:479px){.price-watch{align-items:flex-start;flex-direction:column;gap:10px}.watch-button.stopping{padding:8px 0;min-height:44px}.watch-copy h2{font-size:15px}}
+
+/* One journey indicator; the active view supplies the next action. */
+.customer-steps{display:flex;list-style:none;padding:0;margin:0 0 16px;gap:16px;color:var(--muted);font-size:12px;line-height:1.4}
+.customer-steps li{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.customer-steps li+li{border-left:1px solid var(--line);padding-left:16px}
+.customer-steps span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#e9eff4;font-size:11px}
+.customer-steps [aria-current]{color:var(--ink);font-weight:700}
+.customer-steps [aria-current] span{color:var(--surface);background:var(--ink)}
+.customer-steps .passed span{background:#dceee7;color:var(--green)}
+.price-watch{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 16px;align-items:center}
+#watch-details{grid-column:1/-1;font-size:12px;color:var(--muted)}
+#watch-details>summary{padding:4px 0 0;min-height:32px;font-size:12px}
+#watch-details[open]{padding-bottom:4px}
+#watch-details p{overflow-wrap:anywhere;margin-top:6px}
+.has-switch .booking-photo{height:112px}
+.has-switch .ticket-caption{padding:16px}
+.has-switch .simulation{border-color:#b9d4c7;margin-top:16px}
+.has-switch .alternatives:has(.empty-offers){display:none}
+.has-switch .notification-previews-details{margin-top:0;border-top:0}
+.simulation>details{border-top:1px solid var(--line);margin-top:12px}
+.simulation>details>summary{padding-bottom:0}
+.flexibility-consent{margin-top:8px}
+@media(max-width:479px){.customer-steps{gap:10px;font-size:11px;margin-bottom:12px}.customer-steps li+li{padding-left:10px}.customer-steps span{width:20px;height:20px}.price-watch{gap:0 12px}.watch-button{padding:10px 12px;font-size:12px}.has-switch .booking-photo{height:88px}.has-switch .ticket-caption{padding:12px}.has-switch .ticketmain h1{font-size:22px}.has-switch .ticketstub{margin-top:6px}}
+@media(max-width:359px){.customer-steps{gap:8px;font-size:10px}.customer-steps li+li{padding-left:8px}.customer-steps li{gap:4px}.watch-button{padding:10px}}

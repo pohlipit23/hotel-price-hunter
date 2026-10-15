@@ -13,35 +13,38 @@
     <main id="main">
       <p id="page-status" role="status" class="page-status">Loading your demo booking…</p>
       <div id="content" hidden>
+        <ol id="customer-steps" class="customer-steps" aria-label="Your next steps"><li aria-current="step"><span>1</span> Choose</li><li><span>2</span> Review</li><li><span>3</span> Switch & refund</li></ol>
+        <p id="switch-announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
         <section id="booking-summary" aria-labelledby="hotel">
           <article class="ticket">
             <div class="booking-photo"><div id="booking-photo"></div><span class="photo-tag">Illustrative photo</span></div>
             <div class="ticket-caption"><div class="ticketmain"><p class="eyebrow">Your current booking</p><h1 id="hotel"></h1><p id="room" class="muted"></p><p id="stay" class="muted"></p><p id="guests" class="muted"></p></div><div class="ticketstub"><strong id="booking-total"></strong><span>Whole stay · Taxes included</span></div></div>
           </article>
-          <section id="price-watch" class="price-watch" aria-labelledby="watch-title" aria-busy="false">
-            <div class="watch-copy"><h2 id="watch-title">Watch for better rates</h2><p id="watch-status" role="status" class="small muted"></p><p id="watch-last-check" class="small muted"></p><p id="watch-next-check" class="small muted"></p><p id="watch-frequency" class="small muted"></p></div>
-            <button id="watch-button" class="watch-button" type="button" disabled>Watch for better rates</button>
+          <section id="simulated-switch" class="simulation" aria-labelledby="switch-stage" hidden>
+            <div class="simulation-heading"><span class="key-mark" aria-hidden="true"><img src="/assets/roomdrop-key-icon.png" alt=""></span><div><p id="switch-progress-label" class="eyebrow">Demo switch</p><h2 id="switch-stage" tabindex="-1"></h2></div></div>
+            <p id="switch-explanation"></p><dl id="switch-money" class="switch-outcome"></dl>
+            <p id="switch-message" role="status" class="small"></p><button id="advance-demo" class="primary" type="button">Check final price</button>
+            <details id="switch-history-details"><summary>Step history</summary><ol id="switch-history"></ol></details>
           </section>
-          <section class="alternatives" aria-labelledby="changes-title"><div class="changehead"><h2 id="changes-title">Other ways to save</h2><span>Illustrative photos</span></div><div id="offers" class="offers"></div><details id="lower-rate" class="lower-rate"><summary>Compare a lower non-refundable rate</summary><div id="lower-rate-offer"></div></details></section>
+          <section id="price-watch" class="price-watch" aria-labelledby="watch-title" aria-busy="false">
+            <div class="watch-copy"><h2 id="watch-title">Price watch</h2><p id="watch-status" role="status" class="small muted"></p></div>
+            <button id="watch-button" class="watch-button" type="button" disabled>Watch for better rates</button>
+            <details id="watch-details"><summary>Watch details</summary><p id="watch-last-check" class="small muted"></p><p id="watch-next-check" class="small muted"></p><p id="watch-frequency" class="small muted"></p></details>
+          </section>
+          <section class="alternatives" aria-labelledby="changes-title"><div class="changehead"><h2 id="changes-title">Choose a better rate</h2></div><div id="offers" class="offers"></div><details id="lower-rate" class="lower-rate"><summary>Lower rate · Non-refundable</summary><div id="lower-rate-offer"></div></details></section>
         </section>
         <section id="comparison" aria-labelledby="comparison-title" hidden>
           <a id="close-comparison" class="back" href="#booking-summary"><span aria-hidden="true">‹</span> Your booking</a>
           <h1 id="comparison-title" tabindex="-1"></h1><div id="comparison-pills" class="pills"></div>
           <div class="selected-stay"><div class="selected-photo"><div id="comparison-photo"></div><span class="photo-tag">Illustrative photo</span></div><div><h2 id="after-room"></h2><p id="comparison-stay" class="muted"></p><p id="comparison-guests" class="muted"></p></div></div>
-          <div class="price-comparison"><div><span>Currently booked</span><strong id="before-price"></strong></div><div><span id="after-price-label">Same-stay alternative</span><strong id="after-price"></strong></div><p id="selected-summary" class="muted"></p></div>
+          <div class="price-comparison"><div><span>Current</span><strong id="before-price"></strong></div><div><span id="after-price-label">New rate</span><strong id="after-price"></strong></div><p id="selected-summary" class="muted"></p></div>
           <div id="saving-box" class="saving-box"><h2>Net saving after fees</h2><strong id="comparison-saving"></strong><p id="saving-caption"></p></div>
           <details id="price-details" class="price-details"><summary>Price & cancellation details</summary><dl id="differences"></dl><p id="selected-checked" class="muted small"></p></details>
-          <section id="flexibility-warning" class="flexibility-warning" aria-labelledby="flexibility-title" hidden><h2 id="flexibility-title">This rate is non-refundable</h2><p>You will lose free cancellation. Normal price monitoring ends once original cancellation is verified and the replacement becomes your active booking.</p><label class="flexibility-consent" for="accept-reduced-flexibility"><input id="accept-reduced-flexibility" type="checkbox"><span>I understand that this booking is non-refundable and price monitoring will end after the replacement becomes active.</span></label></section>
+          <section id="flexibility-warning" class="flexibility-warning" aria-labelledby="flexibility-title" hidden><h2 id="flexibility-title">Non-refundable rate</h2><label class="flexibility-consent" for="accept-reduced-flexibility"><input id="accept-reduced-flexibility" type="checkbox"><span>I accept no free cancellation. Price monitoring ends when this replacement becomes active.</span></label></section>
           <p id="review-message" role="status" class="small"></p><div class="review-actions"><button id="approve-offer" class="primary" type="button">Approve simulated switch</button><button id="keep-booking" class="plain" type="button">Keep my booking</button></div>
         </section>
-        <section id="simulated-switch" class="simulation" aria-labelledby="switch-stage" hidden>
-          <div class="simulation-heading"><span class="key-mark" aria-hidden="true"><img src="/assets/roomdrop-key-icon.png" alt=""></span><div><p class="eyebrow">Your simulated switch</p><h2 id="switch-stage" tabindex="-1"></h2></div></div>
-          <p id="switch-explanation"></p><dl id="switch-money" class="switch-outcome"></dl>
-          <details id="switch-history-details"><summary>Saved progress</summary><ol id="switch-history"></ol></details>
-          <p id="switch-message" role="status" class="small"></p><button id="advance-demo" class="primary" type="button">Continue simulation</button>
-        </section>
         <details id="notification-previews-details" class="notification-previews-details"><summary>Updates <span id="notification-count"></span></summary><p class="small muted">Simulated previews only · No email sent.</p><ol id="notification-previews" class="notification-previews"></ol></details>
-        <footer><p>Fictional demo · No real booking, cancellation or refund</p><p>Illustrative photos do not verify hotel or room features.</p></footer>
+        <footer><p>No real bookings or payments.</p></footer>
       </div>
     </main>
   </div>

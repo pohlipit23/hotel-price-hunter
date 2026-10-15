@@ -6,6 +6,8 @@ Only the allowlisted [anonymised jury fixture](fixtures/jury-booking.json) is pu
 
 The RoomDrop customer source `c9a7d7f` is privately deployed behind its own Google IAP gate for `pete@altovo.com`; the agency service remains a separate reader. Independent image/runtime/direct-access verification passed **44+4** checks within the explicit inherited-IAM limit. The user confirmed the live watch/switch/agency check; one approved job execution then passed **20/20** checks and persisted the expected unsupported-replacement fixture outcome. Scheduler remains absent, Gemini disabled and notifications preview-only. Subsequent customer-clarity improvements are local until separately released. See [the execution record](docs/roomdrop-cloud-execution.md), [daily job contract](docs/daily-watch-cloud-contract.md) and [offline setup bundle](docs/roomdrop-cloud-setup.md).
 
+The [local customer preview](http://localhost:8080/) now has shorter watch copy, one three-step guide, explicit next-action labels and a clean completed state. [Its verification](docs/customer-clarity-verification.md) records the UI, keyboard and refund/consent regressions. This revision awaits a separate private customer release.
+
 The public fixture uses a labelled frozen `demoNow` for decisions. Its original `checkedAt` and `expiresAt` stay intact; displaying a snapshot does not perform a live supplier check. Visitor expiry, request limits, and audit `recordedAt` use actual wall time. Any future private/live flow must use actual time for offer and permission validity.
 
 ## Local application

@@ -8,13 +8,18 @@ const customerOffers = ['DEMO_EQUIVALENT', 'DEMO_DIFFERENT_ROOM', 'DEMO_DIFFEREN
 const pendingKey = 'roomdrop-selected-command-v1';
 const labels = { boardBasis: 'Meals', bedType: 'Bed type', nonSmoking: 'Non-smoking', accessible: 'Accessible room', view: 'View', roomSizeSqm: 'Room size (m²)' };
 const stages = {
-  ready: ['Approval saved', 'Your current booking remains active. Continue to check the final price and terms.'],
-  revalidated: ['Final price and terms checked', 'The selected offer passed its final checks. Continue to secure the simulated replacement.'],
-  'replacement-secured': ['Replacement secured · simulated', 'Your current booking remains active. Continue to verify the replacement fulfilment.'],
-  'fulfilment-verified': ['Replacement fulfilment verified', 'The replacement is verified. Continue to request cancellation of the original booking.'],
-  'cancellation-requested': ['Cancellation requested · simulated', 'The cancellation result is pending. Your original booking remains active.'],
-  'cancellation-verified': ['Saving secured · simulated', 'Cancellation is verified and the replacement is now your current booking. Your refund is pending.'],
-  'refund-completed': ['Refund completed · simulated', 'A fictional refund receipt is saved. No real money has been sent or received.']
+  ready: ['Approval saved', 'Your original booking remains active. Check the final price before reserving the replacement.'],
+  revalidated: ['Price and terms checked', 'Your original booking remains active. The replacement is ready to reserve.'],
+  'replacement-secured': ['New booking reserved', 'Your original booking remains active. Verify the replacement before cancelling your original booking.'],
+  'fulfilment-verified': ['New booking verified', 'Your original booking remains active until its cancellation is confirmed.'],
+  'cancellation-requested': ['Waiting for cancellation', 'Your original booking remains active until the cancellation result is confirmed.'],
+  'cancellation-verified': ['New booking active · refund pending', 'Original cancellation confirmed. Your refund has not arrived yet.'],
+  'refund-completed': ['Refund completed', 'Your new booking is active.']
+};
+const nextActions = {
+  ready: 'Check final price', revalidated: 'Reserve new booking', 'replacement-secured': 'Verify new booking',
+  'fulfilment-verified': 'Request original cancellation', 'cancellation-requested': 'Check cancellation result',
+  'cancellation-verified': 'Complete simulated refund'
 };
 let state, selectedOffer, lastOfferId, busy = false, refreshRequired = false;
 let pending = loadPending();
@@ -198,11 +203,11 @@ function renderComparison() {
   $('comparison-guests').textContent = guestText(offer);
   $('before-price').textContent = money(state.booking.retail.totalMinor, state.booking.retail.currency);
   $('after-price').textContent = money(offer.retail.totalMinor, offer.retail.currency);
-  $('after-price-label').textContent = offer.category === 'equivalent' ? 'Same-stay alternative' : 'Selected alternative';
-  $('selected-summary').textContent = needsConsent ? 'Same hotel and room at a lower non-refundable rate. Review the loss of flexibility below.'
-    : offer.category === 'equivalent' ? 'Same hotel, equivalent room, breakfast and free-cancellation deadline.'
-    : offer.category === 'different-room' ? 'Same hotel, a different room. Review the room and cancellation terms below.'
-      : 'A different hotel. Review its room and cancellation terms below.';
+  $('after-price-label').textContent = 'New rate';
+  $('selected-summary').textContent = needsConsent ? 'Free cancellation ends with this rate.'
+    : offer.category === 'equivalent' ? 'Breakfast & cancellation deadline unchanged.'
+    : offer.category === 'different-room' ? 'Room changes · Check details below.'
+      : 'Hotel changes · Check details below.';
   const refund = verifiedSaving(offer);
   $('comparison-saving').textContent = refund.available ? '-' + money(refund.minor, offer.refundQuote?.currency) : 'Unavailable';
   $('saving-box').classList.toggle('unavailable', !refund.available);
@@ -275,6 +280,7 @@ function renderSimulation() {
   if (!operation) return;
   const copy = operationCopy(operation);
   $('switch-stage').textContent = copy[0]; $('switch-explanation').textContent = copy[1];
+  $('switch-progress-label').textContent = ['running', 'complete'].includes(operation.status) ? 'Demo switch' : 'Demo switch · Needs attention';
   const refund = operation.refund;
   const amount = money(refund?.amountMinor, refund?.currency);
   const refundStatus = refund?.status === 'completed' ? amount + ' · completed (simulated)' : refund?.status === 'pending' ? amount + ' · pending' : 'Not started';
@@ -287,9 +293,10 @@ function renderSimulation() {
   }));
   const canRecover = operation.scenarioId === 'uncertain-cancellation' && operation.status === 'agency-exception' && operation.cancellation?.status === 'unknown';
   const canAdvance = operation.status === 'running' || canRecover;
+  $('advance-demo').hidden = operation.status === 'complete';
   $('advance-demo').disabled = busy || refreshRequired || (!pending && !canAdvance) || pending?.kind === 'watch';
   $('advance-demo').textContent = busy ? 'Saving progress…' : refreshRequired ? 'Refresh to see latest progress' : pending ? 'Retry the same simulation step'
-    : operation.status === 'complete' ? 'Simulation complete' : !canAdvance ? 'Simulation paused' : 'Continue simulation';
+    : operation.status === 'complete' ? 'Refund complete' : !canAdvance ? 'Switch paused' : canRecover ? 'Check cancellation result' : nextActions[operation.stage] || 'Continue simulation';
   $('switch-message').textContent = message; $('switch-message').classList.toggle('error', messageError);
 }
 function renderState(next, overview = false) {
@@ -299,6 +306,12 @@ function renderState(next, overview = false) {
   selectedOffer = overview || state.simulation?.operation ? undefined : state.offers.find(offer => offer.offerId === (pending?.kind === 'approval' ? pending.body.offerId : state.selectedOfferId));
   $('booking-summary').hidden = Boolean(selectedOffer);
   $('comparison').hidden = !selectedOffer;
+  $('content').classList.toggle('has-switch', Boolean(state.simulation?.operation));
+  document.querySelectorAll('#customer-steps li').forEach((step, index) => {
+    const current = state.simulation?.operation ? 2 : selectedOffer ? 1 : 0;
+    if (index === current) step.setAttribute('aria-current', 'step'); else step.removeAttribute('aria-current');
+    step.classList.toggle('passed', index < current);
+  });
   renderBooking(); renderOffers();
   if (selectedOffer) renderComparison();
   renderSimulation();
@@ -345,11 +358,14 @@ async function mutate(kind) {
     command = { kind, operationId: operation.operationId, body: { expectedOperationRevision: operation.revision } };
   }
   if (!command || command.kind !== kind) return;
+  let announceAdvance = false;
+  if (kind === 'advance') $('switch-announcement').textContent = '';
   remember(command); busy = true; message = ''; messageError = false; renderState(state);
   try {
     const path = kind === 'approval' ? '/api/offer-approvals' : '/api/switches/' + encodeURIComponent(command.operationId) + '/advances';
     const result = await request(path, command.body, kind === 'approval' ? { 'Idempotency-Key': command.key } : {});
-    remember(null); message = result.replayed ? 'This action was already saved. Latest progress is shown.' : kind === 'approval' ? 'Your selected offer approval is saved.' : 'Progress saved.';
+    announceAdvance = kind === 'advance' && !result.replayed;
+    remember(null); message = result.replayed ? 'Already saved. Latest progress is shown.' : '';
     renderState(result); setStatus('');
     await refreshNotifications();
     if (kind === 'approval') { $('switch-history-details').open = false; $('switch-stage').focus(); }
@@ -362,7 +378,17 @@ async function mutate(kind) {
       remember(null); message = error.message;
     } else message = 'The result could not be confirmed. Retry this same action or refresh to see saved progress.';
     if (!selectedOffer && !state.simulation?.operation) setStatus(message, true);
-  } finally { busy = false; renderState(state); }
+  } finally {
+    busy = false; renderState(state);
+    if (kind === 'advance') {
+      const nextAction = $('advance-demo');
+      if (nextAction.disabled) $('switch-stage').focus();
+      else {
+        nextAction.focus();
+        if (announceAdvance) $('switch-announcement').textContent = operationCopy(state.simulation.operation)[0] + '.';
+      }
+    }
+  }
 }
 async function refreshNotifications() {
   try {
