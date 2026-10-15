@@ -2,7 +2,9 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createStorage } from '../app/storage.mjs';
-import { checkPriceWatch, prepareWatchDigests, watchAliases, fixtureWatchProvider } from '../app/domain/price-watch.mjs';
+import { fixtureWatchProvider } from '../app/domain/price-watch.mjs';
+import { runPriceWatchPass } from '../app/price-watch-pass.mjs';
+export { runPriceWatchPass } from '../app/price-watch-pass.mjs';
 
 export function validateWorkerEnvironment(environment, args) {
   if (environment.K_SERVICE || environment.NODE_ENV === 'production') throw new Error('Local watch worker prohibits production.');
@@ -17,53 +19,26 @@ export function validateWorkerEnvironment(environment, args) {
   } };
 }
 
-/** A bounded private discovery pass. Its cursor never crosses the HTTP/log boundary. */
-export async function runPriceWatchPass({ storage, fixture, now = () => new Date(), provider = fixtureWatchProvider, after = null } = {}) {
-  let cursor = after; let pages = 0; let examined = 0; const results = []; const recordedAt = now().toISOString();
-  while (pages++ < 10) {
-    const entries = await storage.listWatches({ limit: 50, after: cursor });
-    if (!entries.length) { cursor = null; break; }
-    for (const entry of entries) {
-      examined++;
-      cursor = entry.watchId;
-      const captured = entry.state;
-      if (!captured || !captured.priceWatch?.enabled || captured.priceWatch.watchId !== entry.watchId || Date.parse(captured.expiresAt) <= Date.parse(recordedAt)) continue;
-      const aliases = watchAliases();
-      const expected = { ...structuredClone(captured.priceWatch), bookingVersion: captured.booking.version };
-      let result;
-      try {
-        await storage.update(entry.visitorId, current => {
-          result = checkPriceWatch(current, { expected, expectedPreferenceVersion: captured.preferences.version, expectedBooking: captured.booking, expectedPreferences: captured.preferences, fixture, recordedAt, aliases, provider, now });
-          return prepareWatchDigests(result.state, { recordedAt: now().toISOString(), aliases });
-        });
-        results.push({ runId: result.run.runId, status: result.run.status, reasonCodes: result.run.reasonCodes, replayed: result.replayed });
-      } catch (error) {
-        results.push({ status: 'failed', reasonCodes: [error.code === 'WATCH_CAPACITY_REACHED' ? error.code : 'STORAGE_UNAVAILABLE'] });
-      }
-    }
-    if (entries.length < 50) { cursor = null; break; }
-  }
-  return { after: cursor, examined, results };
-}
-
-export async function startPriceWatchWorker(environment = process.env, args = process.argv.slice(2)) {
+export async function startPriceWatchWorker(environment = process.env, args = process.argv.slice(2),
+  { storageFactory = createStorage, fixture: injectedFixture, now, signals = process, log = value => console.log(JSON.stringify(value)) } = {}) {
   const options = validateWorkerEnvironment(environment, args);
-  const storage = await createStorage(environment);
-  const fixture = JSON.parse(await readFile(new URL('../fixtures/jury-booking.json', import.meta.url), 'utf8'));
+  const storage = await storageFactory(environment);
   let stopped = false; let timer; let wake; let after = null;
   const stop = () => { stopped = true; clearTimeout(timer); wake?.(); };
-  process.once('SIGINT', stop); process.once('SIGTERM', stop);
+  signals.once('SIGINT', stop); signals.once('SIGTERM', stop);
   try {
+    const fixture = injectedFixture ?? JSON.parse(await readFile(new URL('../fixtures/jury-booking.json', import.meta.url), 'utf8'));
     do {
-      const pass = await runPriceWatchPass({ storage, fixture, provider: options.provider, after });
+      const pass = await runPriceWatchPass({ storage, fixture, provider: options.provider, after, now, stopReason: () => stopped ? 'INTERRUPTED' : null });
       after = pass.after;
-      console.log(JSON.stringify({ stage: 'watch-pass-completed', examined: pass.examined, results: pass.results }));
+      log({ stage: pass.ok ? 'watch-pass-completed' : 'watch-pass-failed', reason: pass.reason, examined: pass.examined, results: pass.results });
+      if (!pass.ok && !options.loop) throw new Error('Local watch pass failed.');
       if (!options.loop || stopped) break;
       await new Promise(resolveWait => { wake = resolveWait; timer = setTimeout(resolveWait, 60000); });
       wake = null;
     } while (!stopped);
   } finally {
-    clearTimeout(timer); process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop); await storage.close();
+    clearTimeout(timer); signals.removeListener('SIGINT', stop); signals.removeListener('SIGTERM', stop); await storage.close();
   }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

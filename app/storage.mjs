@@ -8,6 +8,15 @@ function watchLocator(state, visitorId) {
 function watchPage(limit, after) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50 || (after !== null && !watchIdValid(after))) throw new Error('Use a bounded private watch page.');
 }
+function checkpointValid(value) {
+  if (!value || !Number.isSafeInteger(value.revision) || value.revision < 0 || value.revision >= Number.MAX_SAFE_INTEGER || (value.after !== null && !watchIdValid(value.after))) throw new Error('Invalid private watch checkpoint.');
+  return { revision: value.revision, after: value.after };
+}
+function checkpointConflict() {
+  const error = new Error('Private watch checkpoint changed.');
+  error.code = 'CHECKPOINT_CONFLICT';
+  return error;
+}
 function newCases(current, next, visitorId) {
   if (next.scenarioId !== 'jury-booking') return [];
   return Object.entries(next.operations ?? {}).filter(([id, operation]) => operation.isSimulated === true && caseIdValid(operation.agencyCaseId) && !current.operations?.[id]?.agencyCaseId)
@@ -30,8 +39,16 @@ export function createTestMemoryStorage() {
   const documents = new Map();
   const agencyCases = new Map();
   const watches = new Map();
+  let checkpoint = { revision: 0, after: null };
   return {
     mode: 'test-memory',
+    async getWatchCheckpoint() { return copy(checkpoint); },
+    async compareAndSetWatchCheckpoint(expected) {
+      checkpointValid(expected);
+      if (expected.revision !== checkpoint.revision) throw checkpointConflict();
+      checkpoint = { revision: checkpoint.revision + 1, after: expected.after };
+      return copy(checkpoint);
+    },
     async get(id) { return copy(documents.get(id) ?? null); },
     async create(id, state) {
       if (documents.has(id)) throw conflict('Visitor already exists.');
@@ -81,7 +98,26 @@ export class FirestoreStorage {
     this.collection = database.collection(collection);
     this.agencyCases = database.collection(`${collection}AgencyCases`);
     this.watches = database.collection(`${collection}PriceWatches`);
+    this.watchJobs = database.collection(`${collection}PriceWatchJobs`);
     this.mode = emulator ? 'firestore-emulator' : 'firestore';
+  }
+
+  async getWatchCheckpoint() {
+    const snapshot = await this.watchJobs.doc('daily-v1').get();
+    return snapshot.exists ? checkpointValid(snapshot.data()) : { revision: 0, after: null };
+  }
+
+  async compareAndSetWatchCheckpoint(expected) {
+    checkpointValid(expected);
+    const reference = this.watchJobs.doc('daily-v1');
+    return this.database.runTransaction(async transaction => {
+      const snapshot = await transaction.get(reference);
+      const current = snapshot.exists ? checkpointValid(snapshot.data()) : { revision: 0, after: null };
+      if (current.revision !== expected.revision) throw checkpointConflict();
+      const next = { revision: current.revision + 1, after: expected.after };
+      transaction.set(reference, next);
+      return next;
+    });
   }
 
   async get(id) {

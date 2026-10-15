@@ -7,3 +7,4 @@
 !fixtures/jury-booking.json
 !scripts/
 !scripts/run-price-watch.mjs
+!scripts/run-price-watch-job.mjs
