@@ -1,0 +1,50 @@
+/* THROWAWAY: variant styles are loaded only by the separate phone preview. */
+body[data-offer-variant] { padding-bottom: 104px; }
+.prototype-switcher { position: fixed; z-index: 20; bottom: max(16px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: space-between; gap: 12px; width: min(420px, calc(100% - 24px)); border: 1px solid #536170; border-radius: 16px; background: #202c3b; color: #fff; padding: 8px; box-shadow: 0 6px 24px #18233235; }
+.prototype-switcher button { width: 46px; height: 48px; flex-shrink: 0; background: #354354; border: 1px solid #5d6b7b; border-radius: 10px; color: white; font-size: 30px; line-height: 1; }
+.prototype-switcher div { text-align: center; min-width: 0; }
+.prototype-switcher p { font-size: 10px; letter-spacing: .5px; color: #d1dbe5; }
+.prototype-switcher strong { display: block; font-size: 13px; line-height: 1.35; margin-top: 2px; }
+body[data-offer-variant] .changehead { display: block; }
+.prototype-savings-note { font-size: 12px; color: var(--muted); margin-top: 4px; }
+body[data-offer-variant] .offer { --category: #215c46; --category-light: #e8f3ec; }
+body[data-offer-variant] .offer[data-category-kind=room] { --category: #294b71; --category-light: #eaf0f7; }
+body[data-offer-variant] .offer[data-category-kind=hotel] { --category: #943e33; --category-light: #fff0e8; }
+.prototype-photo { position: relative; display: block; width: 172px; height: 144px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+body[data-offer-variant] .offer-card .prototype-photo > .stay-photo { width: 100%; height: 100%; border-radius: 0; }
+.prototype-ribbon { display: none; position: absolute; top: 23px; left: -43px; transform: rotate(-45deg); width: 164px; padding: 6px 0; background: var(--category); color: #fff; font-size: 11px; font-weight: 700; text-align: center; box-shadow: 0 2px 4px #202c3b22; }
+.prototype-category { display: none; color: var(--category); font-size: 12px; line-height: 1.4; font-weight: 700; margin-bottom: 6px; }
+.prototype-band { display: none; padding: 9px 14px; background: var(--category); color: white; font-size: 13px; font-weight: 650; line-height: 1.4; }
+.prototype-facts { display: none; }
+body[data-offer-variant] .offer-body .pills > .pill:not(:last-child) { display: none; }
+body[data-offer-variant] .offer-saving { font-size: 27px; letter-spacing: -.5px; }
+body[data-offer-variant] .offer-caption { font-size: 12px; line-height: 1.45; margin-top: 3px; }
+body[data-offer-variant] .offer-saving.unavailable { font-size: 15px; }
+body[data-offer-variant=ribbon] .prototype-ribbon, body[data-offer-variant=ribbon] .prototype-category { display: block; }
+body[data-offer-variant=band] .prototype-band { display: block; }
+body[data-offer-variant=band] .offer-body .pills { margin: 8px 0; }
+body[data-offer-variant=comparison] .offer { border-left: 5px solid var(--category); }
+body[data-offer-variant=comparison] .prototype-facts { display: grid; grid-template-columns: 36px 1fr; gap: 3px 8px; margin: 9px 0 6px; font-size: 11px; line-height: 1.4; }
+.prototype-facts dt { color: var(--muted); }
+.prototype-facts dd { margin: 0; color: var(--category); font-weight: 650; }
+body[data-offer-variant=comparison] .offer-card { align-items: flex-start; }
+body[data-offer-variant=comparison] .prototype-photo { height: 164px; }
+@media (max-width: 479px) {
+  .prototype-photo { width: 98px; height: 142px; }
+  .prototype-category { font-size: 11px; margin-bottom: 5px; }
+  body[data-offer-variant] .offer-body h3 { font-size: 17px; }
+  body[data-offer-variant] .offer-saving { font-size: 24px; line-height: 1.25; }
+  body[data-offer-variant] .offer-caption { font-size: 11px; }
+  body[data-offer-variant] .offer-arrow { padding: 0; font-size: 22px; }
+  .prototype-band { padding: 9px 11px; font-size: 12px; }
+  body[data-offer-variant=comparison] .prototype-photo { width: 84px; height: 168px; }
+  body[data-offer-variant=comparison] .prototype-facts { grid-template-columns: 31px 1fr; gap: 3px 5px; font-size: 10px; }
+}
+@media (max-width: 359px) {
+  .prototype-photo { width: 83px; height: 152px; }
+  .prototype-ribbon { width: 152px; top: 21px; left: -43px; font-size: 10px; }
+  body[data-offer-variant] .offer-card { gap: 8px; }
+  body[data-offer-variant] .offer-body h3 { font-size: 16px; }
+  body[data-offer-variant] .offer-saving { font-size: 22px; }
+  body[data-offer-variant=comparison] .prototype-photo { width: 68px; }
+}
