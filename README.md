@@ -4,6 +4,8 @@ One Node application serves the mobile public jury flow and its API, with Firest
 
 Only the allowlisted [anonymised jury fixture](fixtures/jury-booking.json) is public. All booking/rate facts and the USD 25 agency minimum are fictional demonstration settings. Supplier identities are fictional. There is no arbitrary booking lookup, private retrieval route, or live transaction adapter.
 
+The next private customer rollout and production daily-watch job are prepared locally under [the daily job contract](docs/daily-watch-cloud-contract.md). The customer service will have its own proposed IAP gate; the existing agency service remains a separate reader. The new executable uses explicit Cloud Run activation guards and a durable private batch checkpoint, while the local worker retains its emulator-only guards. [The offline setup bundle](docs/roomdrop-cloud-setup.md) creates no resources. Deployment, a one-shot cloud check and recurring scheduling require separate scoped approval; Scheduler remains absent through rollout acceptance. See [verification and pending cloud gates](docs/daily-watch-cloud-verification.md).
+
 The public fixture uses a labelled frozen `demoNow` for decisions. Its original `checkedAt` and `expiresAt` stay intact; displaying a snapshot does not perform a live supplier check. Visitor expiry, request limits, and audit `recordedAt` use actual wall time. Any future private/live flow must use actual time for offer and permission validity.
 
 ## Local application

@@ -251,3 +251,27 @@ The user requested Google setup, completed browser sign-in as the corrected acco
 - [x] Complete genuine Google IAP browser sign-in and protected read-only availability at the UI level; record organization-policy audit limits separately. The user confirmed **Google-managed agency access and Saved cases** at the deployed URL after the sign-in instruction for `pete@altovo.com`. This is human-observed live acceptance; automated page capture, raw authenticated HTTP capture and nonempty case privacy are not claimed. Earlier automation failures and machine-verifier reports remain preserved separately.
 
 Organization IAM reads are denied to the user. This is not hidden by the verifier or solved with a broad new grant: live reports remain `metadata-partial`, `fullAcceptance:false`, with actual selected reader behavior recorded separately. See `docs/agency-cloud-execution.md`. The existing customer service/IAM remained unchanged. No model generation, real supplier transaction or email occurred.
+
+## Private customer and daily watch preparation — 15 October
+
+Resumed from `.local/roomdrop-next-session-2026-10-15.md`. The local contract is
+`docs/daily-watch-cloud-contract.md`; execution scope and pending release gates are
+in `docs/roomdrop-cloud-setup.md` and `docs/daily-watch-cloud-verification.md`.
+
+### Task 16: Bounded production job and offline rollout bundle
+
+- [x] Separate guarded Cloud Run job entrypoint shares the pure check engine and
+  leaves local worker production/emulator guards intact. It records only simulated
+  observations and previews, with sanitized aggregate diagnostics.
+- [x] Private Firestore checkpoint uses revision comparisons and advances only
+  after whole completed pages; failed or interrupted pages replay safely. Processing
+  is capped at 500 locators and preserves all existing consent/authority guards.
+- [x] Default-offline rollout generator prepares exact source/context/digest checks,
+  separate customer IAP, dedicated writer/trigger identities, bounded job settings,
+  and separately gated one-shot/recurring activation commands. Historical verifiers
+  remain unchanged; Scheduler stays absent through acceptance.
+- [ ] Complete full regression, independent review and packaging proof; record exact
+  source and local image before requesting any cloud execution approval.
+- [ ] Obtain separately scoped cloud approval, deploy privately and verify genuine
+  signed customer/agency data flow and one-shot job execution. Recurring activation
+  remains an additional gate after acceptance.

@@ -3,6 +3,15 @@
 Status: approved; RoomDrop postcard, four selected-offer simulations, protected local agency review, explicit price-watch checks and notification previews are verified locally on `codex/customer-flow`. The separate Google IAP agency service is now privately deployed, with source/configuration/direct-access and actual reader behavior proof; signed browser acceptance is recorded in `docs/agency-cloud-execution.md`. Earlier customer enrolment/advice remains deployed privately with bounded live Gemini evidence. Organization-policy audit coverage, scheduling/delivery, updated customer deployment/browser acceptance, live Altovo probes and submission remain outstanding.
 Reviewed: 12 October 2026, Asia/Kuala_Lumpur.
 
+Latest development checkpoint, 15 October: bounded production watch executable and
+offline private-customer/job/Scheduler setup are implemented and independently
+reviewed locally. The complete emulator suite passes 194/194 with zero skips. See
+`docs/daily-watch-cloud-contract.md`, `docs/roomdrop-cloud-setup.md` and
+`docs/daily-watch-cloud-verification.md` for current scope and pending cloud gates.
+Scheduler stays absent through rollout acceptance; no new deployment or cloud
+execution has occurred. Historical next-step paragraphs below are not the current
+implementation queue.
+
 ## Recommendation
 
 Start by defining the booking/offer contract and checking Altovo read-only feasibility. Then deliver one complete public demo path: an anonymised refundable booking, enrolment, one grounded Gemini comparison, and persisted preferences. Add the simulated switching lifecycle next. Preserve the current Booking changes visual direction.
