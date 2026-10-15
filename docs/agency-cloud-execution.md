@@ -46,11 +46,11 @@ The coordinator's before/after-access verifier and an independent live reviewer 
 
 Anonymous requests to `/agency` and `/api/agency/session` redirect to Google's sign-in origin with HTTP 302. The existing customer's `/health` still returns anonymous 403. These are gateway access checks, not signed browser acceptance. The agency index was empty; no claim of nonempty production case privacy or historical index completeness is made.
 
-Genuine signed browser acceptance is recorded separately after observing the live page. The Google browser check is not replaced by local mocked UI tests.
+Genuine signed browser acceptance remains **unverified**. The in-app Browser bootstrap failed with EPERM before setup. Supported Computer Use initialized and discovered Edge, but its page-state capture returned no result and was interrupted after 991 seconds. No agency page or authentication prompt was observed, and no browser input, credential inspection or source change occurred. The user was asked to open the agency URL, sign in as `pete@altovo.com` if prompted, and confirm whether Google-managed agency access and Saved cases appear. The Google browser check is not replaced by local mocked UI tests or an anonymous redirect.
 
 Organization IAM policy reads remain denied. Both live verifier reports therefore correctly retain `metadata-partial`, `fullAcceptance:false`, and the explicit inherited-policy coverage limit. The selected runtime behavior proof complements that report without claiming a complete IAM inventory. No broad organization permission was added to resolve the gap.
 
-Safe ignored evidence includes `agency-registry-lineage.json`, `agency-before-access-verification.json`, `agency-after-access-verification.json`, `agency-cloud-independent-verification.json`, `agency-reader-proof.json`, `agency-reader-job-observed.json` and `agency-project-grants-observed.json` under `.local/`.
+Safe ignored evidence includes `agency-registry-lineage.json`, `agency-before-access-verification.json`, `agency-after-access-verification.json`, `agency-cloud-independent-verification.json`, `agency-reader-proof.json`, `agency-reader-job-observed.json`, `agency-project-grants-observed.json` and `agency-frozen-source-verification.json` under `.local/`. The read-only verifier was rerun successfully from the retained source checkout after the main checkout's documentation changed; the same exact context/source/digest guards passed, with the same explicit partial-IAM status.
 
 ## Retained source for reproducible verification
 
