@@ -1,0 +1,51 @@
+.quotation-shell { width: min(100%, 940px); margin: 0 auto; padding: 18px 20px 36px; }
+.quotation-demo .site-header { margin-bottom: 22px; }
+.quote-baseline { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin: 0 0 28px; padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; }
+.quote-baseline h1 { font-size: clamp(26px, 5vw, 34px); }
+.quote-baseline p { margin-bottom: 5px; }
+.quoted-total { display: grid; flex-shrink: 0; gap: 3px; text-align: right; }
+.quoted-total span, .quoted-total small { font-size: 12px; color: var(--muted); }
+.quoted-total strong { font-size: 25px; font-family: var(--heading); }
+.quote-heading { margin-bottom: 18px; }
+.quote-heading > p:last-child { max-width: 630px; margin-bottom: 0; font-size: 14px; }
+.quote-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.quote-option { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.quote-photo { height: 135px; position: relative; overflow: hidden; background: var(--blue-bg); }
+.quote-photo img { position: absolute; width: 200%; height: 200%; max-width: none; left: -100%; top: 0; object-fit: cover; }
+.quote-photo span { position: absolute; left: 9px; bottom: 9px; padding: 3px 7px; background: rgba(255,255,255,.94); border-radius: 5px; font-size: 10px; color: var(--muted); }
+.quote-option-body { display: flex; flex-direction: column; flex: 1; padding: 16px; }
+.quote-option h3 { font-size: 19px; line-height: 1.2; overflow-wrap: anywhere; margin-bottom: 8px; }
+.quote-board { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+.quote-terms { display: inline-block; align-self: flex-start; padding: 5px 8px; border-radius: 6px; background: var(--amber-bg); color: var(--amber); font-size: 11px; font-weight: 700; margin-bottom: 14px; }
+.quote-terms.refundable { background: var(--green-bg); color: var(--green); }
+.quote-option-price { display: grid; gap: 3px; margin-top: auto; margin-bottom: 14px; }
+.quote-option-price strong { color: var(--ink); font-size: 24px; font-family: var(--heading); }
+.quote-option-price span { font-size: 11px; color: var(--muted); }
+.quote-difference { font-size: 12px; color: var(--green); margin: 0 0 14px; }
+.quote-option button { width: 100%; min-height: 44px; border: 0; border-radius: 8px; background: var(--ink); color: white; font-weight: 700; cursor: pointer; padding: 10px 12px; }
+.quote-evidence { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 14px; }
+.quote-evidence summary { cursor: pointer; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+.quote-panel { max-width: 700px; padding: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; }
+.quote-panel h2 { font-size: 28px; margin-bottom: 20px; }
+.quote-selected-name { font-size: 22px; margin: 0 0 8px; }
+.quote-facts { display: grid; grid-template-columns: 140px 1fr; gap: 10px 16px; margin: 20px 0; font-size: 14px; }
+.quote-facts dt { color: var(--muted); }.quote-facts dd { margin: 0; overflow-wrap: anywhere; }
+.quote-note { background: var(--blue-bg); padding: 14px 16px; border-radius: 10px; font-size: 13px; line-height: 1.6; margin: 20px 0; }
+.quote-checkbox { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; margin: 16px 0; cursor: pointer; }
+.quote-checkbox input { flex: 0 0 20px; width: 20px; height: 20px; accent-color: var(--blue); margin: 2px 0 0; }
+.quote-flexibility { padding: 12px; background: var(--amber-bg); border-radius: 8px; }
+.quote-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.quotation-demo .primary, .quotation-demo .secondary { min-height: 44px; padding: 11px 18px; border-radius: 9px; font-weight: 700; cursor: pointer; }
+.quotation-demo .primary { border: 1px solid var(--ink); background: var(--ink); color: white; }
+.quotation-demo .secondary { border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.quotation-demo button:disabled { cursor: wait; opacity: .6; }
+.quote-check { display: inline-grid; place-items: center; width: 54px; height: 54px; margin-bottom: 16px; border-radius: 50%; background: var(--green-bg); color: var(--green); font-size: 30px; }
+.quote-footer { margin-top: 28px; color: var(--muted); font-size: 12px; }
+@media (max-width: 700px) {
+  .quotation-shell { padding: 14px 16px 30px; }
+  .quote-baseline { flex-direction: column; align-items: stretch; gap: 14px; padding: 20px; }
+  .quoted-total { text-align: left; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .quote-options { grid-template-columns: 1fr; gap: 18px; }.quote-photo { height: 165px; }
+  .quote-option-body { padding: 18px; }.quote-panel { padding: 22px 18px; }.quote-facts { grid-template-columns: 105px 1fr; }
+  .quote-actions { flex-direction: column; }.quote-actions button { width: 100%; }
+}

@@ -22,6 +22,7 @@ export const civilDate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{
   && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
 
 export function validateEngineInput(operation, input) {
+  if (operation === 'detail' && exactKeys(input, ['booking_code', 'cart_items_appended'])) return text(input.booking_code) && typeof input.cart_items_appended === 'boolean';
   if (['lookup', 'detail', 'retrieve'].includes(operation)) return exactKeys(input, ['booking_code']) && text(input.booking_code);
   if (operation === 'rates') return exactKeys(input, ['search_id', 'hotel_id']) && text(input.search_id) && text(input.hotel_id);
   if (operation === 'rooms') {

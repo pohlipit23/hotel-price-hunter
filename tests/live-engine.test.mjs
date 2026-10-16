@@ -140,3 +140,13 @@ test('targeted rooms validation refuses unbounded pages, unknown fields and inje
     await assert.rejects(engine.read('rooms', { ...input, ...patch }), { code: 'INVALID_INPUT' });
   }
 });
+
+test('operator quotation reads can append existing cart items with a literal boolean without mutating the quote', async () => {
+  let target;
+  const engine = createLiveEngine({ baseUrl, token, authorised: true, fetchImpl: async (url, options) => {
+    target = url; assert.equal(options.method, 'GET'); return response({ code: 'TEST-QUOTE', status: 'quote' });
+  } });
+  await engine.read('detail', { booking_code: 'TEST-QUOTE', cart_items_appended: true });
+  assert.equal(target.searchParams.get('cart_items_appended'), 'true');
+  await assert.rejects(engine.read('detail', { booking_code: 'TEST-QUOTE', cart_items_appended: 'true' }), { code: 'INVALID_INPUT' });
+});

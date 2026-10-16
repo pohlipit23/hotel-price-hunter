@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your stay options · RoomDrop</title>
+  <link rel="icon" href="/assets/roomdrop-key-icon.png"><link rel="stylesheet" href="/booking.css"><link rel="stylesheet" href="/quotation.css">
+  <script type="module" src="/quotation.js"></script>
+</head>
+<body class="quotation-demo">
+  <a class="skip" href="#main">Skip to stay options</a>
+  <div class="quotation-shell">
+    <header class="site-header"><a class="brand" href="/" aria-label="RoomDrop home"><img src="/assets/roomdrop-logo.png" alt="RoomDrop"></a><span class="demo-tag">Quotation demo</span></header>
+    <main id="main">
+      <p id="quote-status" class="page-status" role="status">Loading your stay…</p>
+      <div id="quote-content" hidden>
+        <ol id="quote-steps" class="customer-steps" aria-label="Stay selection">
+          <li aria-current="step"><span>1</span> Options</li><li><span>2</span> Review</li><li><span>3</span> Confirmed</li>
+        </ol>
+        <section class="quote-baseline" aria-labelledby="quote-hotel">
+          <div><p id="quote-reference" class="eyebrow"></p><h1 id="quote-hotel"></h1><p id="quote-stay" class="muted"></p><p id="quote-room" class="small muted"></p></div>
+          <div class="quoted-total"><span>Original quotation</span><strong id="quote-price"></strong><small>Whole stay · not a reservation</small></div>
+        </section>
+        <section id="quote-options-screen" aria-labelledby="options-heading">
+          <div class="quote-heading"><p class="eyebrow">Same hotel · your stay dates</p><h2 id="options-heading" tabindex="-1">Room options for your stay</h2>
+          <p class="muted">Live gateway snapshot. Converted amounts are estimates before final retail pricing and fees.</p></div>
+          <div id="quote-options" class="quote-options"></div>
+          <p id="quote-empty" class="muted" hidden>No comparable source rates were captured. Your quotation is unchanged.</p>
+          <details class="quote-evidence"><summary>About these prices</summary><p id="quote-fx" class="small muted"></p><p id="quote-capture" class="small muted"></p><p class="small muted">Room names and cancellation flags come from the source. Equivalence, full terms and any customer refund still need verification.</p></details>
+        </section>
+        <section id="quote-review-screen" class="quote-panel" aria-labelledby="review-heading" hidden>
+          <p class="eyebrow">Your selected option</p><h2 id="review-heading" tabindex="-1">Review this room</h2>
+          <div id="quote-review-facts"></div>
+          <p class="quote-note">This confirms a room choice for the demo. The price and full terms would be checked before an actual reservation.</p>
+          <label class="quote-checkbox"><input id="quote-demo-consent" type="checkbox"><span>I understand this is a demo selection and no reservation, cancellation or payment will be made.</span></label>
+          <label id="quote-flexibility-label" class="quote-checkbox quote-flexibility" hidden><input id="quote-flexibility-consent" type="checkbox"><span>I understand that free cancellation is not offered or has not been established for this option.</span></label>
+          <p id="quote-review-error" class="error" role="alert"></p>
+          <div class="quote-actions"><button id="quote-confirm" class="primary" type="button">Confirm room for demo</button><button id="quote-back" class="secondary" type="button">Back to options</button></div>
+        </section>
+        <section id="quote-confirmed-screen" class="quote-panel quote-confirmed" aria-labelledby="confirmed-heading" hidden>
+          <span class="quote-check" aria-hidden="true">✓</span><p class="eyebrow">Demo selection confirmed</p>
+          <h2 id="confirmed-heading" tabindex="-1">Your room choice is confirmed</h2><div id="quote-confirmed-facts"></div>
+          <p class="quote-note">Demo complete. No hotel reservation was created, and the original quotation remains unchanged.</p>
+          <button id="quote-restart" class="secondary" type="button">Review other rooms</button>
+        </section>
+        <footer class="quote-footer"><p>Quotation-backed demo · selection only</p></footer>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
