@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createLiveEngine, LiveEngineError } from '../app/live-engine.mjs';
+import { authenticateLiveEngine, createLiveEngine, LiveEngineError } from '../app/live-engine.mjs';
 
 const baseUrl = 'https://bonus.apps.easygds.com/api';
 const token = 'test-private-bearer';
@@ -8,6 +8,16 @@ const search = () => ({ checkin_date: '2026-11-12', checkout_date: '2026-11-15',
   currency_code: 'USD', language_code: 'en-US', hotel_ids: ['opaque-hotel'],
   rooms: [{ idx: 1, adults: [35, 37], children: [8], infants: [] }], timeout: 15000 });
 const response = value => new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } });
+
+test('owner-selected Demo.apps uses its exact verified HTTPS API host', async () => {
+  const baseUrl = 'https://demo.apps.easygds.com/api'; let destination;
+  const engine = createLiveEngine({ baseUrl, token, authorised: true, fetchImpl: async url => {
+    destination = url.href; return response({});
+  } });
+  await engine.read('lookup', { booking_code: 'selected-test-booking' });
+  assert.equal(new URL(destination).origin, 'https://demo.apps.easygds.com');
+  assert.equal(new URL(destination).pathname, '/api/v2/bookings');
+});
 
 test('live engine requires explicit authority, token and a fixed HTTPS tenant before any request', () => {
   for (const patch of [{ authorised: false }, { token: '' }, { token: 'x\r\nsecret' },
@@ -78,4 +88,23 @@ test('oversized JSON is refused before parsing and no response object is returne
   const engine = createLiveEngine({ baseUrl, token, authorised: true,
     fetchImpl: async () => new Response('x'.repeat(4 * 1024 * 1024 + 1), { headers: { 'content-type': 'application/json' } }) });
   await assert.rejects(engine.read('rates', { search_id: 'a', hotel_id: 'b' }), { code: 'RESPONSE_TOO_LARGE' });
+});
+
+test('normal IAM sign-in requires explicit selected credentials and never returns refresh or account data', async () => {
+  const credentials = { email: 'test@example.invalid', secret_key: 'PRIVATE-SIGN-IN-SECRET', scope_type: 'System', flow_type: 'Basic' };
+  let calls = 0;
+  const options = { baseUrl: 'https://demo.apps.easygds.com/api', iamUrl: 'https://iam.services.easygds.com/api', credentials, authorised: true,
+    fetchImpl: async (url, init) => {
+      calls++; assert.equal(url.href, 'https://iam.services.easygds.com/api/auth');
+      assert.equal(init.redirect, 'error'); assert.deepEqual(JSON.parse(init.body), credentials);
+      return response({ access_token: 'short-lived-test-token', refresh_token: 'DO-NOT-RETURN', account: { email: 'DO-NOT-RETURN' } });
+    } };
+  for (const patch of [{ authorised: false }, { iamUrl: 'https://evil.invalid/api' }, { baseUrl: 'https://evil.invalid/api' },
+    { credentials: { ...credentials, scope_type: '' } }, { credentials: { ...credentials, flow_type: 'Other' } },
+    { credentials: { ...credentials, extra: 'PRIVATE' } }]) {
+    await assert.rejects(authenticateLiveEngine({ ...options, ...patch }), { code: 'LIVE_ACCESS_NOT_CONFIGURED' });
+  }
+  assert.equal(calls, 0);
+  assert.equal(await authenticateLiveEngine(options), 'short-lived-test-token');
+  assert.equal(calls, 1);
 });

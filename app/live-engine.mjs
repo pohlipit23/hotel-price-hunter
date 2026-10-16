@@ -1,5 +1,6 @@
 // Private read adapter. No public runtime imports this module.
-const bases = new Set(['https://bonus.apps.easygds.com/api', 'https://mh1.apps.easygds.com/api']);
+const bases = new Set(['https://bonus.apps.easygds.com/api', 'https://mh1.apps.easygds.com/api', 'https://demo.apps.easygds.com/api']);
+export const isLiveEngineBase = value => bases.has(value);
 const operations = Object.freeze({
   lookup: ['GET', '/v2/bookings'], detail: ['GET', '/bookings'],
   retrieve: ['POST', '/v2/shopping/hotels/book/retrieve'],
@@ -57,6 +58,25 @@ async function boundedJson(response) {
   const value = JSON.parse(Buffer.concat(chunks).toString('utf8'));
   if (!record(value) && !Array.isArray(value)) fail('INVALID_RESPONSE');
   return value;
+}
+
+export async function authenticateLiveEngine({ baseUrl, iamUrl, credentials, authorised, fetchImpl = fetch } = {}) {
+  if (authorised !== true || !bases.has(baseUrl) || iamUrl !== 'https://iam.services.easygds.com/api'
+    || !exactKeys(credentials, ['email', 'secret_key', 'scope_type', 'flow_type'])
+    || !text(credentials.email) || !credentials.email.includes('@') || !text(credentials.secret_key)
+    || !['System', 'Agent'].includes(credentials.scope_type) || credentials.flow_type !== 'Basic') fail('LIVE_ACCESS_NOT_CONFIGURED');
+  try {
+    const data = await boundedJson(await fetchImpl(new URL(iamUrl + '/auth'), {
+      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(45000),
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(credentials),
+    }));
+    const token = data?.access_token;
+    if (typeof token !== 'string' || !/^[\x21-\x7e]{1,16384}$/.test(token)) fail('INVALID_AUTH_RESPONSE');
+    return token;
+  } catch (error) {
+    if (error instanceof LiveEngineError) throw error;
+    fail('ENGINE_AUTH_FAILED');
+  }
 }
 
 export function createLiveEngine({ baseUrl, token, authorised, fetchImpl = fetch } = {}) {
