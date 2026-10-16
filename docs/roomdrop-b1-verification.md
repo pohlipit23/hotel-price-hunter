@@ -46,3 +46,23 @@ The current B1 browser harness passed again with **12 acceptance groups, 96 geom
 JavaScript syntax checks and `git diff --check` passed. `npm audit --omit=dev --audit-level=high` reported zero vulnerabilities; its retained result is `.local/b1-release-audit.json`. The existing independent source review above remains the review evidence; this release pass additionally inspected navigation, approval retries, watch consent and the scoped diff. No fresh external OCR was requested or run.
 
 Release scope is the five customer frontend files, the B1 browser harness, this verification record and the README update. Brand design sources and remote attachments remain separate. Image packaging and the exact proposed private deployment scope will be recorded in `roomdrop-b1-release.md`; cloud upload/deployment and recurring watch activation remain separate approval steps.
+
+## Highest-drop hero follow-up, 16 October 2026
+
+The deals hero now uses the same highest verified net saving among the main
+refundable offers as its Best drop stamp. Photo, hotel, room, trip and price come
+from that offer; a small current-booking reference preserves the original hotel
+and total. With no eligible offer it falls back to the current booking. The
+existing simulated-switch view and approval authority are unchanged.
+
+The browser regression first reproduced the Harbour/Garden mismatch, then passed
+13 acceptance groups, 96 layout checks and 32 screenshots with zero runtime
+errors. It covers the default USD 85 Garden offer, a synthetic changed ranking,
+and the no-offer fallback. Mobile and desktop hero screenshots were visually
+inspected. The existing reduced-motion assertion now waits up to one second for
+its .01ms animations to settle after reload, avoiding a paint-timing race.
+
+Node tests passed 189 with six emulator integration skips and zero failures.
+Syntax and whitespace checks passed. Logs: `.local/b1-hero-{red,green}.log` and
+`.local/b1-hero-node-test.log`. This follow-up is local and has not been deployed;
+the preceding deployment record remains pinned to its original image.

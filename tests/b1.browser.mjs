@@ -100,6 +100,23 @@ export async function runB1(browser, origin, { allowFonts = false } = {}) {
     checkpoint = 'selection/history';
     const test = await fresh(); const { page } = test;
     assert.equal(await page.locator('#offers [data-offer-id]').count(), 3);
+    assert.equal(await page.locator('#hotel').innerText(), 'Example Garden Hotel');
+    assert.equal(await page.locator('#booking-total').innerText(), 'USD 510');
+    assert.equal(await page.locator('#booking-photo svg').getAttribute('viewBox'), '768 512 768 512');
+    assert.match(await page.locator('#booking-label').innerText(), /highest price drop.*new hotel/i);
+    assert.match(await page.locator('#current-booking-summary').innerText(), /Example Harbour Hotel.*USD 600/);
+    assert.match(await page.locator('#best-drop').getAttribute('aria-label'), /85 USD/);
+    const reordered = await fresh(375, value => {
+      const offer = value.offers.find(offer => offer.offerId === 'DEMO_DIFFERENT_ROOM');
+      offer.decision.netSavingMinor = 9500;
+      return value;
+    });
+    syntheticFixtures.push({ name: 'hero-changed-saving-ranking', source: 'bootstrap response substitution; presentation fixture only' });
+    assert.equal(await reordered.page.locator('#hotel').innerText(), 'Example Harbour Hotel');
+    assert.equal(await reordered.page.locator('#booking-total').innerText(), 'USD 520');
+    assert.equal(await reordered.page.locator('#booking-photo svg').getAttribute('viewBox'), '0 512 768 512');
+    assert.match(await reordered.page.locator('#best-drop').getAttribute('aria-label'), /95 USD/);
+    checks.push('Hero photo, hotel, price and saving follow the highest verified net drop, including a changed ranking');
     assert((await page.locator('#offers').innerText()).includes('-'), 'Savings lost their minus sign');
     await inspect(page, 'choose');
     for (const [filter, offerId] of [['match', 'DEMO_EQUIVALENT'], ['room', 'DEMO_DIFFERENT_ROOM'], ['hotel', 'DEMO_DIFFERENT_HOTEL']]) {
@@ -237,6 +254,8 @@ export async function runB1(browser, origin, { allowFonts = false } = {}) {
     assert.equal(journey.writes.filter(item => item.path.endsWith('/advances')).length, 6);
     assert.equal(journey.writes.filter(item => item.path.endsWith('/offer-approvals')).length, 1);
     assert.equal((await state(journey.page)).offers.length, 0);
+    // Reduced-motion animations last .01ms but may still await the next paint after reload.
+    await journey.page.waitForFunction(() => document.getAnimations().every(animation => animation.playState !== 'running'), undefined, { timeout: 1000 });
     assert.equal(await journey.page.evaluate(() => document.getAnimations().filter(animation => animation.playState === 'running').length), 0, 'Reduced motion still runs stamp/confetti animations');
     checks.push('Exactly one selected approval and six deliberate demo advances; cancellation precedes refund; pending/completed/reload remain distinct');
 
@@ -310,6 +329,11 @@ export async function runB1(browser, origin, { allowFonts = false } = {}) {
     const empty = await fresh(375, value => ({ ...value, offers: [], simulation: { ...value.simulation, offerApprovalIntents: {} } }));
     syntheticFixtures.push({ name: 'nooffers', source: 'bootstrap response substitution; presentation fixture only' });
     assert.equal(await empty.page.locator('#offers [data-offer-id]').count(), 0);
+    assert.equal(await empty.page.locator('#hotel').innerText(), 'Example Harbour Hotel');
+    assert.equal(await empty.page.locator('#booking-total').innerText(), 'USD 600');
+    assert.equal(await empty.page.locator('#booking-label').textContent(), 'Your current booking');
+    assert(await empty.page.locator('#best-drop').isHidden());
+    assert(await empty.page.locator('#current-booking-summary').isHidden());
     assert(/no .*offer|no .*drop|no .*ticket|no .*saving|no .*cheaper/i.test(await empty.page.locator('body').innerText()), 'No-offer state lacks explanation');
     await inspect(empty.page, 'nooffers');
     const sourceUnavailable = await fresh(375, () => {

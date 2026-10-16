@@ -214,7 +214,13 @@ function reconcilePending() {
   }
 }
 function renderBooking() {
-  const booking = state.booking;
+  const operation = state.simulation?.operation;
+  const best = customerOffers.map(id => state.offers.find(offer => offer.offerId === id)).filter(Boolean)
+    .map(offer => ({ offer, saving: verifiedSaving(offer) })).filter(item => item.saving.available)
+    .sort((a, b) => b.saving.minor - a.saving.minor)[0];
+  const featured = !operation ? best?.offer : undefined;
+  const booking = featured || state.booking;
+  $('booking-label').textContent = featured ? 'Highest price drop · ' + categoryText(featured) : 'Your current booking';
   $('hotel').textContent = booking.hotel.name;
   const board = booking.room.conditions.boardBasis;
   $('room').textContent = roomText(booking) + (board === 'BREAKFAST' ? ' · Breakfast included' : '');
@@ -222,12 +228,13 @@ function renderBooking() {
   $('guests').textContent = guestText(booking);
   $('booking-total').textContent = money(booking.retail.totalMinor, booking.retail.currency);
   $('booking-total-caption').textContent = 'Whole stay' + (booking.retail.includedInTotal === true ? ' · taxes included' : '');
-  const operation = state.simulation?.operation;
-  const photoIndex = operation?.savingSecured && operation.revalidatedOffer ? offerPhotoIndex(operation.revalidatedOffer) : 0;
+  const baseline = $('current-booking-summary');
+  baseline.hidden = !featured;
+  baseline.textContent = featured ? 'Your current booking: ' + state.booking.hotel.name + ' · '
+    + money(state.booking.retail.totalMinor, state.booking.retail.currency) : '';
+  const photoIndex = featured ? offerPhotoIndex(featured)
+    : operation?.savingSecured && operation.revalidatedOffer ? offerPhotoIndex(operation.revalidatedOffer) : 0;
   $('booking-photo').replaceChildren(stayPhoto(photoIndex));
-  const best = customerOffers.map(id => state.offers.find(offer => offer.offerId === id)).filter(Boolean)
-    .map(offer => ({ offer, saving: verifiedSaving(offer) })).filter(item => item.saving.available)
-    .sort((a, b) => b.saving.minor - a.saving.minor)[0];
   const stamp = $('best-drop');
   if (best && !operation) addStamp(stamp, best.saving.minor, best.offer.refundQuote.currency, 'Best drop', 'featured-stamp');
   else stamp.hidden = true;
