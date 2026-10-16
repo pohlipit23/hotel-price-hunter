@@ -8,20 +8,41 @@ const customerOffers = ['DEMO_EQUIVALENT', 'DEMO_DIFFERENT_ROOM', 'DEMO_DIFFEREN
 const pendingKey = 'roomdrop-selected-command-v1';
 const labels = { boardBasis: 'Meals', bedType: 'Bed type', nonSmoking: 'Non-smoking', accessible: 'Accessible room', view: 'View', roomSizeSqm: 'Room size (m²)' };
 const stages = {
-  ready: ['Approval saved', 'Your original booking remains active. Check the final price before reserving the replacement.'],
-  revalidated: ['Price and terms checked', 'Your original booking remains active. The replacement is ready to reserve.'],
-  'replacement-secured': ['New booking reserved', 'Your original booking remains active. Verify the replacement before cancelling your original booking.'],
-  'fulfilment-verified': ['New booking verified', 'Your original booking remains active until its cancellation is confirmed.'],
-  'cancellation-requested': ['Waiting for cancellation', 'Your original booking remains active until the cancellation result is confirmed.'],
-  'cancellation-verified': ['New booking active · refund pending', 'Original cancellation confirmed. Your refund has not arrived yet.'],
-  'refund-completed': ['Refund completed', 'Your new booking is active.']
+  ready: ['We are checking the final price', 'Your current booking stays active while the demo checks this offer.'],
+  revalidated: ['We are reserving the new room', 'The price and terms were checked. Your current booking stays active.'],
+  'replacement-secured': ['We are verifying the new booking', 'The replacement was reserved in the demo. Your current booking stays active.'],
+  'fulfilment-verified': ['We are cancelling the old booking', 'The new booking was verified in the demo. The old booking stays active until cancellation is confirmed.'],
+  'cancellation-requested': ['Waiting for cancellation confirmation', 'A cancellation request was recorded in the demo. The result is not confirmed yet.'],
+  'cancellation-verified': ['Your new stay is active', 'The old booking cancellation is confirmed in the demo. The refund is pending.'],
+  'refund-completed': ['Your switch is complete', 'The demo marks the refund as complete. No real payment was made.']
 };
 const nextActions = {
-  ready: 'Check final price', revalidated: 'Reserve new booking', 'replacement-secured': 'Verify new booking',
-  'fulfilment-verified': 'Request original cancellation', 'cancellation-requested': 'Check cancellation result',
-  'cancellation-verified': 'Complete simulated refund'
+  ready: 'Check simulated price', revalidated: 'Reserve simulated replacement',
+  'replacement-secured': 'Verify simulated booking', 'fulfilment-verified': 'Request simulated cancellation',
+  'cancellation-requested': 'Check simulated cancellation', 'cancellation-verified': 'Complete simulated refund'
 };
-let state, selectedOffer, lastOfferId, busy = false, refreshRequired = false;
+const reasonCopy = {
+  FULFILMENT_UNVERIFIED: 'The new booking could not be verified.',
+  OFFER_MATERIAL_CHANGED: 'The offer details changed after review.',
+  OFFER_APPROVAL_REQUIRED: 'Current approval is required for this offer.',
+  STANDING_PERMISSION_REQUIRED: 'Saved switch permission is no longer current.',
+  BOOKING_VERSION_CHANGED: 'The booking changed.', BOOKING_VERSION_MISMATCH: 'The offer no longer matches this booking.',
+  PREFERENCES_VERSION_CHANGED: 'Saved stay requirements changed.', ENROLMENT_REQUIRED: 'Price watch permission is no longer active.',
+  OFFER_NOT_CURRENT: 'The offer check is no longer current.', UNVERIFIED_OFFER_PRICE: 'The offer price could not be verified.',
+  UNKNOWN_ESSENTIAL_CONDITION: 'An important room detail could not be verified.',
+  ESSENTIAL_REQUIREMENT_MISMATCH: 'The offer does not meet a saved stay requirement.',
+  UNKNOWN_EQUIVALENCE: 'The room details could not be verified.',
+  CANCELLATION_WINDOW_EXPIRED: 'The free-cancellation deadline has passed.',
+  UNKNOWN_CANCELLATION_POLICY: 'The cancellation terms could not be verified.',
+  UNVERIFIED_REFUND_QUOTE: 'The refund after fees could not be verified.',
+  SAVING_BELOW_MINIMUM: 'The verified saving is below the required minimum.',
+  STAY_MISMATCH: 'The dates do not match this booking.', INVALID_STAY: 'The dates could not be verified.',
+  OCCUPANCY_MISMATCH: 'The guest details do not match this booking.', UNKNOWN_OCCUPANCY: 'The guest details could not be verified.',
+  MISSING_IDENTITY: 'The booking or hotel could not be verified.', MISSING_OFFER_IDENTITY: 'The offer could not be verified.',
+  INVALID_PREFERENCES: 'Saved stay requirements could not be verified.', INVALID_CHECK_TIME: 'The check time could not be verified.',
+  UNSUPPORTED_BOOKING_SCOPE: 'This booking cannot use the demo switch.'
+};
+let state, selectedOffer, lastOfferId, offerFilter = 'all', busy = false, refreshRequired = false;
 let pending = loadPending();
 let message = '', messageError = false;
 let watchMessage = '', watchError = false, notifications = { notifications: [] };
@@ -36,6 +57,22 @@ function money(minor, currency = state?.currency?.code || 'USD') {
   if (!Number.isSafeInteger(minor)) return 'Not verified';
   const digits = state?.currency?.minorUnit ?? 2;
   return currency + ' ' + new Intl.NumberFormat('en-US', { minimumFractionDigits: minor % (10 ** digits) ? digits : 0, maximumFractionDigits: digits }).format(minor / (10 ** digits));
+}
+function savingLabel(minor, currency = state?.currency?.code || 'USD') {
+  if (!Number.isSafeInteger(minor) || minor <= 0) return 'Saving unavailable';
+  const formatted = money(minor, currency);
+  const amount = formatted.startsWith(currency + ' ') ? formatted.slice(currency.length + 1) : formatted;
+  return '-' + amount + ' ' + currency;
+}
+function addStamp(target, minor, currency, label, className = '') {
+  target.replaceChildren();
+  target.className = 'saving-stamp' + (className ? ' ' + className : '');
+  const formatted = money(minor, currency);
+  const amount = formatted.startsWith(currency + ' ') ? formatted.slice(currency.length + 1) : formatted;
+  target.setAttribute('role', 'img');
+  target.setAttribute('aria-label', label + ' ' + savingLabel(minor, currency));
+  target.append(node('span', label, 'stamp-label'), node('strong', '-' + amount, 'stamp-amount'), node('span', currency, 'stamp-currency'));
+  target.hidden = false;
 }
 function valueText(value) {
   if (value === null || value === undefined) return 'Not verified';
@@ -54,7 +91,7 @@ function deadline(record) {
 function stayText(record) {
   const date = value => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(value + 'T00:00:00Z'));
   const nights = Math.round((Date.parse(record.stay.checkout) - Date.parse(record.stay.checkin)) / 86400000);
-  return date(record.stay.checkin) + ' – ' + date(record.stay.checkout) + ' · ' + nights + ' nights';
+  return date(record.stay.checkin) + ' - ' + date(record.stay.checkout) + ' · ' + nights + ' nights';
 }
 function guestText(record) {
   const o = record.occupancy;
@@ -75,15 +112,52 @@ function needsFlexibilityConsent(offer) { return offer?.cancellation?.refundabil
 function canApprove(offer) {
   return verifiedSaving(offer).available && (!needsFlexibilityConsent(offer) || $('accept-reduced-flexibility').checked);
 }
+function categoryKey(offer) {
+  if (offer.offerId === 'DEMO_NON_REFUNDABLE') return 'nonref';
+  if (offer.hotel.id !== state.booking.hotel.id) return 'hotel';
+  if (offer.category === 'equivalent' && offer.equivalence === 'verified') return 'match';
+  if (offer.category === 'different-room') return 'room';
+  return 'unverified';
+}
+function categoryText(offer) {
+  return ({ match: 'Same room', room: 'Other room', hotel: 'New hotel',
+    nonref: offer.category === 'equivalent' && offer.equivalence === 'verified' ? 'Non-refundable · same room' : 'Non-refundable offer',
+    unverified: 'Room details not verified' })[categoryKey(offer)];
+}
+function categoryIcon(key) {
+  const paths = {
+    match: 'M5 12l4 4L19 6',
+    room: 'M3 11h18v8H3z M3 15h18 M7 11V7h5v4',
+    hotel: 'M5 21V5h14v16 M8 8h2m4 0h2M8 12h2m4 0h2M10 21v-5h4v5',
+    nonref: 'M12 3v18 M17 7H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6',
+    meals: 'M4 3v7m4-7v7M4 6h4m-2 4v11m10-18v18m0-18c-2 1-3 4-3 7h3',
+    cancellation: 'M12 3 20 6v5c0 5-3 8-8 10-5-2-8-5-8-10V6l8-3Zm-3 9 2 2 4-4'
+  };
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', paths[key] || paths.hotel);
+  svg.append(path);
+  return svg;
+}
+function categoryBadge(offer, className) {
+  const badge = node('span', undefined, className + ' category-' + categoryKey(offer));
+  badge.append(categoryIcon(categoryKey(offer)), node('span', categoryText(offer)));
+  return badge;
+}
+function decisionText(codes = []) {
+  return [...new Set(codes.map(code => reasonCopy[code] || 'A saved safety check could not be verified.'))].join(' ');
+}
 function pills(offer, includeRelationship = true) {
   const list = node('div', undefined, 'pills');
   if (includeRelationship) {
     const relationship = offer.hotel.id === state.booking.hotel.id ? 'Same hotel' : 'Different hotel';
     list.append(node('span', relationship, 'pill' + (relationship === 'Same hotel' ? ' positive' : '')));
-    if (offer.category === 'equivalent' && offer.equivalence === 'verified') list.append(node('span', 'Equivalent room', 'pill positive'));
-    else if (offer.category === 'different-room') list.append(node('span', 'Different room', 'pill'));
+    if (offer.category === 'equivalent' && offer.equivalence === 'verified') list.append(node('span', 'Same room', 'pill positive'));
+    else if (offer.category === 'different-room') list.append(node('span', 'Other room', 'pill'));
   }
-  list.append(node('span', valueText(offer.cancellation.refundability), 'pill' + (offer.cancellation.refundability === 'refundable' ? ' positive' : '')));
+  const refundable = offer.cancellation?.refundability === 'refundable';
+  list.append(node('span', refundable ? 'Refundable' : valueText(offer.cancellation?.refundability), 'pill' + (refundable ? ' positive' : ' warning')));
   return list;
 }
 function loadPending() {
@@ -140,183 +214,353 @@ function reconcilePending() {
   }
 }
 function renderBooking() {
-  const b = state.booking;
-  $('hotel').textContent = b.hotel.name;
-  $('room').textContent = roomText(b) + (b.room.conditions.boardBasis === 'BREAKFAST' ? ' · Breakfast included' : '');
-  $('stay').textContent = stayText(b);
-  $('guests').textContent = guestText(b);
-  $('booking-total').textContent = money(b.retail.totalMinor, b.retail.currency);
-  const sourceOffer = state.simulation?.operation?.revalidatedOffer;
-  const photoIndex = state.simulation?.operation?.savingSecured && sourceOffer ? offerPhotoIndex(sourceOffer) : 1;
+  const booking = state.booking;
+  $('hotel').textContent = booking.hotel.name;
+  const board = booking.room.conditions.boardBasis;
+  $('room').textContent = roomText(booking) + (board === 'BREAKFAST' ? ' · Breakfast included' : '');
+  $('stay').textContent = stayText(booking);
+  $('guests').textContent = guestText(booking);
+  $('booking-total').textContent = money(booking.retail.totalMinor, booking.retail.currency);
+  $('booking-total-caption').textContent = 'Whole stay' + (booking.retail.includedInTotal === true ? ' · taxes included' : '');
+  const operation = state.simulation?.operation;
+  const photoIndex = operation?.savingSecured && operation.revalidatedOffer ? offerPhotoIndex(operation.revalidatedOffer) : 0;
   $('booking-photo').replaceChildren(stayPhoto(photoIndex));
+  const best = customerOffers.map(id => state.offers.find(offer => offer.offerId === id)).filter(Boolean)
+    .map(offer => ({ offer, saving: verifiedSaving(offer) })).filter(item => item.saving.available)
+    .sort((a, b) => b.saving.minor - a.saving.minor)[0];
+  const stamp = $('best-drop');
+  if (best && !operation) addStamp(stamp, best.saving.minor, best.offer.refundQuote.currency, 'Best drop', 'featured-stamp');
+  else stamp.hidden = true;
 }
-function offerCard(offer, index) {
-  const featured = index === 0 && offer.category === 'equivalent';
-  const article = node('article', undefined, 'offer' + (featured ? ' featured' : ''));
-  article.dataset.offer = offer.offerId;
-  const sameHotel = offer.hotel.id === state.booking.hotel.id;
-  const matchingRoom = offer.category === 'equivalent' && offer.equivalence === 'verified';
-  const differentRoom = offer.category === 'different-room';
-  const category = !sameHotel ? 'Different hotel' : matchingRoom ? 'Same hotel · Matches your room'
-    : differentRoom ? 'Same hotel · Different room' : 'Same hotel · Review room details';
-  article.dataset.category = !sameHotel ? 'hotel' : matchingRoom ? 'match' : differentRoom ? 'room' : 'unverified';
-  const card = node(featured ? 'div' : 'button', undefined, 'offer-card');
-  const body = node('div', undefined, 'offer-body');
-  const refund = verifiedSaving(offer);
+function offerCard(offer, index, compact = false, biggest = false) {
+  const category = categoryKey(offer);
+  const saving = verifiedSaving(offer);
   const quote = offer.refundQuote;
-  const feeMinor = quote && [quote.originalCancellationMinor, quote.switchFeesMinor, quote.refundProcessingMinor].every(Number.isSafeInteger)
+  const fees = quote && [quote.originalCancellationMinor, quote.switchFeesMinor, quote.refundProcessingMinor].every(Number.isSafeInteger)
     ? quote.originalCancellationMinor + quote.switchFeesMinor + quote.refundProcessingMinor : null;
-  body.append(node('h3', offer.hotel.name), node('p', roomText(offer), 'room-subline'), pills(offer, false),
-    node('strong', refund.available ? 'Save ' + money(refund.minor, offer.refundQuote?.currency) : 'Saving unavailable', 'offer-saving' + (refund.available ? '' : ' unavailable')),
-    node('p', refund.available ? 'Potential refund after ' + money(feeMinor, quote.currency) + ' fees' : 'Current conditions need verification', 'offer-caption'));
-  card.append(stayPhoto(offerPhotoIndex(offer)), body);
-  const review = featured ? node('button', 'Review saving', 'primary') : card;
-  review.type = 'button'; review.dataset.offerId = offer.offerId;
-  review.setAttribute('aria-label', 'Review saving at ' + offer.hotel.name + ', ' + roomText(offer) + '. ' + category);
-  review.disabled = busy || Boolean(pending);
-  review.addEventListener('click', () => select(offer));
-  if (!featured) {
-    const arrow = node('span', '›', 'offer-arrow'); arrow.setAttribute('aria-hidden', 'true'); card.append(arrow);
-    card.append(node('span', 'Review saving', 'sr-only'));
+  const article = node('article', undefined, 'offer-ticket' + (compact ? ' offer-compact' : ''));
+  article.dataset.offer = offer.offerId;
+  article.dataset.category = category;
+  if (!compact) {
+    const photo = node('div', undefined, 'offer-photo');
+    photo.append(stayPhoto(offerPhotoIndex(offer)), node('span', 'Illustrative photo', 'photo-tag'));
+    const tag = categoryBadge(offer, 'photo-category');
+    photo.append(tag);
+    if (saving.available) {
+      const stamp = node('div', undefined, 'saving-stamp offer-stamp');
+      stamp.id = 'offer-saving-' + offer.offerId;
+      addStamp(stamp, saving.minor, quote.currency, biggest ? 'Biggest' : 'Price drop', 'offer-stamp' + (biggest ? ' biggest-stamp' : ''));
+      photo.append(stamp);
+    }
+    article.append(photo);
   }
-  article.append(node('p', category, 'offer-category'), card);
-  if (featured) article.append(review);
+  const body = node('div', undefined, 'offer-body');
+  if (compact) body.append(categoryBadge(offer, 'category-band'));
+  const title = node('h3', offer.hotel.name);
+  title.id = 'offer-title-' + offer.offerId;
+  const room = node('p', roomText(offer), 'room-subline');
+  const rates = node('div', undefined, 'offer-rates');
+  rates.append(node('s', money(state.booking.retail.totalMinor, state.booking.retail.currency), 'old-rate'),
+    node('span', '→', 'rate-arrow'), node('strong', money(offer.retail.totalMinor, offer.retail.currency), 'new-rate'));
+  const detailText = !saving.available ? 'Saving unavailable · current terms need checking'
+    : compact ? savingLabel(saving.minor, quote.currency) + ' · potential refund after ' + money(fees, quote.currency) + ' fees'
+      : 'Potential refund after ' + money(fees, quote.currency) + ' fees';
+  const detail = node('p', detailText, 'offer-caption');
+  detail.id = 'offer-detail-' + offer.offerId;
+  const refundable = offer.cancellation?.refundability === 'refundable';
+  const conditionText = refundable ? 'Free cancellation' : offer.cancellation?.refundability === 'non-refundable'
+    ? 'Non-refundable · no free cancellation' : 'Cancellation terms not verified';
+  const condition = node('p', conditionText,
+    'offer-condition' + (refundable ? '' : ' warning'));
+  condition.id = 'offer-condition-' + offer.offerId;
+  body.append(title, room, rates, detail, condition);
+  article.append(body);
+  const review = node('button', 'Review this drop', 'offer-action');
+  review.type = 'button';
+  review.dataset.offerId = offer.offerId;
+  review.setAttribute('aria-describedby', [detail.id, condition.id, title.id, saving.available ? 'offer-saving-' + offer.offerId : ''].filter(Boolean).join(' '));
+  review.disabled = busy || Boolean(pending) || !saving.available;
+  review.addEventListener('click', () => select(offer));
+  article.append(review);
   return article;
 }
+function applyOfferFilter() {
+  const cards = [...$('offers').children];
+  const visible = cards.filter(card => offerFilter === 'all' || card.dataset.category === offerFilter);
+  cards.forEach(card => { card.hidden = !visible.includes(card); });
+  const empty = $('offer-empty');
+  const hasAnyOffers = cards.length > 0;
+  $('offer-filters').hidden = !hasAnyOffers;
+  if (!hasAnyOffers) empty.textContent = 'No better offers right now. Your current booking stays active.';
+  else if (!visible.length) empty.textContent = 'No offers in this group right now.';
+  empty.hidden = visible.length > 0;
+  $('filter-status').textContent = visible.length + (visible.length === 1 ? ' offer shown.' : ' offers shown.');
+}
 function renderOffers() {
-  const offers = customerOffers.map(id => state.offers.find(offer => offer.offerId === id)).filter(Boolean);
-  $('offers').replaceChildren(...offers.map(offerCard));
-  if (!offers.length) $('offers').append(node('p', 'There are no fresh alternatives for your current booking.', 'empty-offers'));
+  const operation = state.simulation?.operation;
+  const offers = customerOffers.map(id => state.offers.find(offer => offer.offerId === id)).filter(Boolean)
+    .filter(offer => { const saving = verifiedSaving(offer); return saving.available && saving.minor > 0; });
+  const biggest = offers.reduce((best, offer) => Math.max(best, verifiedSaving(offer).minor), 0);
+  $('offers').replaceChildren(...offers.map((offer, index) => offerCard(offer, index, false, verifiedSaving(offer).minor === biggest)));
+  $('changes-title').textContent = offers.length
+    ? offers.length + ' cheaper ticket' + (offers.length === 1 ? '' : 's') + ' for the same trip'
+    : 'No better offers right now';
   const lowerRate = state.offers.find(offer => offer.offerId === 'DEMO_NON_REFUNDABLE');
-  $('lower-rate').hidden = !lowerRate;
-  $('lower-rate-offer').replaceChildren(...(lowerRate ? [offerCard(lowerRate, -1)] : []));
-  document.querySelector('.alternatives').hidden = Boolean(state.simulation?.operation) && !state.simulation.operation.savingSecured;
+  const lowerSaving = lowerRate ? verifiedSaving(lowerRate) : { available: false };
+  $('lower-rate').hidden = !lowerRate || !lowerSaving.available || lowerSaving.minor <= 0;
+  $('lower-rate-offer').replaceChildren(...($('lower-rate').hidden ? [] : [offerCard(lowerRate, -1, true)]));
+  $('deal-list').hidden = Boolean(operation);
+  applyOfferFilter();
+}
+function factTile(label, value, iconKey, cue, className = '') {
+  const tile = node('div', undefined, 'fact-tile' + (className ? ' ' + className : ''));
+  const header = node('div', undefined, 'fact-head');
+  const icon = node('span', undefined, 'fact-icon');
+  icon.append(categoryIcon(iconKey));
+  header.append(icon, node('span', cue, 'fact-cue'));
+  tile.append(header, node('span', label, 'fact-label'), node('strong', value, 'fact-value'));
+  return tile;
 }
 function renderComparison() {
   const offer = selectedOffer;
+  if (!offer) return;
   const needsConsent = needsFlexibilityConsent(offer);
   const intent = offerIntent(offer);
   const currentKey = JSON.stringify([offer.offerId, offer.version, state.booking.version, state.preferences.version, intent?.materialFingerprint]);
+  const matchingPending = pending?.kind === 'approval' && pending.body.offerId === offer.offerId && pending.key === intent?.idempotencyKey;
   if (acknowledgementKey !== currentKey) {
-    $('accept-reduced-flexibility').checked = false;
+    $('accept-reduced-flexibility').checked = Boolean(matchingPending && pending.body.acceptReducedFlexibility === true);
     acknowledgementKey = currentKey;
   }
   $('flexibility-warning').hidden = !needsConsent;
   $('accept-reduced-flexibility').disabled = busy || refreshRequired || !verifiedSaving(offer).available;
+  $('flexibility-watch-note').hidden = !state.priceWatch?.enabled;
   $('comparison-title').textContent = offer.hotel.name;
   $('comparison-pills').replaceChildren(...pills(offer).children);
   $('comparison-photo').replaceChildren(stayPhoto(offerPhotoIndex(offer)));
+  const category = $('comparison-category');
+  category.className = 'category-band category-' + categoryKey(offer);
+  category.replaceChildren(categoryIcon(categoryKey(offer)), node('span', categoryText(offer)));
   $('after-room').textContent = roomText(offer);
   $('comparison-stay').textContent = stayText(offer);
   $('comparison-guests').textContent = guestText(offer);
   $('before-price').textContent = money(state.booking.retail.totalMinor, state.booking.retail.currency);
   $('after-price').textContent = money(offer.retail.totalMinor, offer.retail.currency);
-  $('after-price-label').textContent = 'New rate';
-  $('selected-summary').textContent = needsConsent ? 'Free cancellation ends with this rate.'
-    : offer.category === 'equivalent' ? 'Breakfast & cancellation deadline unchanged.'
-    : offer.category === 'different-room' ? 'Room changes · Check details below.'
-      : 'Hotel changes · Check details below.';
-  const refund = verifiedSaving(offer);
-  $('comparison-saving').textContent = refund.available ? '-' + money(refund.minor, offer.refundQuote?.currency) : 'Unavailable';
-  $('saving-box').classList.toggle('unavailable', !refund.available);
+  const saving = verifiedSaving(offer);
   const quote = offer.refundQuote;
   const fees = quote && [quote.originalCancellationMinor, quote.switchFeesMinor, quote.refundProcessingMinor].every(Number.isSafeInteger)
     ? quote.originalCancellationMinor + quote.switchFeesMinor + quote.refundProcessingMinor : null;
-  $('saving-caption').textContent = refund.available ? 'Potential refund after ' + money(fees, quote.currency) + ' fees' : 'This offer cannot be approved with the current verified facts.';
+  $('switch-fees').textContent = Number.isSafeInteger(fees) ? money(fees, quote.currency) : 'Not verified';
+  $('comparison-saving').textContent = saving.available ? savingLabel(saving.minor, quote.currency) : 'Saving unavailable';
+  if (saving.available) addStamp($('comparison-saving-stamp'), saving.minor, quote.currency, 'You save', 'review-stamp');
+  else {
+    $('comparison-saving-stamp').replaceChildren(node('span', 'Saving unavailable', 'stamp-label'));
+    $('comparison-saving-stamp').className = 'saving-stamp review-stamp saving-unavailable';
+  }
+  $('saving-caption').textContent = saving.available ? 'Calculated after listed fees · whole stay' : 'This offer cannot be approved until its price, terms and saving are verified.';
+
+  const before = state.booking.room.conditions || {};
+  const after = offer.room.conditions || {};
+  const hotelMatch = state.booking.hotel.id === offer.hotel.id;
+  const roomMatch = offer.category === 'equivalent' && offer.equivalence === 'verified';
+  const mealsMatch = before.boardBasis != null && after.boardBasis != null && before.boardBasis === after.boardBasis;
+  const currentCancel = state.booking.cancellation;
+  const offeredCancel = offer.cancellation;
+  const cancellationTermsMatch = currentCancel?.refundability === 'refundable' && offeredCancel?.refundability === 'refundable'
+    && Boolean(currentCancel.freeUntil && offeredCancel.freeUntil && currentCancel.timeZone && offeredCancel.timeZone)
+    && Array.isArray(currentCancel.schedule) && currentCancel.schedule.length > 0
+    && Array.isArray(offeredCancel.schedule) && offeredCancel.schedule.length > 0
+    && currentCancel.freeUntil === offeredCancel.freeUntil && currentCancel.timeZone === offeredCancel.timeZone
+    && JSON.stringify(currentCancel.schedule) === JSON.stringify(offeredCancel.schedule);
+  const board = after.boardBasis == null ? 'Not verified' : valueText(after.boardBasis);
+  const cancel = offeredCancel?.refundability === 'refundable' ? 'Free cancellation'
+    : offeredCancel?.refundability === 'non-refundable' ? 'No free cancellation' : 'Terms not verified';
+  const roomCue = roomMatch ? 'Verified' : offer.category === 'different-room' ? 'Other room' : 'Review details';
+  const mealsCue = mealsMatch ? 'Same' : before.boardBasis != null && after.boardBasis != null ? 'Changed' : 'Check details';
+  const cancellationCue = cancellationTermsMatch ? 'Same terms' : offeredCancel?.refundability === 'refundable' ? 'Terms differ'
+    : offeredCancel?.refundability === 'non-refundable' ? 'Less flexible' : 'Check details';
+  $('change-facts-grid').replaceChildren(
+    factTile('Hotel', offer.hotel.name, 'hotel', hotelMatch ? 'Same hotel' : 'New hotel', (hotelMatch ? 'fact-same' : 'fact-new') + ' fact-hotel'),
+    factTile('Room', roomMatch ? 'Same room' : roomText(offer), roomMatch ? 'match' : 'room', roomCue,
+      (roomMatch ? 'fact-same' : 'fact-change') + ' fact-room'),
+    factTile('Meals', board, 'meals', mealsCue,
+      (mealsMatch ? 'fact-same' : board === 'Not verified' ? 'fact-warning' : 'fact-change') + ' fact-meals'),
+    factTile('Cancellation', cancel, 'cancellation', cancellationCue,
+      (cancellationTermsMatch ? 'fact-same' : offeredCancel?.refundability === 'refundable' ? 'fact-change' : 'fact-warning') + ' fact-cancellation')
+  );
+
   const differences = [];
-  if (state.booking.hotel.id !== offer.hotel.id) differences.push(['Hotel', state.booking.hotel.name + ' → ' + offer.hotel.name]);
+  if (!hotelMatch) differences.push(['Hotel', state.booking.hotel.name + ' → ' + offer.hotel.name]);
   if (state.booking.room.name !== offer.room.name) differences.push(['Room', state.booking.room.name + ' → ' + offer.room.name]);
-  for (const key of new Set([...Object.keys(state.booking.room.conditions), ...Object.keys(offer.room.conditions)])) {
-    const before = state.booking.room.conditions[key], after = offer.room.conditions[key];
-    differences.push([labels[key] || key, before === after ? valueText(after) : valueText(before) + ' → ' + valueText(after)]);
+  for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    const oldValue = before[key], newValue = after[key];
+    if (oldValue !== newValue) differences.push([labels[key] || key, valueText(oldValue) + ' → ' + valueText(newValue)]);
   }
   differences.push(['Current cancellation', deadline(state.booking)], ['Alternative cancellation', deadline(offer)]);
-  if (quote) differences.push(['Price calculation', money(quote.originalRetailMinor, quote.currency) + ' − ' + money(quote.replacementRetailMinor, quote.currency) + ' − ' + money(fees, quote.currency) + ' fees = ' + (refund.available ? money(refund.minor, quote.currency) + ' potential refund' : 'no verified saving')]);
-  if (offer.decision?.reasons?.length) differences.push(['Checks', offer.decision.reasons.map(valueText).join(' · ')]);
+  if (quote) differences.push(['Price calculation', money(quote.originalRetailMinor, quote.currency) + ' minus ' + money(quote.replacementRetailMinor, quote.currency)
+    + ' minus ' + money(fees, quote.currency) + ' fees = ' + (saving.available ? savingLabel(saving.minor, quote.currency) : 'saving unavailable')]);
+  if (offer.decision?.reasons?.length) differences.push(['Checks', decisionText(offer.decision.reasons)]);
   $('differences').replaceChildren(...differences.flatMap(([key, value]) => [node('dt', key), node('dd', value)]));
-  $('selected-checked').textContent = 'Simulated check: ' + instant(offer.checkedAt) + ' · Offer expires ' + instant(offer.expiresAt) + '.';
+  $('selected-checked').textContent = 'Fictional demo quote · not a live rate or a price hold.';
   $('review-message').textContent = message;
   $('review-message').classList.toggle('error', messageError);
-  $('approve-offer').disabled = busy || refreshRequired || (!pending && !canApprove(offer))
-    || (needsConsent && !$('accept-reduced-flexibility').checked) || pending?.kind === 'advance';
-  if (pending?.kind === 'watch') $('approve-offer').disabled = true;
-  $('approve-offer').textContent = busy ? 'Saving approval…' : pending?.kind === 'approval' ? 'Retry the same approval' : 'Approve simulated switch';
+  const consentMissing = needsConsent && !$('accept-reduced-flexibility').checked && !matchingPending;
+  $('approve-offer').disabled = busy || refreshRequired || (!pending && !canApprove(offer)) || consentMissing || pending?.kind === 'advance' || pending?.kind === 'watch';
+  $('approve-offer').textContent = busy ? 'Saving approval…' : pending?.kind === 'approval' ? 'Retry the same approval'
+    : saving.available ? 'Approve switch ' + savingLabel(saving.minor, quote.currency) : 'Approval unavailable';
+  const help = consentMissing ? 'Tick the box above to confirm the cancellation terms.'
+      : !saving.available ? 'The current price and terms are not verified for approval.' : '';
+  $('approve-help').textContent = help;
+  $('approve-help').hidden = !help;
 }
 function operationCopy(operation) {
-  const reasons = {
-    FULFILMENT_UNVERIFIED: 'The replacement fulfilment could not be verified.',
-    OFFER_MATERIAL_CHANGED: 'The offer facts or recorded approval are no longer current.',
-    OFFER_APPROVAL_REQUIRED: 'Current approval for this offer is required.',
-    STANDING_PERMISSION_REQUIRED: 'Current permission for the switch is required.',
-    BOOKING_VERSION_CHANGED: 'Your booking has changed.',
-    BOOKING_VERSION_MISMATCH: 'The offer no longer matches your current booking.',
-    PREFERENCES_VERSION_CHANGED: 'Your saved stay requirements have changed.',
-    ENROLMENT_REQUIRED: 'Price watch permission is no longer active.',
-    OFFER_NOT_CURRENT: 'The offer check has expired or is no longer current.',
-    UNVERIFIED_OFFER_PRICE: 'The offer price could not be verified.',
-    UNKNOWN_ESSENTIAL_CONDITION: 'An essential room condition could not be verified.',
-    ESSENTIAL_REQUIREMENT_MISMATCH: 'The offer does not meet your essential stay requirements.',
-    UNKNOWN_EQUIVALENCE: 'Room equivalence could not be verified.',
-    CANCELLATION_WINDOW_EXPIRED: 'The original free-cancellation window has ended.',
-    UNKNOWN_CANCELLATION_POLICY: 'The cancellation terms could not be verified.',
-    UNVERIFIED_REFUND_QUOTE: 'The refund after fees could not be verified.',
-    SAVING_BELOW_MINIMUM: 'The verified saving is below the required minimum.',
-    STAY_MISMATCH: 'The offer dates do not match your booking.',
-    INVALID_STAY: 'The stay dates could not be verified.',
-    OCCUPANCY_MISMATCH: 'The offer guests do not match your booking.',
-    UNKNOWN_OCCUPANCY: 'The guest details could not be verified.',
-    MISSING_IDENTITY: 'The booking or hotel identity could not be verified.',
-    MISSING_OFFER_IDENTITY: 'The offer identity could not be verified.',
-    INVALID_PREFERENCES: 'Your saved stay requirements could not be verified.',
-    INVALID_CHECK_TIME: 'The time of the safety check could not be verified.',
-    UNSUPPORTED_BOOKING_SCOPE: 'This booking cannot use the simulated switch.'
-  };
-  const explanation = [...new Set((operation.reasonCodes || []).map(code => reasons[code] || 'A saved safety check could not be verified.'))].join(' ');
-  if (operation.status === 'awaits-renewed-approval') return ['Offer changed · review needed', (explanation || 'The final price or conditions changed.') + ' The switch stopped before a replacement or cancellation.'];
-  if (operation.status === 'failed') return ['Switch stopped safely', (explanation || 'Current checks do not support this switch.') + ' Your saved progress is preserved.'];
+  const explanation = decisionText(operation.reasonCodes || []);
+  if (operation.savingSecured && operation.refund?.status === 'pending') return ['Nice drop!', 'The new booking is active. The refund is pending in this demo.'];
+  if (operation.savingSecured && operation.refund?.status === 'completed') return ['Nice drop!', 'The new booking is active. The refund is marked complete in this demo.'];
+  if (operation.status === 'awaits-renewed-approval') return ['Price changed · review needed', 'The final price or terms changed. No replacement was booked and your current booking remains active. This demo cannot collect renewed approval for this switch.'];
+  if (operation.status === 'failed') return ['Switch stopped safely', (explanation || 'A required check could not be completed.') + ' No replacement was booked and your current booking remains active.'];
   if (operation.status === 'agency-exception') {
-    if (operation.cancellation?.status === 'unknown') return ['Cancellation uncertain · agency review', 'Your original booking remains active. Its cancellation result is unknown; no saving is secured and no refund has started.'];
-    return ['Switch paused · agency review', (explanation || 'The current safety checks require agency review.') + ' Your original booking remains active; no refund has started.'];
+    if (operation.cancellation?.status === 'unknown') return ['Hold on · cancellation not confirmed', 'The cancellation result is unknown. Your original booking remains active in the saved record. No saving is secured and no refund has started. Reload to see a verified update.'];
+    return ['Switch paused · review needed', (explanation || 'A saved safety check needs review.') + ' The current booking details below show the latest saved state.'];
   }
-  return stages[operation.stage] || ['Saved switch progress', 'Review the latest saved state before continuing.'];
+  return stages[operation.stage] || ['Saved switch progress', 'The latest saved booking details are shown below.'];
+}
+function photoForStay(record) {
+  if (record.hotel.id === 'DEMO_HOTEL_A' && record.room.name.toLowerCase().includes('premier')) return 2;
+  if (record.hotel.id === 'DEMO_HOTEL_A') return 0;
+  if (record.hotel.id === 'DEMO_HOTEL_B') return 3;
+  if (record.room.name.toLowerCase().includes('premier')) return 2;
+  return 1;
+}
+function trailItem(label, description, status) {
+  const item = node('li', undefined, 'trail-item trail-' + status);
+  if (status === 'current' || status === 'attention') item.setAttribute('aria-current', 'step');
+  item.append(node('span', status === 'done' ? '✓' : status === 'attention' ? '!' : status === 'current' ? '•' : '·', 'trail-mark'),
+    node('span', undefined, 'trail-copy'));
+  item.lastElementChild.append(node('strong', label), node('span', description));
+  return item;
+}
+function renderTrail(operation) {
+  const stage = operation.stage;
+  const status = operation.status;
+  const unknown = operation.cancellation?.status === 'unknown';
+  const doneBooking = ['fulfilment-verified', 'cancellation-requested', 'cancellation-verified', 'refund-completed'].includes(stage);
+  const doneCancel = ['cancellation-verified', 'refund-completed'].includes(stage);
+  const doneRefund = stage === 'refund-completed' || operation.refund?.status === 'completed';
+  const needsReview = status === 'awaits-renewed-approval' || status === 'failed';
+  const paused = status === 'agency-exception' && !unknown;
+  const bookingStatus = needsReview ? 'attention' : paused ? 'attention' : doneBooking ? 'done' : 'current';
+  const cancelStatus = unknown ? 'attention' : doneCancel ? 'done' : doneBooking ? 'current' : 'todo';
+  const refundStatus = doneRefund ? 'done' : operation.refund?.status === 'pending' ? 'current' : 'todo';
+  const refundDescription = operation.refund?.status === 'completed' ? 'Marked complete in this demo'
+    : operation.refund?.status === 'pending' ? money(operation.refund.amountMinor, operation.refund.currency) + ' pending in this demo'
+      : 'Not started';
+  $('switch-trail').replaceChildren(
+    trailItem('You approved this drop', 'Saved for this offer', 'done'),
+    trailItem('Book and verify the new room', needsReview ? 'Price or safety check needs review' : doneBooking ? 'Verified in this demo' : 'In progress in this demo', bookingStatus),
+    trailItem('Cancel the old booking', unknown ? 'Result not confirmed' : doneCancel ? 'Confirmed in this demo' : doneBooking ? 'In progress in this demo' : 'After the new room is verified', cancelStatus),
+    trailItem('Refund', refundDescription, refundStatus)
+  );
 }
 function renderSimulation() {
   const operation = state.simulation?.operation;
-  $('switch-message').textContent = message; $('switch-message').classList.toggle('error', messageError);
   $('simulated-switch').hidden = !operation;
   $('simulated-switch').setAttribute('aria-busy', String(busy));
   if (!operation) return;
+  const secured = operation.savingSecured === true;
+  $('simulated-switch').classList.toggle('switch-complete', secured);
+  $('current-ticket').hidden = true;
+  $('switch-from').hidden = secured;
+  document.querySelector('.journey-arrow').hidden = secured;
   const copy = operationCopy(operation);
-  $('switch-stage').textContent = copy[0]; $('switch-explanation').textContent = copy[1];
-  $('switch-progress-label').textContent = ['running', 'complete'].includes(operation.status) ? 'Demo switch' : 'Demo switch · Needs attention';
-  const refund = operation.refund;
-  const amount = money(refund?.amountMinor, refund?.currency);
-  const refundStatus = refund?.status === 'completed' ? amount + ' · completed (simulated)' : refund?.status === 'pending' ? amount + ' · pending' : 'Not started';
-  $('switch-money').replaceChildren(node('dt', operation.savingSecured ? 'Saving secured · simulated' : 'Potential refund after fees'), node('dd', amount), node('dt', 'Refund'), node('dd', refundStatus));
-  if (state.booking.cancellation?.refundability === 'non-refundable' && state.monitoring?.status === 'ended') {
-    $('switch-money').append(node('dt', 'Normal price monitoring'), node('dd', 'Ended · non-refundable booking'));
-  }
-  $('switch-history').replaceChildren(...(state.simulation.history || operation.history || []).map(item => {
-    const row = node('li'); row.append(node('strong', operationCopy(item)[0]), node('p', item.message), node('time', instant(item.demoAt))); return row;
+  $('switch-stage').textContent = copy[0];
+  $('switch-explanation').textContent = copy[1];
+  $('switch-progress-label').textContent = operation.status === 'running' ? 'Simulated switch' : 'Simulated switch · saved status';
+  const stateLabel = operation.cancellation?.status === 'unknown' ? 'Hold on'
+    : operation.status === 'failed' ? 'Stopped safely' : operation.status === 'agency-exception' || operation.status === 'awaits-renewed-approval' ? 'Review needed'
+      : operation.status === 'complete' ? 'Done · simulated' : 'In progress · simulated';
+  $('switch-state').textContent = stateLabel;
+  $('switch-state').className = 'state-pill' + (operation.cancellation?.status === 'unknown' || operation.status === 'agency-exception'
+    || operation.status === 'awaits-renewed-approval' ? ' state-warning' : '');
+
+  const original = operation.originalBooking || state.booking;
+  const target = operation.replacementBooking || operation.revalidatedOffer || state.offers.find(offer => offer.offerId === operation.offerId) || state.booking;
+  const originalStillActive = state.booking.version === operation.bookingVersion;
+  $('switch-from-status').textContent = originalStillActive ? 'still yours' : 'cancelled in demo';
+  $('switch-from-photo').replaceChildren(stayPhoto(photoForStay(original), true));
+  $('switch-from-hotel').textContent = original.hotel.name;
+  $('switch-from-room').textContent = roomText(original) + ' · ' + stayText(original);
+  $('switch-from-price').textContent = money(original.retail.totalMinor, original.retail.currency);
+  $('switch-to-photo').replaceChildren(stayPhoto(photoForStay(target), true));
+  $('switch-to-hotel').textContent = target.hotel.name;
+  $('switch-to-room').textContent = roomText(target) + ' · ' + stayText(target);
+  $('switch-to-price').textContent = money(target.retail.totalMinor, target.retail.currency);
+  $('switch-to-status').textContent = operation.replacementBooking?.fulfilment?.status === 'simulated-fulfilled' ? 'verified in demo'
+    : operation.replacementBooking ? 'reserved in demo' : 'being checked';
+  const saving = operation.refund?.amountMinor;
+  const stamp = $('switch-stamp');
+  if (operation.cancellation?.status === 'unknown') {
+    stamp.replaceChildren(node('strong', 'HOLD ON'));
+    stamp.className = 'switch-stamp attention-stamp';
+    stamp.hidden = false;
+  } else if (operation.savingSecured && Number.isSafeInteger(saving)) {
+    addStamp(stamp, saving, operation.refund.currency, 'Switched', 'switch-stamp');
+  } else stamp.hidden = true;
+
+  renderTrail(operation);
+  $('switch-reassurance').hidden = secured;
+  $('switch-reassurance').textContent = operation.cancellation?.status === 'unknown'
+    ? 'The original booking remains active. No saving is secured and no refund has started.'
+    : operation.savingSecured ? operation.refund?.status === 'completed'
+      ? 'The new booking is active. The refund is marked complete in this demo.'
+      : 'The new booking is active. The refund status is pending in this demo.'
+      : operation.replacementBooking ? 'Your original booking remains active until its cancellation is confirmed.'
+        : 'Your current booking remains active. No replacement has been reserved.';
+  const refundText = operation.refund?.status === 'completed' ? 'Completed in this demo'
+    : operation.refund?.status === 'pending' ? 'Pending in this demo' : 'Not started';
+  $('switch-money').replaceChildren(
+    node('dt', operation.savingSecured ? 'Drop after fees' : 'Potential drop after fees'),
+    node('dd', Number.isSafeInteger(saving) && saving > 0 ? savingLabel(saving, operation.refund.currency) : 'Not verified'),
+    node('dt', 'Refund'), node('dd', refundText)
+  );
+  const history = state.simulation.history || operation.history || [];
+  $('switch-history').replaceChildren(...history.map(item => {
+    const title = item.status === 'awaits-renewed-approval' ? 'Price changed during the check'
+      : item.status === 'failed' ? 'Switch stopped safely'
+        : stages[item.stage]?.[0] || 'Progress saved';
+    const row = node('li');
+    row.append(node('strong', title), node('p', item.status === 'awaits-renewed-approval'
+      ? 'No replacement was reserved.' : 'Saved in this fictional demo.'));
+    return row;
   }));
   const canRecover = operation.scenarioId === 'uncertain-cancellation' && operation.status === 'agency-exception' && operation.cancellation?.status === 'unknown';
   const canAdvance = operation.status === 'running' || canRecover;
-  $('advance-demo').hidden = operation.status === 'complete';
+  $('demo-controls').hidden = !canAdvance && pending?.kind !== 'advance';
+  $('advance-demo').hidden = !canAdvance && pending?.kind !== 'advance';
   $('advance-demo').disabled = busy || refreshRequired || (!pending && !canAdvance) || pending?.kind === 'watch';
   $('advance-demo').textContent = busy ? 'Saving progress…' : refreshRequired ? 'Refresh to see latest progress' : pending ? 'Retry the same simulation step'
-    : operation.status === 'complete' ? 'Refund complete' : !canAdvance ? 'Switch paused' : canRecover ? 'Check cancellation result' : nextActions[operation.stage] || 'Continue simulation';
-  $('switch-message').textContent = message; $('switch-message').classList.toggle('error', messageError);
+    : canRecover ? 'Check cancellation result in demo' : nextActions[operation.stage] || 'Advance simulated step';
+  $('done-button').hidden = !operation.savingSecured;
+  $('switch-message').textContent = message;
+  $('switch-message').classList.toggle('error', messageError);
 }
 function renderState(next, overview = false) {
   state = { ...next, offers: next.offers.filter(offer => offer.bookingVersion === next.booking.version) };
   reconcilePending();
   $('content').hidden = false;
-  selectedOffer = overview || state.simulation?.operation ? undefined : state.offers.find(offer => offer.offerId === (pending?.kind === 'approval' ? pending.body.offerId : state.selectedOfferId));
+  const operation = state.simulation?.operation;
+  const reviewInHistory = location.hash === '#comparison' || history.state?.view === 'review';
+  const historyOfferId = history.state?.view === 'review' ? history.state.offerId : null;
+  const reviewOfferId = pending?.kind === 'approval' ? pending.body.offerId : historyOfferId || state.selectedOfferId;
+  const pendingApproval = pending?.kind === 'approval' && !operation;
+  const showReview = pendingApproval || (!overview && reviewInHistory);
+  selectedOffer = operation || !showReview ? undefined : state.offers.find(offer => offer.offerId === reviewOfferId);
   $('booking-summary').hidden = Boolean(selectedOffer);
   $('comparison').hidden = !selectedOffer;
-  $('content').classList.toggle('has-switch', Boolean(state.simulation?.operation));
+  $('current-ticket').hidden = Boolean(operation);
+  $('content').classList.toggle('has-switch', Boolean(operation));
   document.querySelectorAll('#customer-steps li').forEach((step, index) => {
-    const current = state.simulation?.operation ? 2 : selectedOffer ? 1 : 0;
+    const current = operation ? 2 : selectedOffer ? 1 : 0;
     if (index === current) step.setAttribute('aria-current', 'step'); else step.removeAttribute('aria-current');
     step.classList.toggle('passed', index < current);
   });
@@ -332,8 +576,10 @@ async function select(offer) {
   busy = true; renderOffers();
   message = ''; messageError = false;
   try {
-    renderState(await request('/api/selection', { offerId: offer.offerId, bookingVersion: state.booking.version }));
+    const next = await request('/api/selection', { offerId: offer.offerId, bookingVersion: state.booking.version });
     lastOfferId = offer.offerId;
+    history.pushState({ view: 'review', offerId: offer.offerId }, '', '#comparison');
+    renderState(next);
     $('price-details').open = false;
     $('comparison-title').focus(); window.scrollTo({ top: 0, behavior: 'instant' }); setStatus('');
   } catch (error) { setStatus(error.message, true); if (error.status === 409) await refreshLatest(); }
@@ -341,11 +587,15 @@ async function select(offer) {
 }
 function keepBooking() {
   if (busy || pending) return;
+  const offerId = selectedOffer?.offerId || state?.selectedOfferId || lastOfferId;
   $('accept-reduced-flexibility').checked = false;
   acknowledgementKey = null;
-  $('comparison').hidden = true; $('booking-summary').hidden = false;
-  const trigger = [...document.querySelectorAll('[data-offer-id]')].find(element => element.dataset.offerId === (lastOfferId || selectedOffer?.offerId));
-  trigger?.focus(); window.scrollTo({ top: 0, behavior: 'instant' }); setStatus('');
+  history.pushState({ view: 'booking' }, '', '#booking-summary');
+  renderState(state, true);
+  const trigger = [...document.querySelectorAll('[data-offer-id]')].find(element => element.dataset.offerId === offerId);
+  (trigger || $('hotel')).focus();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  setStatus('');
 }
 async function refreshLatest(overview = false) {
   try { renderState(await request('/api/bootstrap?scenario=jury-booking'), overview); }
@@ -418,11 +668,13 @@ async function mutateWatch() {
   remember(command); busy = true; watchMessage = ''; watchError = false; renderState(state, true);
   try {
     const result = await request('/api/price-watch', command.body, { 'Idempotency-Key': command.key });
-    remember(null); renderState(result, true); watchMessage = ''; setStatus('');
+    remember(null); watchMessage = command.body.enabled ? 'Price watch is on for this demo booking.' : 'Price watch stopped.';
+    renderState(result, true); setStatus('');
     await refreshNotifications();
   } catch (error) {
     watchError = true;
     if (error.status === 409) {
+      $('watch-consent-check').checked = false;
       remember(null); await refreshLatest(true);
       watchMessage = refreshRequired ? 'Could not refresh saved watch state. Reload before continuing.' : 'The booking or watch changed. Latest values are shown; review them before trying again.';
     } else if (error.status && error.status < 500) {
@@ -435,9 +687,30 @@ $('keep-booking').addEventListener('click', keepBooking);
 $('approve-offer').addEventListener('click', () => mutate('approval'));
 $('accept-reduced-flexibility').addEventListener('change', () => { if (selectedOffer) renderComparison(); });
 $('advance-demo').addEventListener('click', () => mutate('advance'));
+$('done-button').addEventListener('click', () => {
+  $('switch-history-details').open = false;
+  $('watch-title').focus();
+  $('price-watch').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 $('watch-button').addEventListener('click', mutateWatch);
+ $('watch-consent-check').addEventListener('change', () => {
+  if (state) renderWatch(state, { busy, pending, refreshRequired, message: watchMessage, messageError: watchError, money, instant });
+});
+document.querySelectorAll('#offer-filters [data-filter]').forEach(button => {
+  button.addEventListener('click', () => {
+    offerFilter = button.dataset.filter;
+    document.querySelectorAll('#offer-filters [data-filter]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+    applyOfferFilter();
+  });
+});
+window.addEventListener('popstate', () => { if (state) renderState(state); });
 async function bootstrap() {
-  try { renderState(await request('/api/bootstrap?scenario=jury-booking')); setStatus(''); await refreshNotifications(); }
+  try {
+    if (!['#comparison', '#booking-summary'].includes(location.hash)) history.replaceState({ view: 'booking' }, '', '#booking-summary');
+    renderState(await request('/api/bootstrap?scenario=jury-booking'));
+    setStatus('');
+    await refreshNotifications();
+  }
   catch (error) {
     setStatus('Cannot load the demo booking. ' + error.message, true);
     const retry = node('button', 'Try again', 'plain');

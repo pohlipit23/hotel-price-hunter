@@ -1,9 +1,9 @@
 // Generated inspiration for the fictional jury fixture, never evidence of amenities.
 const photos = [
-  { title: 'The hotel', box: '0 0 768 512', alt: 'Illustrative hotel exterior with a sunny courtyard' },
-  { title: 'Deluxe King', box: '768 0 768 512', alt: 'Illustrative king room with white linen and a city view' },
-  { title: 'Premier King', box: '0 512 768 512', alt: 'Illustrative larger king room with a sitting area' },
-  { title: 'Garden hotel', box: '768 512 768 512', alt: 'Illustrative alternative hotel with a leafy courtyard' },
+  { title: 'Harbour exterior', box: '0 0 768 512', alt: 'Illustrative exterior image for Harbour Hotel' },
+  { title: 'Deluxe King room', box: '768 0 768 512', alt: 'Illustrative Deluxe King room image' },
+  { title: 'Premier King room', box: '0 512 768 512', alt: 'Illustrative Premier King room image' },
+  { title: 'Garden Hotel exterior', box: '768 512 768 512', alt: 'Illustrative exterior image for Garden Hotel. A room photo is not available in this demo.' },
 ];
 const namespace = 'http://www.w3.org/2000/svg';
 
@@ -14,11 +14,13 @@ export function stayPhoto(index, decorative = false) {
   const svg = document.createElementNS(namespace, 'svg');
   svg.setAttribute('viewBox', photo.box);
   svg.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+  svg.setAttribute('focusable', 'false');
   if (decorative) svg.setAttribute('aria-hidden', 'true');
   else { svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', photo.alt); }
   const image = document.createElementNS(namespace, 'image');
   image.setAttribute('href', '/assets/illustrative-stays.jpg');
   image.setAttribute('width', '1536'); image.setAttribute('height', '1024');
+  image.setAttribute('decoding', 'async');
   const fallback = document.createElement('span');
   fallback.className = 'photo-unavailable';
   fallback.textContent = 'Illustrative photo unavailable';
