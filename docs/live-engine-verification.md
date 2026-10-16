@@ -1,12 +1,20 @@
 # Private live engine integration checkpoint
 
+Current source checkpoint: the owner-selected direct gateway route is verified
+in [gateway-rate-verification.md](gateway-rate-verification.md). The engine's
+four-MiB bound is restored; the optional rooms GET has local tests only. The
+earlier engine-only counts and approval states below are historical checkpoints,
+not the current gateway connection status.
+
 16 October 2026, Asia/Kuala_Lumpur. Local adapter/runner implemented; actual
-booking and full-rate acceptance remains pending owner-selected input/access.
+booking and full-rate acceptance remains pending. Scraper credentials and a live
+availability response are now verified; detailed rates are not yet verified.
 
 ## Implemented and verified locally
 
 - `app/live-engine.mjs`: fixed HTTPS tenant allowlist, five exact read operations,
-  input validation, 45-second request deadlines, four-MiB streamed JSON limit,
+  input validation, 45-second request deadlines, four-MiB JSON limit for ordinary
+  reads and a separate sixteen-MiB local patch for full rates,
   no redirects/retries, and fixed error codes. Optional ordinary IAM sign-in uses
   only explicitly selected credentials, returns one in-memory access token and
   discards refresh/account data. No transaction operation exists in the adapter.
@@ -22,11 +30,12 @@ booking and full-rate acceptance remains pending owner-selected input/access.
   Traveler names, birthdays, contact/payment fields and credentials are omitted.
   Terminal output contains aggregate counts/gates, not real booking/rate IDs.
 
-The focused suite passes **23/23**, zero skips. Tests first failed for absent
+The focused suite contains **24 passing checks**, zero skips. Tests first failed for absent
 functionality and additional product/identifier/mapping guards, then passed after
-implementation. The complete Node suite passes **212**, zero failures, with the
-existing **six emulator integration checks skipped** (218 total). Evidence:
-`.local/live-engine/regression-final.tap`. No emulator/storage implementation was
+implementation. The complete Node suite passes **213**, zero failures, with the
+existing **six emulator integration checks skipped** (219 total). Current evidence:
+`.local/live-engine/regression-scraper-20261016.tap`; the previous
+`regression-final.tap` remains historical. No emulator/storage implementation was
 changed. Syntax and targeted whitespace checks pass. Direct CLI offline execution
 reports configuration presence and makes no network call.
 
@@ -52,12 +61,49 @@ full-rate response details remain underspecified. The shared currency schema's
 mapping gates until selected-tenant responses are inspected; no alias, monetary
 conversion, refund, timezone or fulfilment guarantee was inferred.
 
-## Pending live acceptance
+## Scraper credential and availability check
 
-The follow-up request asks for one authorised standalone single-room Demo.apps
-booking and confirmation of the existing local credential source (proposed:
-`C:/Users/pohli/Sites/scraper/.env`). The owner has selected the tenant only so far.
-No IAM login or authenticated booking/search/rates call was attempted.
+The owner explicitly authorised `C:/Users/pohli/Sites/scraper/.env`. One normal-host
+execution from `2026-10-16T10:06:56.359Z` to `10:07:15.662Z` authenticated through
+the configured IAM and obtained a Demo.apps availability response containing the
+requested hotel. Credentials/tokens stayed in memory and were not printed/saved.
+
+This was a source-only test: Four Seasons Hotel Kuala Lumpur, catalogue ID
+`21122615` verified in the scraper catalogue, 12–15 November 2026, MYR, one room,
+two test adults aged 18 (the scraper's test default), no children/infants. These
+are explicit test-search facts, not a retrieved customer's booking/occupancy.
+The scraper smoke file's 15–16 October stay was not reused as a current booking.
+No original booking was compared and no saving/refund claim follows.
+
+The subsequent detailed-rates request exceeded the four-MiB streamed-body guard.
+It was refused before JSON parsing; no complete rate body or rate count was
+obtained. The safe historical summary is
+`.local/live-engine/demo-source-only-summary-20261016.json`. Its `rates` flag
+remained `not-attempted` because the old script assigned success only after
+parsing; the `RESPONSE_TOO_LARGE` reason establishes that a rate request was
+actually attempted. It must not be interpreted as zero rate requests.
+
+The local patch accepts rate JSON above four MiB with a sixteen-MiB hard limit,
+while other operations retain four MiB. A failing-then-passing regression covers
+both successful larger JSON and oversized advertised/actual rate bodies. This
+is an ingestion ceiling, not a payload-size optimization. A repeat live command
+was rejected in the approval prompt before process creation; it made no further
+calls. No live retest, new sign-in, booking probe or alternate access path followed.
+
+## Pending live acceptance and response shape
+
+The comparison draft still reconstructs canonical per-offer context for the
+existing decision core and repeats hotel/stay/occupancy in its private output.
+The owner questioned that size. The proposed smaller external shape is shared
+context once plus compact room/board/price/cancellation offer rows, with opaque
+engine references private and a short filtered list for a future customer view.
+That projection has not been implemented or browser-verified. The rejected raw
+rate response has not been inspected, so the cause of its upstream size is
+unknown. Smaller application output would not itself reduce upstream bytes.
+
+Full-rate inspection/retest remains stopped after the approval rejection. A
+separate owner-selected standalone single-room booking is still required to
+verify retrieval and actual original-versus-replacement comparisons.
 
 After the owner supplies that context, verify the actual hotel timezone, execute
 the bounded read pipeline, resolve current response mappings from evidence and

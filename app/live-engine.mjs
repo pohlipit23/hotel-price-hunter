@@ -6,6 +6,7 @@ const operations = Object.freeze({
   retrieve: ['POST', '/v2/shopping/hotels/book/retrieve'],
   search: ['POST', '/v2/products/hotels/availabilities'],
   rates: ['POST', '/v2/products/hotels/availabilities/rates'],
+  rooms: ['GET', '/products/hotels/rooms'],
 });
 export class LiveEngineError extends Error {
   constructor(code, httpStatus) {
@@ -23,6 +24,16 @@ export const civilDate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{
 export function validateEngineInput(operation, input) {
   if (['lookup', 'detail', 'retrieve'].includes(operation)) return exactKeys(input, ['booking_code']) && text(input.booking_code);
   if (operation === 'rates') return exactKeys(input, ['search_id', 'hotel_id']) && text(input.search_id) && text(input.hotel_id);
+  if (operation === 'rooms') {
+    const required = ['hotel_id', 'search_id', 'language_code', 'page', 'per_page', 'sort'];
+    const optional = ['room_id', 'board_basis_codes', 'source_ids', 'search_text', 'cache'];
+    return record(input) && required.every(key => Object.hasOwn(input, key)) && Object.keys(input).every(key => [...required, ...optional].includes(key))
+      && text(input.hotel_id) && text(input.search_id) && input.language_code === 'en-US'
+      && Number.isInteger(input.page) && input.page >= 1 && input.page <= 100
+      && Number.isInteger(input.per_page) && input.per_page >= 1 && input.per_page <= 10
+      && ['price', 'name'].includes(input.sort) && (!Object.hasOwn(input, 'cache') || typeof input.cache === 'boolean')
+      && optional.filter(key => key !== 'cache').every(key => !Object.hasOwn(input, key) || text(input[key]));
+  }
   if (operation !== 'search' || !exactKeys(input, ['checkin_date', 'checkout_date', 'currency_code', 'language_code', 'hotel_ids', 'rooms', 'timeout'])) return false;
   if (!civilDate(input.checkin_date) || !civilDate(input.checkout_date) || input.checkin_date >= input.checkout_date
     || !Intl.supportedValuesOf('currency').includes(input.currency_code) || input.language_code !== 'en-US'
@@ -87,7 +98,7 @@ export function createLiveEngine({ baseUrl, token, authorised, fetchImpl = fetch
       if (!Object.hasOwn(operations, operation)) fail('OPERATION_DENIED');
       if (!validateEngineInput(operation, input)) fail('INVALID_INPUT');
       const [method, path] = operations[operation]; const url = new URL(baseUrl + path);
-      if (method === 'GET') url.searchParams.set('booking_code', input.booking_code);
+      if (method === 'GET') for (const [key, value] of Object.entries(input)) url.searchParams.set(key, String(value));
       try {
         const response = await fetchImpl(url, { method, redirect: 'error', signal: AbortSignal.timeout(45000),
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' },

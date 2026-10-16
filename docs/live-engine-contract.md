@@ -1,5 +1,10 @@
 # Private live engine comparison
 
+Current rate-source direction: the owner selected direct Supplier Gateway calls.
+That path is now verified; see [gateway-rate-contract.md](gateway-rate-contract.md)
+and [gateway-rate-verification.md](gateway-rate-verification.md). This document
+retains the separate original-booking/engine comparison proposal and history.
+
 16 October 2026. Approved direction: read one owner-authorised standalone,
 single-room booking and compare full live EasyGDS rates before enabling a schedule.
 
@@ -28,6 +33,10 @@ one single-hotel availability request and one full-rates request. Fixed HTTPS
 tenant origins, exact input schemas, request deadlines, bounded JSON responses,
 no redirects, and no automatic retries constrain the external boundary. Supplier
 errors produce fixed codes rather than raw response bodies or request URLs.
+An actual Demo.apps full-rate body exceeded four MiB. A temporary local
+sixteen-MiB draft was superseded by the owner-directed direct gateway path and
+removed; engine reads retain four MiB. Optional paged engine rooms transport is
+locally tested, but no live acceptance is claimed for it.
 
 Preserve opaque search/hotel/offer/supplier/source/contract/room identifiers in
 private memory. Strip traveler names, contact/payment data and credentials from
