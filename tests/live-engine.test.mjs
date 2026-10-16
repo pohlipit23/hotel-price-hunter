@@ -1,0 +1,81 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createLiveEngine, LiveEngineError } from '../app/live-engine.mjs';
+
+const baseUrl = 'https://bonus.apps.easygds.com/api';
+const token = 'test-private-bearer';
+const search = () => ({ checkin_date: '2026-11-12', checkout_date: '2026-11-15',
+  currency_code: 'USD', language_code: 'en-US', hotel_ids: ['opaque-hotel'],
+  rooms: [{ idx: 1, adults: [35, 37], children: [8], infants: [] }], timeout: 15000 });
+const response = value => new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } });
+
+test('live engine requires explicit authority, token and a fixed HTTPS tenant before any request', () => {
+  for (const patch of [{ authorised: false }, { token: '' }, { token: 'x\r\nsecret' },
+    { baseUrl: 'http://bonus.apps.easygds.com/api' }, { baseUrl: 'https://bonus.apps.easygds.com.evil/api' },
+    { baseUrl: 'https://user:pass@bonus.apps.easygds.com/api' }, { baseUrl: `${baseUrl}/../api` }]) {
+    assert.throws(() => createLiveEngine({ baseUrl, token, authorised: true, ...patch }), LiveEngineError);
+  }
+});
+
+test('only read operations are possible and an opaque booking code is encoded intact', async () => {
+  const requests = [];
+  const engine = createLiveEngine({ baseUrl, token, authorised: true, fetchImpl: async (url, options) => {
+    requests.push({ url: new URL(url), options }); return response({ booking_code: 'opaque/$?&code' });
+  } });
+  for (const op of ['auth', 'prebook', 'book', 'cancel', 'refund', '../book', '__proto__']) {
+    await assert.rejects(engine.read(op, { booking_code: 'x' }), { code: 'OPERATION_DENIED' });
+  }
+  assert.equal(requests.length, 0);
+  await engine.read('detail', { booking_code: 'opaque/$?&code' });
+  assert.equal(requests[0].url.pathname, '/api/bookings');
+  assert.equal(requests[0].url.searchParams.get('booking_code'), 'opaque/$?&code');
+  assert.equal(requests[0].options.method, 'GET');
+  assert.equal(requests[0].options.redirect, 'error');
+  assert.equal(requests[0].options.headers.Authorization, `Bearer ${token}`);
+  assert.ok(requests[0].options.signal instanceof AbortSignal);
+});
+
+test('single-hotel search preserves exact dates and every occupancy age', async () => {
+  let body;
+  const engine = createLiveEngine({ baseUrl, token, authorised: true,
+    fetchImpl: async (_url, options) => { body = JSON.parse(options.body); return response({ search_id: 'opaque-search' }); } });
+  await engine.read('search', search());
+  assert.deepEqual(body, search());
+});
+
+test('invalid dates, ages, extra keys and multiroom searches are refused without network work', async () => {
+  let calls = 0;
+  const engine = createLiveEngine({ baseUrl, token, authorised: true,
+    fetchImpl: async () => { calls++; return response({}); } });
+  for (const patch of [{ checkin_date: '2026-02-30' }, { checkout_date: '2026-11-12' },
+    { currency_code: 'ZZZ' }, { hotel_ids: ['a', 'b'] }, { extra: true },
+    { rooms: [{ idx: 1, adults: [30], children: [-1], infants: [] }] },
+    { rooms: [{ idx: 1, adults: [5], children: [], infants: [] }] },
+    { rooms: [{ idx: 1, adults: [30], children: [null], infants: [] }] },
+    { rooms: [{ idx: 1, adults: [30], children: [], infants: [], name: 'PRIVATE' }] },
+    { rooms: [search().rooms[0], search().rooms[0]] }]) {
+    await assert.rejects(engine.read('search', { ...search(), ...patch }), { code: 'INVALID_INPUT' });
+  }
+  await assert.rejects(engine.read('rates', { search_id: 'a', hotel_id: 'b', token: 'x' }), { code: 'INVALID_INPUT' });
+  assert.equal(calls, 0);
+});
+
+test('provider failures never include raw bodies, credentials, booking codes or exception messages', async () => {
+  for (const fetchImpl of [async () => new Response('PRIVATE server body', { status: 403 }),
+    async () => { throw new Error(`PRIVATE ${token}`); },
+    async () => new Response('<html>PRIVATE</html>', { headers: { 'content-type': 'text/html' } }),
+    async () => new Response('{PRIVATE', { headers: { 'content-type': 'application/json' } })]) {
+    const engine = createLiveEngine({ baseUrl, token, authorised: true, fetchImpl });
+    await assert.rejects(engine.read('lookup', { booking_code: 'PRIVATE' }), error => {
+      assert.ok(error instanceof LiveEngineError);
+      assert.doesNotMatch(JSON.stringify(error) + error.message + error.stack, /PRIVATE|test-private-bearer/);
+      return true;
+    });
+  }
+});
+
+test('oversized JSON is refused before parsing and no response object is returned', async () => {
+  const engine = createLiveEngine({ baseUrl, token, authorised: true,
+    fetchImpl: async () => new Response('x'.repeat(4 * 1024 * 1024 + 1), { headers: { 'content-type': 'application/json' } }) });
+  await assert.rejects(engine.read('rates', { search_id: 'a', hotel_id: 'b' }), { code: 'RESPONSE_TOO_LARGE' });
+});
