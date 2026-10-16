@@ -256,7 +256,7 @@ function offerCard(offer, index, compact = false, biggest = false) {
     if (saving.available) {
       const stamp = node('div', undefined, 'saving-stamp offer-stamp');
       stamp.id = 'offer-saving-' + offer.offerId;
-      addStamp(stamp, saving.minor, quote.currency, biggest ? 'Biggest' : 'Price drop', 'offer-stamp' + (biggest ? ' biggest-stamp' : ''));
+      addStamp(stamp, saving.minor, quote.currency, biggest ? 'Biggest' : 'Drop', 'offer-stamp' + (biggest ? ' biggest-stamp' : ''));
       photo.append(stamp);
     }
     article.append(photo);
