@@ -80,3 +80,18 @@ Release evidence and the previous image/configuration for recovery are under
 `cloud-before.json`, `cloud-after.json`, `registry-result.json`,
 `deployment-request.json`, `deployment-result.json` and `live-browser/result.json`.
 Confirmation still creates no actual reservation, cancellation, payment or refund.
+
+## Drop-card badge removal
+
+The owner requested removal of the room-detail verification label. Source
+`cae2b32f763b318793b064d8f680d86fb285e427` omits the unverified photo badge; review
+details and all data/eligibility handling are unchanged. Published revision
+`hotel-price-hunter-00014-p9g` receives full traffic. Image index:
+`sha256:107c79148e2482bda21d411c4592aba0db0c7e8890f4244cc36773ada591bd36`.
+Only the card script differs in the frozen context; the display snapshot and all
+other packaged files are identical. Network-disabled container confirmation and
+local/live 320/768/1440 browser checks passed, explicitly asserting zero photo
+category badges and absence of the removed text. Savings, review, consent,
+confirmation, reload and return focus still pass with no browser errors. Runtime
+and public-access settings were preserved and the agency configuration is
+unchanged. Evidence: `.local/booking-release-8bbfc97a-469e-44fd-90f5-ff9fef23d23d/`.
