@@ -1,4 +1,43 @@
-# Private quotation-demo Cloud Run release
+# Quotation-demo Cloud Run release
+
+## Current access: public, 17 October 2026
+
+The owner explicitly authorized public exposure of the existing DEMOP010223 demo,
+including its hotel, dates, occupancy, room details, quotation price, supplier rates
+and currency conversion. The customer URL is now public:
+https://hotel-price-hunter-2qbcpylngq-as.a.run.app/.
+This section supersedes the initial private-access boundary recorded below.
+
+The customer service was updated with `--no-iap --no-invoker-iam-check`. The
+customer's obsolete IAP-agent invoker binding was removed by gcloud; no `allUsers`
+or project-wide grant was added. The agency service retains IAP, its invoker check
+and its original Run/IAP bindings. Anonymous agency access still redirects to
+Google sign-in.
+
+Verification at 04:14 UTC confirmed anonymous HTTP 200 responses for the customer
+page, quotation API and `/health`, the expected three-option snapshot, Secure
+session cookie, and denied transaction/private-snapshot routes. Live isolated
+Chromium checks passed at 320, 768 and 1440 pixels for options, review,
+acknowledgements, reduced-flexibility consent, confirmation and reload. There
+were no page/console errors or external requests. The desktop confirmation was
+visually inspected. Confirmations reported `reservationCreated:false` and
+`quoteModified:false`.
+
+The image, entire customer runtime specification, ready revision
+`hotel-price-hunter-00012-6sx` and full traffic allocation are unchanged. The agency
+configuration and its access policies are unchanged. No application rebuild,
+supplier call, recurring check or persistent booking-data write was performed.
+Only the approved display snapshot is served; credentials, guest/contact data
+and actionable supplier references remain excluded.
+
+Access-change evidence and recovery policies are retained under ignored
+`.local/quotation-public-access-20261017/`, including `before.json`, `after.json`,
+`verification.json` and `browser/result.json`. Restoring private access requires
+reenabling customer IAP and the invoker check, with its original IAP-agent invoker
+binding restored from the retained policy. Agency access is outside that recovery
+operation.
+
+## Initial private publication history
 
 The owner requested publication of the latest version. This release updates the
 existing private customer Cloud Run service to the quotation-backed, selection-only
