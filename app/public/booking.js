@@ -255,7 +255,7 @@ function offerCard(offer, highlight, overlap) {
   article.append(pick);
   const photo = node('div', undefined, 'offer-photo');
   photo.append(stayPhoto(offerPhotoIndex(offer), Boolean(state.bookingDemo)), node('span', 'Illustrative photo', 'photo-tag'));
-  photo.append(categoryBadge(offer, 'photo-category'));
+  if (category !== 'unverified') photo.append(categoryBadge(offer, 'photo-category'));
   if (saving.available) {
     const stamp = node('div', undefined, 'saving-stamp offer-stamp');
     stamp.id = 'offer-saving-' + suffix;
