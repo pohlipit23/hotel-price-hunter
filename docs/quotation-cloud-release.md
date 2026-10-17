@@ -1,5 +1,10 @@
 # Quotation-demo Cloud Run release
 
+The customer interface was subsequently restored to the original RoomDrop booking
+screens. Current UI, source/image pins and live acceptance are recorded in
+[`booking-ui-restoration.md`](booking-ui-restoration.md). The records below retain
+the initial deployment and public-access history.
+
 ## Current access: public, 17 October 2026
 
 The owner explicitly authorized public exposure of the existing DEMOP010223 demo,

@@ -40,4 +40,43 @@ routes and CSRF/origin-protected confirmation. Local browser acceptance covers
 keyboard entry, cancellation acknowledgement, confirmation, reload and return
 focus. Detailed local evidence is under `.local/restore-booking-ui/`.
 
-Release and live verification results are recorded after deployment.
+## Published and verified
+
+Published to https://hotel-price-hunter-2qbcpylngq-as.a.run.app/ on 17 October 2026.
+Source: `0fcbbeb059140ece8536f909181978e19ae34067`.
+Ready revision: `hotel-price-hunter-00013-dv9`, receiving 100% of traffic.
+Image index: `sha256:dbcc7dfbb65a87723ea7748b0e800df865ccf0642d6d75387be98deb4b41979c`.
+Runtime child: `sha256:fcb8c95c5c5899a8b27958f04ed95faada915d7235a706ce7096c31e1086a83f`.
+Context SHA-256: `cbd838db31051d1edb9d4a54185251d82f466ec2b0a553307ade3cf5692ad212`.
+Display snapshot SHA-256: `8fe12f79f9910d9ca9123ff2069d349f3e11909c1e1f36d9708539663fb5f6f4`.
+
+The local regression passed 263 tests with six existing skips and zero failures.
+The original six-width in-memory UI acceptance flow also passed. Focused HTTP and
+display tests plus three-width browser acceptance passed against the exact frozen
+source, excluding unrelated working-tree code. The image passed a read-only,
+network-disabled container smoke including confirmation with no reservation or
+record modification. Independent registry manifest/config bytes verified its
+source/context/snapshot labels and default booking entry point. Isolated upload
+credentials were removed and the global Docker configuration remained unchanged.
+
+Live anonymous browser acceptance passed at 320, 768 and 1440 pixels: real drop
+cards and saving stamps, review, cancellation acknowledgement, confirmation,
+reload and return focus. No page/console errors or external requests occurred.
+Customer text contained no source-record type terminology or fictional-record
+labels. Mobile drop cards and review, and desktop drop cards, were visually
+inspected. The displayed estimated savings are AED 217.55, AED 7.82 and AED 207.34.
+
+Final cloud verification at 13:01 UTC confirmed the approved runtime digest,
+ready revision/full traffic and anonymous HTTP 200 root/API/health. Only the image
+and revision nonce differ in the customer service specification. Public access,
+agency configuration/policies, project IAM, watch job, absent Scheduler and saved
+data fingerprints are unchanged. The registry upload timestamp and Firestore's
+moving retention timestamp/etag are the same documented observation exclusions.
+The retained organization-IAM read limitation remains a scope limitation of the
+metadata audit; public browser acceptance is recorded independently.
+
+Release evidence and the previous image/configuration for recovery are under
+`.local/booking-release-17b24688-3554-462c-91ed-f50be0b43ae4/`, including
+`cloud-before.json`, `cloud-after.json`, `registry-result.json`,
+`deployment-request.json`, `deployment-result.json` and `live-browser/result.json`.
+Confirmation still creates no actual reservation, cancellation, payment or refund.
