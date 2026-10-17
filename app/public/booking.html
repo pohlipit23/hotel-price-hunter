@@ -31,25 +31,21 @@
 
         <section id="booking-summary" aria-labelledby="hotel">
           <article id="current-ticket" class="ticket current-ticket">
-            <div class="ticket-photo">
-              <div id="booking-photo"></div>
-              <span class="photo-tag">Illustrative photo</span>
-              <div id="best-drop" class="saving-stamp featured-stamp" hidden></div>
-            </div>
-            <div class="ticket-tear" aria-hidden="true"></div>
             <div class="ticket-caption">
               <div class="ticket-main">
                 <p id="booking-label" class="eyebrow">Your current booking</p>
-                <h1 id="hotel"></h1>
-                <p id="room" class="muted"></p>
+                <h1 id="hotel" tabindex="-1"></h1>
                 <p id="stay" class="muted"></p>
-                <p id="guests" class="muted"></p>
-                <p id="current-booking-summary" class="muted" hidden></p>
               </div>
               <div class="ticket-price">
                 <strong id="booking-total"></strong>
                 <span id="booking-total-caption">Whole stay</span>
               </div>
+              <details id="booking-details" class="booking-details">
+                <summary>Room &amp; guests</summary>
+                <p id="room" class="muted"></p>
+                <p id="guests" class="muted"></p>
+              </details>
             </div>
           </article>
 
@@ -109,19 +105,8 @@
                 <p class="savings-explanation">Potential refund after fees · for the whole stay</p>
               </div>
             </div>
-            <div id="offer-filters" class="offer-filters" role="group" aria-label="Filter offers">
-              <button type="button" data-filter="all" aria-pressed="true">All drops</button>
-              <button type="button" data-filter="match" aria-pressed="false">Same room</button>
-              <button type="button" data-filter="room" aria-pressed="false">Other room</button>
-              <button type="button" data-filter="hotel" aria-pressed="false">New hotel</button>
-            </div>
-            <p id="filter-status" class="sr-only" role="status" aria-live="polite"></p>
             <div id="offers" class="offers"></div>
             <p id="offer-empty" class="empty-offers" hidden></p>
-            <details id="lower-rate" class="lower-rate">
-              <summary>Lower price · no free cancellation</summary>
-              <div id="lower-rate-offer"></div>
-            </details>
           </section>
 
           <section id="price-watch" class="price-watch" aria-labelledby="watch-title" aria-busy="false">
@@ -134,17 +119,15 @@
               </div>
             </div>
             <div id="watch-consent" class="watch-consent">
-              <p class="consent-title">Before you turn on the price watch</p>
+              <p class="consent-title">Daily checks. Your choice to switch.</p>
               <ul>
-                <li>Daily simulated checks for these dates and guests</li>
                 <li id="watch-consent-threshold">Offers must meet the saved minimum</li>
                 <li id="watch-consent-frequency">Weekly update previews in this demo</li>
-                <li>Preview records only · no email is sent</li>
-                <li>Nothing switches without your separate approval</li>
+                <li>No email sent. Every switch needs separate approval.</li>
               </ul>
               <label for="watch-consent-check">
                 <input id="watch-consent-check" type="checkbox">
-                <span>I agree to daily simulated price checks and update previews for this demo booking.</span>
+                <span>I agree to daily simulated checks for these dates and guests, and saved update previews.</span>
               </label>
             </div>
             <button id="watch-button" class="watch-button" type="button" disabled>Turn on price watch</button>
@@ -191,6 +174,7 @@
           <section class="change-facts" aria-labelledby="what-changes-title">
             <h2 id="what-changes-title">What changes</h2>
             <div id="change-facts-grid" class="fact-grid"></div>
+            <div id="cancellation-summary" class="cancellation-summary"></div>
           </section>
 
           <details id="price-details" class="price-details">
@@ -200,12 +184,13 @@
           </details>
 
           <section id="flexibility-warning" class="flexibility-warning" aria-labelledby="flexibility-title" hidden>
-            <h2 id="flexibility-title">This rate cannot be cancelled for a refund</h2>
+            <h2 id="flexibility-title">Final drop · Non-refundable</h2>
+            <p class="small">No free cancellation. If your plans change, you may not get your money back.</p>
             <label class="flexibility-consent" for="accept-reduced-flexibility">
               <input id="accept-reduced-flexibility" type="checkbox">
-              <span>I understand this stay has no free cancellation and I may not get money back if my plans change.</span>
+              <span>I understand this stay has no free cancellation and price watch ends when it becomes active.</span>
             </label>
-            <p id="flexibility-watch-note" class="small">Price watch ends if this booking becomes active.</p>
+            <p id="flexibility-watch-note" class="small">This is the final drop. Price watch ends if this booking becomes active.</p>
           </section>
 
           <section class="approval-explainer" aria-labelledby="approval-title">
@@ -219,9 +204,11 @@
           </section>
 
           <p id="review-message" role="status" class="inline-message"></p>
-          <p id="approve-help" class="approve-help" hidden></p>
           <div class="review-actions">
-            <button id="approve-offer" class="primary" type="button">Approve switch</button>
+            <div class="review-total"><span>Drop after fees</span><strong id="review-saving"></strong></div>
+            <button id="approve-offer" class="primary" type="button" aria-describedby="approve-help">Approve switch</button>
+            <p id="approve-help" class="approve-help" hidden></p>
+            <button id="review-consent-link" class="plain consent-jump" type="button" hidden>Review cancellation terms to approve</button>
             <button id="keep-booking" class="plain" type="button">Keep my booking</button>
           </div>
         </section>

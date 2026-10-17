@@ -37,7 +37,8 @@ export function renderWatch(state, { busy, pending, refreshRequired, message, me
   const checkbox = $('watch-consent-check');
   const consent = $('watch-consent');
   const command = pending?.kind === 'watch' ? pending : null;
-  const consentIntent = !watch.enabled && watch.status !== 'ended';
+  const finalDrop = state.booking?.cancellation?.refundability === 'non-refundable';
+  const consentIntent = !finalDrop && !watch.enabled && watch.status !== 'ended';
   consent.hidden = !consentIntent;
   if (!consentIntent) checkbox.checked = false;
   const minimum = state.preferences?.minimumSavingMinor;
@@ -58,7 +59,8 @@ export function renderWatch(state, { busy, pending, refreshRequired, message, me
             : watch.status === 'ended' ? 'Price watch ended.' : 'Price watch status unavailable.';
   const reason = latestFailed ? reasonText(watch.lastCheck.reasonCodes)
     : watch.reason && !ordinaryReason ? reasonText([watch.reason]) : '';
-  const status = baseStatus + (reason ? ' ' + reason : '') + ' ' + cadence(state.preferences?.notificationFrequency) + '. Nothing switches without separate approval.';
+  const status = finalDrop ? 'Final drop. Price watch has ended for this non-refundable stay.'
+    : baseStatus + (reason ? ' ' + reason : '') + ' ' + cadence(state.preferences?.notificationFrequency) + '. Nothing switches without separate approval.';
   $('watch-status').textContent = status + (message ? ' ' + message : '');
   $('watch-status').classList.toggle('error', messageError);
 
@@ -87,10 +89,10 @@ export function renderWatch(state, { busy, pending, refreshRequired, message, me
   const hasCommand = Boolean(command);
   button.setAttribute('aria-pressed', String(watch.enabled));
   button.disabled = busy || refreshRequired || Boolean(pending && !command)
-    || (!hasCommand && (!intent || (!watch.enabled && watch.status === 'ended') || (!watch.enabled && !checkbox.checked)));
+    || (!hasCommand && (!intent || (!watch.enabled && (finalDrop || watch.status === 'ended')) || (!watch.enabled && !checkbox.checked)));
   button.classList.toggle('stopping', watch.enabled && !command);
   button.textContent = busy && command ? 'Saving price watch…' : command ? 'Retry the same watch action'
-    : watch.enabled ? 'Stop price watch' : watch.status === 'ended' ? 'Price watch ended' : 'Turn on price watch';
+    : watch.enabled ? 'Stop price watch' : finalDrop || watch.status === 'ended' ? 'Price watch ended' : 'Turn on price watch';
 }
 export function renderNotificationPreviews(data, { instant, error = '' }) {
   const records = (data?.notifications || []).filter(record => record.deliveryMode === 'preview-only' && record.isSimulated === true);

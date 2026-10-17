@@ -21,3 +21,14 @@ export function isPriceDrop(booking, offer) {
   return Number.isSafeInteger(old?.totalMinor) && Number.isSafeInteger(next?.totalMinor)
     && next.totalMinor >= 0 && old.currency === next.currency && next.totalMinor < old.totalMinor;
 }
+
+export function bestDropHighlights(booking, offers) {
+  const ranked = offers.filter(offer => offer.bookingVersion === booking.version && refundPresentation(offer).available)
+    .toSorted((a, b) => refundPresentation(b).minor - refundPresentation(a).minor);
+  const sameHotel = offer => Boolean(booking.hotel?.id) && offer.hotel?.id === booking.hotel.id;
+  return [
+    { key: 'overall', label: 'Best drop', offer: ranked[0] },
+    { key: 'hotel', label: 'Best in the same hotel', offer: ranked.find(sameHotel) },
+    { key: 'room', label: 'Best in the same room', offer: ranked.find(offer => sameHotel(offer) && offer.category === 'equivalent' && offer.equivalence === 'verified') },
+  ];
+}

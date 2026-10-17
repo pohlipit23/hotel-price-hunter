@@ -1,0 +1,50 @@
+import { execFileSync } from 'node:child_process';
+import { readFile, writeFile, mkdir, realpath } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { resolve, dirname, relative, isAbsolute, sep } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { deploymentQuotationSnapshot } from '../app/quotation-demo-server.mjs';
+
+const sourceFiles = ['app/booking-cloud.mjs','app/booking-demo-server.mjs','app/quotation-demo-server.mjs',
+'app/domain/quotation-demo.mjs','app/domain/live-comparison.mjs','app/domain/decision.mjs','app/domain/money.mjs','app/live-engine.mjs',
+'app/public/booking.html','app/public/booking.css','app/public/booking.js','app/public/booking-live.js','app/public/booking-live-data.js',
+'app/public/pricing.js','app/public/watch.js','app/public/stay-photos.js',
+'app/public/assets/roomdrop-logo.png','app/public/assets/roomdrop-key-icon.png','app/public/assets/illustrative-stays.jpg'];
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+export async function main(args = process.argv.slice(2), { root = fileURLToPath(new URL('../', import.meta.url)) } = {}) {
+  if (!args.includes('--prepare')) return { status: 'offline', requirements: ['--prepare', '--source=exact-commit', '--snapshot=private-.local-file'] };
+  if (args.some(arg => arg !== '--prepare' && !arg.startsWith('--source=') && !arg.startsWith('--snapshot='))
+    || new Set(args.map(arg => arg.split('=')[0])).size !== args.length) throw Error('INVALID_RELEASE_ARGUMENTS');
+  const source = args.find(arg => arg.startsWith('--source='))?.slice(9); const input = args.find(arg => arg.startsWith('--snapshot='))?.slice(11);
+  if (!/^[a-f0-9]{40}$/.test(source ?? '') || !input) throw Error('EXACT_RELEASE_INPUT_REQUIRED');
+  const workspace = await realpath(root); const local = resolve(workspace, '.local');
+  if (await realpath(local) !== local) throw Error('PRIVATE_RELEASE_ROOT_REQUIRED');
+  const path = await realpath(resolve(workspace, input)); const part = relative(local, path);
+  if (!part || part === '..' || part.startsWith('..' + sep) || isAbsolute(part)) throw Error('PRIVATE_SNAPSHOT_REQUIRED');
+  const snapshot = deploymentQuotationSnapshot(JSON.parse(await readFile(path, 'utf8')));
+  const git = command => execFileSync('git', command, { cwd: workspace, windowsHide: true, maxBuffer: 16 * 1024 * 1024 });
+  if (git(['rev-parse', `${source}^{commit}`]).toString().trim() !== source) throw Error('SOURCE_COMMIT_UNAVAILABLE');
+  const directory = resolve(local, `booking-release-${randomUUID()}`); const context = resolve(directory, 'context');
+  await mkdir(context, { recursive: true }); const files = [];
+  for (const name of sourceFiles) {
+    const bytes = git(['show', `${source}:${name}`]); const target = resolve(context, name); await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, bytes, { flag: 'wx' }); files.push({ path: name, sha256: hash(bytes), bytes: bytes.length });
+  }
+  const dockerfile = git(['show', `${source}:Dockerfile.booking`]); await writeFile(resolve(context, 'Dockerfile'), dockerfile, { flag: 'wx' });
+  files.push({ path: 'Dockerfile', sha256: hash(dockerfile), bytes: dockerfile.length });
+  const bytes = Buffer.from(JSON.stringify(snapshot) + '\n'); await writeFile(resolve(context, 'booking-demo.json'), bytes, { flag: 'wx' });
+  files.push({ path: 'booking-demo.json', sha256: hash(bytes), bytes: bytes.length });
+  files.sort((a, b) => a.path.localeCompare(b.path)); const contextSha256 = hash(JSON.stringify(files));
+  const manifest = { sourceCommit: source, contextSha256, snapshotSha256: hash(bytes), snapshotVersion: snapshot.snapshotVersion,
+    contextDirectory: context, privateSnapshot: path, uncommittedFilesExcluded: true, files,
+    localImageTag: `roomdrop-booking:${source.slice(0, 12)}-${contextSha256.slice(0, 12)}`,
+    registry: 'asia-southeast1-docker.pkg.dev/sincere-apex-511418-p0/hotel-price-hunter/roomdrop',
+    registryTag: `booking-${source.slice(0, 12)}-${contextSha256.slice(0, 12)}` };
+  const manifestPath = resolve(directory, 'manifest.json'); await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n', { flag: 'wx' });
+  return { status: 'prepared-offline', manifestPath, sourceCommit: source, contextSha256, snapshotSha256: manifest.snapshotSha256,
+    contextDirectory: context, localImageTag: manifest.localImageTag };
+}
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
+  try { console.log(JSON.stringify(await main(), null, 2)); }
+  catch (error) { console.error(JSON.stringify({ status: 'blocked', code: /^[A-Z_]+$/.test(error.message) ? error.message : 'RELEASE_PREPARATION_FAILED' })); process.exitCode = 1; }
+}

@@ -1,10 +1,9 @@
 /* RoomDrop postcard. Saved server facts and approvals are the only execution authority. */
 'use strict';
-import { refundPresentation } from './pricing.js';
+import { refundPresentation, bestDropHighlights } from './pricing.js';
 import { stayPhoto, offerPhotoIndex } from './stay-photos.js';
 import { renderWatch, renderNotificationPreviews } from './watch.js';
 const $ = id => document.getElementById(id);
-const customerOffers = ['DEMO_EQUIVALENT', 'DEMO_DIFFERENT_ROOM', 'DEMO_DIFFERENT_HOTEL'];
 const pendingKey = 'roomdrop-selected-command-v1';
 const labels = { boardBasis: 'Meals', bedType: 'Bed type', nonSmoking: 'Non-smoking', accessible: 'Accessible room', view: 'View', roomSizeSqm: 'Room size (m²)' };
 const stages = {
@@ -42,7 +41,8 @@ const reasonCopy = {
   INVALID_PREFERENCES: 'Saved stay requirements could not be verified.', INVALID_CHECK_TIME: 'The check time could not be verified.',
   UNSUPPORTED_BOOKING_SCOPE: 'This booking cannot use the demo switch.'
 };
-let state, selectedOffer, lastOfferId, offerFilter = 'all', busy = false, refreshRequired = false;
+let state, selectedOffer, lastOfferId, busy = false, refreshRequired = false;
+let liveSelect;
 let pending = loadPending();
 let message = '', messageError = false;
 let watchMessage = '', watchError = false, notifications = { notifications: [] };
@@ -52,6 +52,17 @@ function node(tag, text, className) {
   if (text !== undefined) element.textContent = text;
   if (className) element.className = className;
   return element;
+}
+function setActionContent(button, label) {
+  button.classList.add('room-key-action');
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  icon.setAttribute('viewBox', '0 0 48 24');
+  icon.setAttribute('aria-hidden', 'true'); icon.setAttribute('focusable', 'false');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('fill-rule', 'evenodd');
+  path.setAttribute('d', 'M7 2h8a6 6 0 0 1 6 6v1h26v12h-5v-7h-4v7h-5v-7h-4v7h-5v-7h-3v2a6 6 0 0 1-6 6H7a6 6 0 0 1-6-6V8a6 6 0 0 1 6-6Zm0 6v8h8V8H7Z');
+  icon.append(path);
+  button.replaceChildren(icon, node('span', label, 'action-label'));
 }
 function money(minor, currency = state?.currency?.code || 'USD') {
   if (!Number.isSafeInteger(minor)) return 'Not verified';
@@ -91,7 +102,7 @@ function deadline(record) {
 function stayText(record) {
   const date = value => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(value + 'T00:00:00Z'));
   const nights = Math.round((Date.parse(record.stay.checkout) - Date.parse(record.stay.checkin)) / 86400000);
-  return date(record.stay.checkin) + ' - ' + date(record.stay.checkout) + ' · ' + nights + ' nights';
+  return date(record.stay.checkin) + ' - ' + date(record.stay.checkout) + ' · ' + nights + (nights === 1 ? ' night' : ' nights');
 }
 function guestText(record) {
   const o = record.occupancy;
@@ -121,7 +132,7 @@ function categoryKey(offer) {
 }
 function categoryText(offer) {
   return ({ match: 'Same room', room: 'Other room', hotel: 'New hotel',
-    nonref: offer.category === 'equivalent' && offer.equivalence === 'verified' ? 'Non-refundable · same room' : 'Non-refundable offer',
+    nonref: 'Final drop',
     unverified: 'Room details not verified' })[categoryKey(offer)];
 }
 function categoryIcon(key) {
@@ -213,14 +224,12 @@ function reconcilePending() {
     remember(null); message = 'The latest booking is shown. Review the current offer before approving.'; messageError = false;
   }
 }
+function mainOffers() {
+  return state.offers.filter(offer => verifiedSaving(offer).available);
+}
 function renderBooking() {
-  const operation = state.simulation?.operation;
-  const best = customerOffers.map(id => state.offers.find(offer => offer.offerId === id)).filter(Boolean)
-    .map(offer => ({ offer, saving: verifiedSaving(offer) })).filter(item => item.saving.available)
-    .sort((a, b) => b.saving.minor - a.saving.minor)[0];
-  const featured = !operation ? best?.offer : undefined;
-  const booking = featured || state.booking;
-  $('booking-label').textContent = featured ? 'Highest price drop · ' + categoryText(featured) : 'Your current booking';
+  const booking = state.booking;
+  $('booking-label').textContent = 'Your current booking';
   $('hotel').textContent = booking.hotel.name;
   const board = booking.room.conditions.boardBasis;
   $('room').textContent = roomText(booking) + (board === 'BREAKFAST' ? ' · Breakfast included' : '');
@@ -228,96 +237,88 @@ function renderBooking() {
   $('guests').textContent = guestText(booking);
   $('booking-total').textContent = money(booking.retail.totalMinor, booking.retail.currency);
   $('booking-total-caption').textContent = 'Whole stay' + (booking.retail.includedInTotal === true ? ' · taxes included' : '');
-  const baseline = $('current-booking-summary');
-  baseline.hidden = !featured;
-  baseline.textContent = featured ? 'Your current booking: ' + state.booking.hotel.name + ' · '
-    + money(state.booking.retail.totalMinor, state.booking.retail.currency) : '';
-  const photoIndex = featured ? offerPhotoIndex(featured)
-    : operation?.savingSecured && operation.revalidatedOffer ? offerPhotoIndex(operation.revalidatedOffer) : 0;
-  $('booking-photo').replaceChildren(stayPhoto(photoIndex));
-  const stamp = $('best-drop');
-  if (best && !operation) addStamp(stamp, best.saving.minor, best.offer.refundQuote.currency, 'Best drop', 'featured-stamp');
-  else stamp.hidden = true;
 }
-function offerCard(offer, index, compact = false, biggest = false) {
+function offerCard(offer, highlight, overlap) {
+  const suffix = highlight.key;
   const category = categoryKey(offer);
-  const saving = verifiedSaving(offer);
-  const quote = offer.refundQuote;
+  const saving = state.bookingDemo ? offer.displaySaving : verifiedSaving(offer);
+  const quote = offer.refundQuote || { currency: offer.retail.currency };
   const fees = quote && [quote.originalCancellationMinor, quote.switchFeesMinor, quote.refundProcessingMinor].every(Number.isSafeInteger)
     ? quote.originalCancellationMinor + quote.switchFeesMinor + quote.refundProcessingMinor : null;
-  const article = node('article', undefined, 'offer-ticket' + (compact ? ' offer-compact' : ''));
+  const article = node('article', undefined, 'offer-ticket' + (suffix === 'overall' ? ' best-overall' : ''));
   article.dataset.offer = offer.offerId;
   article.dataset.category = category;
-  if (!compact) {
-    const photo = node('div', undefined, 'offer-photo');
-    photo.append(stayPhoto(offerPhotoIndex(offer)), node('span', 'Illustrative photo', 'photo-tag'));
-    const tag = categoryBadge(offer, 'photo-category');
-    photo.append(tag);
-    if (saving.available) {
-      const stamp = node('div', undefined, 'saving-stamp offer-stamp');
-      stamp.id = 'offer-saving-' + offer.offerId;
-      addStamp(stamp, saving.minor, quote.currency, biggest ? 'Biggest' : 'Price drop', 'offer-stamp' + (biggest ? ' biggest-stamp' : ''));
-      photo.append(stamp);
-    }
-    article.append(photo);
+  article.dataset.highlight = suffix;
+  const pick = node('p', highlight.label, 'offer-pick');
+  pick.id = 'offer-pick-' + suffix;
+  article.setAttribute('aria-labelledby', pick.id);
+  article.append(pick);
+  const photo = node('div', undefined, 'offer-photo');
+  photo.append(stayPhoto(offerPhotoIndex(offer), Boolean(state.bookingDemo)), node('span', 'Illustrative photo', 'photo-tag'));
+  photo.append(categoryBadge(offer, 'photo-category'));
+  if (saving.available) {
+    const stamp = node('div', undefined, 'saving-stamp offer-stamp');
+    stamp.id = 'offer-saving-' + suffix;
+    addStamp(stamp, saving.minor, quote.currency, suffix === 'overall' ? 'Best drop' : 'Drop', 'offer-stamp' + (suffix === 'overall' ? ' biggest-stamp' : ''));
+    photo.append(stamp);
   }
+  article.append(photo);
   const body = node('div', undefined, 'offer-body');
-  if (compact) body.append(categoryBadge(offer, 'category-band'));
   const title = node('h3', offer.hotel.name);
-  title.id = 'offer-title-' + offer.offerId;
+  title.id = 'offer-title-' + suffix;
   const room = node('p', roomText(offer), 'room-subline');
   const rates = node('div', undefined, 'offer-rates');
   rates.append(node('s', money(state.booking.retail.totalMinor, state.booking.retail.currency), 'old-rate'),
     node('span', '→', 'rate-arrow'), node('strong', money(offer.retail.totalMinor, offer.retail.currency), 'new-rate'));
-  const detailText = !saving.available ? 'Saving unavailable · current terms need checking'
-    : compact ? savingLabel(saving.minor, quote.currency) + ' · potential refund after ' + money(fees, quote.currency) + ' fees'
-      : 'Potential refund after ' + money(fees, quote.currency) + ' fees';
+  const detailText = state.bookingDemo ? 'Estimated saving · final pricing and fees to be checked'
+    : !saving.available ? 'Saving unavailable · current terms need checking'
+    : 'Potential refund after ' + money(fees, quote.currency) + ' fees';
   const detail = node('p', detailText, 'offer-caption');
-  detail.id = 'offer-detail-' + offer.offerId;
+  detail.id = 'offer-detail-' + suffix;
   const refundable = offer.cancellation?.refundability === 'refundable';
-  const conditionText = refundable ? 'Free cancellation' : offer.cancellation?.refundability === 'non-refundable'
-    ? 'Non-refundable · no free cancellation' : 'Cancellation terms not verified';
+  const conditionText = refundable ? (state.bookingDemo ? 'Free cancellation flag · check terms' : 'Free cancellation') : offer.cancellation?.refundability === 'non-refundable'
+    ? 'Final drop · Non-refundable' : 'Cancellation terms not verified';
   const condition = node('p', conditionText,
     'offer-condition' + (refundable ? '' : ' warning'));
-  condition.id = 'offer-condition-' + offer.offerId;
+  condition.id = 'offer-condition-' + suffix;
   body.append(title, room, rates, detail, condition);
+  if (needsFlexibilityConsent(offer)) {
+    const finalNote = node('p', state.bookingDemo ? 'No free cancellation. Review this change before choosing.' : 'No free cancellation. Price watch ends when this stay becomes active.', 'final-drop-note');
+    finalNote.id = 'offer-final-' + suffix;
+    body.append(finalNote);
+  }
+  if (overlap) body.append(node('p', 'Same offer as ' + overlap, 'offer-overlap'));
   article.append(body);
-  const review = node('button', 'Review this drop', 'offer-action');
+  const review = node('button', undefined, 'offer-action');
+  review.id = 'review-drop-' + suffix;
+  setActionContent(review, 'Peek at this drop');
   review.type = 'button';
   review.dataset.offerId = offer.offerId;
-  review.setAttribute('aria-describedby', [detail.id, condition.id, title.id, saving.available ? 'offer-saving-' + offer.offerId : ''].filter(Boolean).join(' '));
+  review.setAttribute('aria-label', 'Peek at this drop: ' + highlight.label);
+  review.setAttribute('aria-describedby', [detail.id, condition.id, title.id, needsFlexibilityConsent(offer) ? 'offer-final-' + suffix : '', saving.available ? 'offer-saving-' + suffix : ''].filter(Boolean).join(' '));
   review.disabled = busy || Boolean(pending) || !saving.available;
-  review.addEventListener('click', () => select(offer));
+  review.addEventListener('click', event => state.bookingDemo ? liveSelect(offer, event.currentTarget) : select(offer, event.currentTarget));
   article.append(review);
   return article;
 }
-function applyOfferFilter() {
-  const cards = [...$('offers').children];
-  const visible = cards.filter(card => offerFilter === 'all' || card.dataset.category === offerFilter);
-  cards.forEach(card => { card.hidden = !visible.includes(card); });
-  const empty = $('offer-empty');
-  const hasAnyOffers = cards.length > 0;
-  $('offer-filters').hidden = !hasAnyOffers;
-  if (!hasAnyOffers) empty.textContent = 'No better offers right now. Your current booking stays active.';
-  else if (!visible.length) empty.textContent = 'No offers in this group right now.';
-  empty.hidden = visible.length > 0;
-  $('filter-status').textContent = visible.length + (visible.length === 1 ? ' offer shown.' : ' offers shown.');
-}
 function renderOffers() {
   const operation = state.simulation?.operation;
-  const offers = customerOffers.map(id => state.offers.find(offer => offer.offerId === id)).filter(Boolean)
-    .filter(offer => { const saving = verifiedSaving(offer); return saving.available && saving.minor > 0; });
-  const biggest = offers.reduce((best, offer) => Math.max(best, verifiedSaving(offer).minor), 0);
-  $('offers').replaceChildren(...offers.map((offer, index) => offerCard(offer, index, false, verifiedSaving(offer).minor === biggest)));
-  $('changes-title').textContent = offers.length
-    ? offers.length + ' cheaper ticket' + (offers.length === 1 ? '' : 's') + ' for the same trip'
-    : 'No better offers right now';
-  const lowerRate = state.offers.find(offer => offer.offerId === 'DEMO_NON_REFUNDABLE');
-  const lowerSaving = lowerRate ? verifiedSaving(lowerRate) : { available: false };
-  $('lower-rate').hidden = !lowerRate || !lowerSaving.available || lowerSaving.minor <= 0;
-  $('lower-rate-offer').replaceChildren(...($('lower-rate').hidden ? [] : [offerCard(lowerRate, -1, true)]));
+  const offers = mainOffers();
+  const highlights = bestDropHighlights(state.booking, offers);
+  $('offers').replaceChildren(...highlights.map((highlight, index) => {
+    if (!highlight.offer) {
+      const empty = node('article', undefined, 'offer-ticket empty-highlight');
+      empty.dataset.highlight = highlight.key;
+      empty.append(node('h3', highlight.label), node('p', 'No verified drop in this group right now.', 'muted'));
+      return empty;
+    }
+    const earlier = highlights.slice(0, index).find(item => item.offer?.offerId === highlight.offer.offerId);
+    return offerCard(highlight.offer, highlight, earlier?.label);
+  }));
+  $('changes-title').textContent = 'Three ways to find your drop';
+  $('offer-empty').textContent = 'No better offers right now. Your current booking stays active.';
+  $('offer-empty').hidden = highlights.some(highlight => highlight.offer);
   $('deal-list').hidden = Boolean(operation);
-  applyOfferFilter();
 }
 function factTile(label, value, iconKey, cue, className = '') {
   const tile = node('div', undefined, 'fact-tile' + (className ? ' ' + className : ''));
@@ -327,6 +328,29 @@ function factTile(label, value, iconKey, cue, className = '') {
   header.append(icon, node('span', cue, 'fact-cue'));
   tile.append(header, node('span', label, 'fact-label'), node('strong', value, 'fact-value'));
   return tile;
+}
+function penaltySchedule(cancellation) {
+  if (!cancellation?.schedule?.length) return 'Penalty schedule not verified';
+  return cancellation.schedule.map(term => 'From ' + instant(term.from, cancellation.timeZone)
+    + ' until ' + instant(term.to, cancellation.timeZone) + ': '
+    + (Number.isSafeInteger(term.penaltyMinor) && term.penaltyMinor >= 0 && /^[A-Z]{3}$/.test(term.currency || '')
+      ? money(term.penaltyMinor, term.currency) : 'Penalty not verified')).join('; ');
+}
+function renderCancellationSummary(current, alternative, offer) {
+  const summary = $('cancellation-summary');
+  summary.replaceChildren(node('p', 'New stay: ' + deadline(offer)));
+  const oldLate = current?.schedule?.filter(term => term.from === current.freeUntil) || [];
+  const newLate = alternative?.schedule?.filter(term => term.from === alternative.freeUntil) || [];
+  const comparable = current?.freeUntil && current.freeUntil === alternative?.freeUntil
+    && Number.isFinite(Date.parse(current.freeUntil))
+    && current.timeZone === alternative.timeZone && oldLate.length === 1 && newLate.length === 1
+    && oldLate[0].to === newLate[0].to && oldLate[0].currency === newLate[0].currency
+    && /^[A-Z]{3}$/.test(oldLate[0].currency || '')
+    && [oldLate[0].penaltyMinor, newLate[0].penaltyMinor].every(value => Number.isSafeInteger(value) && value >= 0);
+  if (comparable) summary.append(node('p', 'After that deadline: '
+    + money(oldLate[0].penaltyMinor, oldLate[0].currency) + ' current → '
+    + money(newLate[0].penaltyMinor, newLate[0].currency) + ' new.'));
+  else summary.append(node('p', 'Compare the full cancellation schedules below.'));
 }
 function renderComparison() {
   const offer = selectedOffer;
@@ -341,7 +365,7 @@ function renderComparison() {
   }
   $('flexibility-warning').hidden = !needsConsent;
   $('accept-reduced-flexibility').disabled = busy || refreshRequired || !verifiedSaving(offer).available;
-  $('flexibility-watch-note').hidden = !state.priceWatch?.enabled;
+  $('flexibility-watch-note').hidden = false;
   $('comparison-title').textContent = offer.hotel.name;
   $('comparison-pills').replaceChildren(...pills(offer).children);
   $('comparison-photo').replaceChildren(stayPhoto(offerPhotoIndex(offer)));
@@ -359,6 +383,7 @@ function renderComparison() {
     ? quote.originalCancellationMinor + quote.switchFeesMinor + quote.refundProcessingMinor : null;
   $('switch-fees').textContent = Number.isSafeInteger(fees) ? money(fees, quote.currency) : 'Not verified';
   $('comparison-saving').textContent = saving.available ? savingLabel(saving.minor, quote.currency) : 'Saving unavailable';
+  $('review-saving').textContent = saving.available ? savingLabel(saving.minor, quote.currency) : 'Unverified';
   if (saving.available) addStamp($('comparison-saving-stamp'), saving.minor, quote.currency, 'You save', 'review-stamp');
   else {
     $('comparison-saving-stamp').replaceChildren(node('span', 'Saving unavailable', 'stamp-label'));
@@ -395,6 +420,7 @@ function renderComparison() {
     factTile('Cancellation', cancel, 'cancellation', cancellationCue,
       (cancellationTermsMatch ? 'fact-same' : offeredCancel?.refundability === 'refundable' ? 'fact-change' : 'fact-warning') + ' fact-cancellation')
   );
+  renderCancellationSummary(currentCancel, offeredCancel, offer);
 
   const differences = [];
   if (!hotelMatch) differences.push(['Hotel', state.booking.hotel.name + ' → ' + offer.hotel.name]);
@@ -404,8 +430,9 @@ function renderComparison() {
     if (oldValue !== newValue) differences.push([labels[key] || key, valueText(oldValue) + ' → ' + valueText(newValue)]);
   }
   differences.push(['Current cancellation', deadline(state.booking)], ['Alternative cancellation', deadline(offer)]);
+  differences.push(['Current penalties', penaltySchedule(currentCancel)], ['Alternative penalties', penaltySchedule(offeredCancel)]);
   if (quote) differences.push(['Price calculation', money(quote.originalRetailMinor, quote.currency) + ' minus ' + money(quote.replacementRetailMinor, quote.currency)
-    + ' minus ' + money(fees, quote.currency) + ' fees = ' + (saving.available ? savingLabel(saving.minor, quote.currency) : 'saving unavailable')]);
+    + ' minus ' + money(fees, quote.currency) + ' fees = ' + (saving.available ? money(saving.minor, quote.currency) + ' saving' : 'saving unavailable')]);
   if (offer.decision?.reasons?.length) differences.push(['Checks', decisionText(offer.decision.reasons)]);
   $('differences').replaceChildren(...differences.flatMap(([key, value]) => [node('dt', key), node('dd', value)]));
   $('selected-checked').textContent = 'Fictional demo quote · not a live rate or a price hold.';
@@ -413,12 +440,15 @@ function renderComparison() {
   $('review-message').classList.toggle('error', messageError);
   const consentMissing = needsConsent && !$('accept-reduced-flexibility').checked && !matchingPending;
   $('approve-offer').disabled = busy || refreshRequired || (!pending && !canApprove(offer)) || consentMissing || pending?.kind === 'advance' || pending?.kind === 'watch';
-  $('approve-offer').textContent = busy ? 'Saving approval…' : pending?.kind === 'approval' ? 'Retry the same approval'
-    : saving.available ? 'Approve switch ' + savingLabel(saving.minor, quote.currency) : 'Approval unavailable';
+  setActionContent($('approve-offer'), busy ? 'Saving approval…' : pending?.kind === 'approval' ? 'Retry the same approval'
+    : saving.available ? 'Approve switch ' + savingLabel(saving.minor, quote.currency) : 'Approval unavailable');
   const help = consentMissing ? 'Tick the box above to confirm the cancellation terms.'
       : !saving.available ? 'The current price and terms are not verified for approval.' : '';
   $('approve-help').textContent = help;
-  $('approve-help').hidden = !help;
+  $('approve-help').hidden = !help || consentMissing;
+  $('review-consent-link').hidden = !consentMissing;
+  $('review-consent-link').disabled = busy;
+  $('content').classList.toggle('needs-review-consent', consentMissing);
 }
 function operationCopy(operation) {
   const explanation = decisionText(operation.reasonCodes || []);
@@ -566,6 +596,7 @@ function renderState(next, overview = false) {
   $('comparison').hidden = !selectedOffer;
   $('current-ticket').hidden = Boolean(operation);
   $('content').classList.toggle('has-switch', Boolean(operation));
+  $('content').classList.toggle('has-review', Boolean(selectedOffer));
   document.querySelectorAll('#customer-steps li').forEach((step, index) => {
     const current = operation ? 2 : selectedOffer ? 1 : 0;
     if (index === current) step.setAttribute('aria-current', 'step'); else step.removeAttribute('aria-current');
@@ -578,30 +609,40 @@ function renderState(next, overview = false) {
   $('close-comparison').setAttribute('aria-disabled', String(busy || Boolean(pending)));
   $('keep-booking').disabled = busy || Boolean(pending);
 }
-async function select(offer) {
+async function select(offer, trigger) {
   if (busy || pending || state.simulation?.operation) return;
-  busy = true; renderOffers();
+  const returnTo = { scrollY: window.scrollY, triggerId: trigger?.id || '', offerId: offer.offerId };
+  history.replaceState({ ...history.state, view: 'booking', returnTo }, '');
+  busy = true; renderBooking(); renderOffers();
   message = ''; messageError = false;
   try {
     const next = await request('/api/selection', { offerId: offer.offerId, bookingVersion: state.booking.version });
     lastOfferId = offer.offerId;
-    history.pushState({ view: 'review', offerId: offer.offerId }, '', '#comparison');
+    history.pushState({ view: 'review', offerId: offer.offerId, returnTo }, '', '#comparison');
     renderState(next);
     $('price-details').open = false;
     $('comparison-title').focus(); window.scrollTo({ top: 0, behavior: 'instant' }); setStatus('');
   } catch (error) { setStatus(error.message, true); if (error.status === 409) await refreshLatest(); }
   finally { busy = false; if (state) renderState(state); }
 }
+function restoreDealPosition(returnTo) {
+  const trigger = returnTo?.triggerId ? $(returnTo.triggerId)
+    : [...document.querySelectorAll('#offers [data-offer-id]')]
+      .find(element => element.dataset.offerId === (returnTo?.offerId || lastOfferId));
+  const target = trigger && !trigger.closest('[hidden]') ? trigger : $('hotel');
+  target.focus({ preventScroll: true });
+  window.scrollTo({ top: returnTo?.scrollY || 0, behavior: 'instant' });
+  const rect = target.getBoundingClientRect();
+  if (rect.top < 0 || rect.bottom > window.innerHeight) target.scrollIntoView({ block: 'center', behavior: 'instant' });
+}
 function keepBooking() {
   if (busy || pending) return;
-  const offerId = selectedOffer?.offerId || state?.selectedOfferId || lastOfferId;
+  const returnTo = history.state?.returnTo || { offerId: selectedOffer?.offerId || state?.selectedOfferId || lastOfferId };
   $('accept-reduced-flexibility').checked = false;
   acknowledgementKey = null;
-  history.pushState({ view: 'booking' }, '', '#booking-summary');
+  history.pushState({ view: 'booking', returnTo }, '', '#booking-summary');
   renderState(state, true);
-  const trigger = [...document.querySelectorAll('[data-offer-id]')].find(element => element.dataset.offerId === offerId);
-  (trigger || $('hotel')).focus();
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  restoreDealPosition(returnTo);
   setStatus('');
 }
 async function refreshLatest(overview = false) {
@@ -689,9 +730,19 @@ async function mutateWatch() {
     } else watchMessage = 'The watch result could not be confirmed. Retry the same action or reload to see saved state.';
   } finally { busy = false; renderState(state, true); }
 }
+if (document.body.dataset.liveBooking === 'true') {
+  const { startBookingDemo } = await import('./booking-live.js');
+  await startBookingDemo({ $, node, money, savingLabel, addStamp, setActionContent, factTile, stayText, guestText,
+    stayPhoto, offerPhotoIndex, renderBooking, offerCard,
+    setState(next) { state = next; pending = null; }, setSelect(handler) { liveSelect = handler; } });
+} else {
 $('close-comparison').addEventListener('click', event => { event.preventDefault(); keepBooking(); });
 $('keep-booking').addEventListener('click', keepBooking);
 $('approve-offer').addEventListener('click', () => mutate('approval'));
+$('review-consent-link').addEventListener('click', () => {
+  $('accept-reduced-flexibility').focus({ preventScroll: true });
+  $('flexibility-warning').scrollIntoView({ block: 'center', behavior: 'instant' });
+});
 $('accept-reduced-flexibility').addEventListener('change', () => { if (selectedOffer) renderComparison(); });
 $('advance-demo').addEventListener('click', () => mutate('advance'));
 $('done-button').addEventListener('click', () => {
@@ -703,14 +754,13 @@ $('watch-button').addEventListener('click', mutateWatch);
  $('watch-consent-check').addEventListener('change', () => {
   if (state) renderWatch(state, { busy, pending, refreshRequired, message: watchMessage, messageError: watchError, money, instant });
 });
-document.querySelectorAll('#offer-filters [data-filter]').forEach(button => {
-  button.addEventListener('click', () => {
-    offerFilter = button.dataset.filter;
-    document.querySelectorAll('#offer-filters [data-filter]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
-    applyOfferFilter();
+window.addEventListener('popstate', () => {
+  if (!state) return;
+  renderState(state);
+  if (!selectedOffer && !state.simulation?.operation) requestAnimationFrame(() => {
+    if (!selectedOffer && !state.simulation?.operation) restoreDealPosition(history.state?.returnTo);
   });
 });
-window.addEventListener('popstate', () => { if (state) renderState(state); });
 async function bootstrap() {
   try {
     if (!['#comparison', '#booking-summary'].includes(location.hash)) history.replaceState({ view: 'booking' }, '', '#booking-summary');
@@ -726,3 +776,4 @@ async function bootstrap() {
   }
 }
 bootstrap();
+}
