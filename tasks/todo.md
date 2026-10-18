@@ -72,6 +72,9 @@ confirm-quote, create supplier bookings or commit `.local\`.
   city and scenario labels supplied as curated facts, not invented metadata.
   Pending the owner. Only a provisional draft exists (ignored
   `.local\cards-draft.json`, `photo: null`, labels and order unreviewed).
+  18 Oct: photo path built and tested offline (capture keeps Gateway
+  `imageSources`; importer `--images=PATH` attaches reviewed local card and Drop
+  photos). Still open: owner live re-capture, reviewed download, asset routes.
 - [x] S0.6 Guarded Firestore import: emulator import through the F2 importer
   (local, test-owned data); a production Firestore import is a separate LIVE step
   requiring explicit approval and is not part of Part 1 acceptance.

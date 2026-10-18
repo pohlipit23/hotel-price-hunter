@@ -353,6 +353,54 @@ S0.5 stays open until the owner reviews photos, labels and order. A reviewed
 change of label or order is a content change and gives `BOOKING_CHANGED` against
 the emulator import below; re-import into a fresh prefix or emulator then.
 
+#### S0.5 photo path: Gateway image sources and reviewed local photos (18 October 2026)
+
+User decision: photos come from the Gateway search response. The first S0.4
+capture dropped them, so a re-capture is needed (owner-run, not done here).
+
+- `scripts\prepare-altovo-catalogue.mjs` now writes, beside each bundle (outside
+  its integrity hash), `imageSources: { kind: 'remote-source-urls-pending-review',
+  renderable: false, hotel: { url, caption } | null, drops: [{ optionId, url,
+  caption }] }`. Hotel: first `data[].avatar` with an https URL in `urls.md`,
+  `urls.lg`, `urls.sm`, then flat `md`/`lg`/`sm`. Drop: the first image of the
+  matched rate (by its private rate detail) or else its room, same size order, or
+  null. Only https URLs without credentials are kept; anything else is null.
+  Not-searched codes (179, 184) have `hotel: null, drops: []`.
+  `normaliseGatewayRates` is unchanged and still drops images.
+- `app\booking-storage.mjs`: optional reviewed image manifest
+  `{ [code]: { hotel?: photo|null, drops?: { [optionId]: photo|null } } }`, with
+  photo `{ asset: 'assets/<a-z0-9->.jpg|png|webp', alt }`. A Drop photo becomes the
+  optional `photo` fact of that Drop (absent when unreviewed, so earlier Drop-set
+  versions are unchanged). A hotel photo fills a `photo: null` card and refuses a
+  different existing card photo (`IMAGE_MANIFEST_CONFLICT`). Unknown codes or Drop
+  ids, remote URLs and extra keys give `IMAGE_MANIFEST_INVALID`. Prepared
+  `imageSources` are accepted only as `renderable: false` and never stored.
+- `scripts\import-altovo-catalogue.mjs --images=PATH` reads the manifest (inside
+  the workspace) and refuses missing assets (`CARD_PHOTO_MISSING`,
+  `DROP_PHOTO_MISSING`).
+- Evidence: `node --test .\tests\altovo-catalogue.test.mjs` 17/17 pass (two new:
+  with images, without images, non-https, missing or non-object avatar).
+  `node --test .\tests\booking-storage.test.mjs` with the Part 1 emulator env:
+  15/15 pass (three new, one emulator round trip of a Drop photo and a filled
+  card photo with no remote URL stored). All non-browser tests except
+  `daily-watch-job` with the emulator env: 376/376 pass.
+- Owner-run helpers (session scratchpad, not tracked): `run-s04-images.mjs`
+  (same guard as the S0.4 run: POST login at most 1, search-by-id at most 4, no
+  retries, path/status/ms logged; dry run by default, `--execute` for live) and
+  `plan-image-downloads.mjs` (lists each unique URL with code, role and target
+  `app/public/assets/roomdrop-<code>-<role>[-n].jpg`; `--download` does one GET per
+  URL with no redirects, keeps image/jpeg|png|webp up to 600 KB whose bytes match
+  the type, writes create-only and prints SHA-256 and bytes, plus an image
+  manifest under `.local\roomdrop-images\`). Both were proven offline only: dry
+  run (0 calls, 4 planned searches), injected fake Gateway (1 login, 4 searches,
+  guard refusals for other origin, GET, query string, other path and a fifth
+  search), and a fake-fetch download whose manifest passed an importer dry run.
+  Neither ran live.
+- Still needed after the live re-capture: review the downloaded files, then add
+  each exact `/assets/...` route to `app\booking-demo-server.mjs` and
+  `app\quotation-demo-server.mjs`, and render Drop photos in the UI. A
+  re-capture gives new Drop ids and prices, so the Drop set changes on re-import.
+
 ### S0.6: Guarded emulator import of the six real captures (18 October 2026)
 
 Input: `.local\s0.6\catalogue-import.json` in this worktree (ignored, SHA-256
