@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import { AGENCY_SEARCH_CONTEXT } from './domain/altovo-quotation.mjs';
+import { ENGINE_BASIS, ENGINE_HOST, ENGINE_SEARCH_DEFAULTS, ENGINE_SOURCE } from './domain/engine-availability.mjs';
+import { decimalMoney } from './domain/live-comparison.mjs';
 
 // Shared, immutable curated catalogue records in Firestore:
 //   {prefix}BookingsV1/{code}                         Original Booking facts and card metadata
@@ -86,11 +88,17 @@ function validBaseline(baseline, code) {
     && CURRENCY.test(baseline.fx?.from ?? '') && plain(baseline.cancellation) && plain(baseline.stay);
 }
 
+// A Gateway Drop's source price is in the quotation's source currency and converted at its FX rate;
+// an engine Drop's source price is the engine's own booking-currency total, equal to its estimate.
+const sourcePriceAgrees = (option, baseline) => option.estimate?.basis === ENGINE_BASIS
+  ? option.sourcePrice.currency === option.estimate.currency && decimalMoney(option.sourcePrice.amount, option.sourcePrice.currency)?.totalMinor === option.estimate.totalMinor
+  : option.sourcePrice.currency === baseline.fx.from;
+
 function validOption(option, baseline) {
   return exactKeys(option, OPTION_KEYS) && OPTION_KEYS.every(key => Object.hasOwn(option, key)) && DROP_ID.test(option.optionId)
     && typeof option.roomName === 'string' && typeof option.board === 'string' && option.termsVerified === false
-    && exactKeys(option.sourcePrice, ['amount', 'currency']) && option.sourcePrice.currency === baseline.fx.from
-    && exactKeys(option.estimate, ['totalMinor', 'currency', 'isEstimate', 'basis']) && option.estimate.isEstimate === true
+    && exactKeys(option.sourcePrice, ['amount', 'currency']) && exactKeys(option.estimate, ['totalMinor', 'currency', 'isEstimate', 'basis'])
+    && sourcePriceAgrees(option, baseline) && option.estimate.isEstimate === true
     && option.estimate.currency === baseline.quotedRetail.currency && Number.isSafeInteger(option.estimate.totalMinor)
     && option.indicativeDifferenceMinor === baseline.quotedRetail.totalMinor - option.estimate.totalMinor;
 }
@@ -107,13 +115,23 @@ function validCapture(entry) {
       || capture.reason !== blocker || bundle.options.length) fail('CAPTURE_MISMATCH');
     return { status: 'not-searched', reason: capture.reason, capturedAt: null, offerCount: null, searchDefaults: null };
   }
-  if (!exactKeys(capture, ['status', 'checkedAt', 'offerCount', 'optionCount', 'searchDefaults']) || blocker !== null
+  // A Gateway capture has no provenance key (its records stay byte-identical); an engine capture names
+  // the engine source and its host, and carries the engine's own search defaults.
+  const engine = Object.hasOwn(capture, 'provenance');
+  if (!exactKeys(capture, ['status', 'checkedAt', 'offerCount', 'optionCount', 'searchDefaults', ...(engine ? ['provenance'] : [])]) || blocker !== null
     || !INSTANT.test(capture.checkedAt ?? '') || capture.checkedAt !== bundle.checkedAt
     || !Number.isSafeInteger(capture.offerCount) || capture.offerCount < 0 || capture.optionCount !== bundle.options.length
     || (capture.status === 'observed-empty') !== (capture.offerCount === 0) || (capture.status === 'observed-empty' && bundle.options.length)
-    || canonicalJson(capture.searchDefaults) !== canonicalJson(SEARCH_DEFAULTS)) fail('CAPTURE_MISMATCH');
+    || canonicalJson(capture.searchDefaults) !== canonicalJson(engine ? ENGINE_SEARCH_DEFAULTS : SEARCH_DEFAULTS)
+    || (engine && (!exactKeys(capture.provenance, ['source', 'host']) || capture.provenance.source !== ENGINE_SOURCE || !ENGINE_HOST.test(capture.provenance.host ?? '')))
+    || bundle.options.some(option => (option.estimate.basis === ENGINE_BASIS) !== engine)) fail('CAPTURE_MISMATCH');
+  if (engine) return { status: capture.status, reason: null, capturedAt: capture.checkedAt, offerCount: capture.offerCount,
+    searchDefaults: { ...ENGINE_SEARCH_DEFAULTS }, provenance: { source: ENGINE_SOURCE, host: capture.provenance.host } };
   return { status: capture.status, reason: null, capturedAt: capture.checkedAt, offerCount: capture.offerCount, searchDefaults: { ...SEARCH_DEFAULTS } };
 }
+const dropProvenance = capture => capture.provenance
+  ? { source: capture.provenance.source, host: capture.provenance.host, searchDefaults: capture.searchDefaults }
+  : { source: 'gateway-capture', searchDefaults: capture.searchDefaults };
 
 // Validates the reviewed import input ({ schemaVersion, entries: prepared bundles, cards: manifest })
 // and builds the exact shared records. Pure: no clock, no storage.
@@ -169,7 +187,7 @@ export function planCatalogueImport(input) {
       booking: { ...booking, contentVersion },
       dropSet: { ...dropSetCore, dropSetVersion },
       drops: drops.map((facts, index) => ({ schemaVersion: 1, code, dropId: facts.optionId, rank: index + 1, contentVersion, dropSetVersion,
-        capturedAt: capture.capturedAt, facts, limitations: [...DROP_LIMITATIONS], provenance: { source: 'gateway-capture', searchDefaults: capture.searchDefaults } })),
+        capturedAt: capture.capturedAt, facts, limitations: [...DROP_LIMITATIONS], provenance: dropProvenance(capture) })),
     };
   });
 }
