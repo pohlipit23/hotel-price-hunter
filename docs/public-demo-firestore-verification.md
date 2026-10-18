@@ -1039,3 +1039,40 @@ data contents or public acceptance. The shared ignored deployment plan contains
 
 No registry push, deployment, production import, model/supplier call, IAM/TTL
 change, email, schedule or traffic mutation ran. Each live step awaits approval.
+
+## Submission UI/email integration - contract v7
+
+Integrated only Part 1 commits 1f82761, a32e350 and 410ba31 (local picks f2133a2,
+40a9dbd and 514facd). Engine capture commits were excluded; Gateway pins and
+reviewed photos remain unchanged.
+
+`requireCurrentWatch` now binds the stored watch through `publicWatch`, so the
+full delivery address cannot enter confirmation or advice bindings. Read
+projection accepts both a stored watch and an already masked public watch.
+A regression first reproduced DROPS_CHANGED, then passed across confirmation,
+advice reservation/merge and restored context, with no raw address in the public
+outputs and the private stored address retained. Arm still calls
+`judge.armRequestBody(data, minimum)`. No email is sent: delivery is pending-service.
+
+Updated the initial hand-off assertion for the masked email chip, and its retry
+revision assertion: the same email and minimum is unchanged, so it must not add
+a revision. Catalogue mode uses the three-step journey strip; the redundant
+five-step bar is hidden. The legacy non-catalogue bar is preserved.
+
+Requested gates each ran once on this integration:
+
+- `npm.cmd test`: 433 total, 398 pass, zero fail, 35 skips. Log: integration/v7-npm-test.log.
+- Seven core session/arm/catalogue/server/action suites on 8281/demo-roomdrop-part2:
+  71/71, zero skips. Log: integration/v7-core-emulator.log.
+- Actual Firestore browser gate with the reviewed Gateway catalogue: passed at
+  320, 390, 768, 1024 and 1440 px, including typed email/masked hand-off, arm,
+  selection, restart, model context, judge isolation and stale tabs. Zero page
+  errors or external requests. Log: integration/v7-firestore-browser.log;
+  report/screenshots: .local/part2-firestore-real-browser/.
+- Judge browser gate: initially caught the obsolete retry revision assertion;
+  after correcting that expectation, passed 320/768/1440 and ended-booking checks.
+  Log: integration/v7-judge-browser.log; report/screenshots: .local/judge-flow/browser/.
+
+Inspected the 320 px Drops screenshot: one journey indicator and no duplicate
+five-step bar. No further full test or core/browser rerun was needed after the
+judge-only assertion correction. No live model/supplier call or cloud mutation ran.

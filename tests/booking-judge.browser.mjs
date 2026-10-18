@@ -151,7 +151,7 @@ try {
     assert.match(await page.locator('#checking-replay').innerText(), /Replayed check · captured 18 Oct 2026, 12:10 UTC · not live/);
     await shot('checking', false);
     await visible('handoff'); await shot('handoff');
-    await handoff();
+    await handoff('j***@example.test');
     await visible('armed-strip'); await focused('armed-title'); await step(3);
     assert.deepEqual([receipt.watch.revision, receipt.watch.minimumSavingMinor, receipt.dropOptionIds.length], [1, 5000, 2]);
     assert.equal(new URL(page.url()).hash, '#drops-' + SIAM);
@@ -159,6 +159,7 @@ try {
     assert.match(detail, /^Drops of MYR 50 or more .*replayed check from 18 Oct 2026, 12:10 UTC/);
     assert.match(detail, /Replayed 20 Oct 2026, 00:00 UTC.*Captured 18 Oct 2026, 12:10 UTC.*not live$/);
     assert.equal(await page.locator('#offers .offer-ticket').count(), 2);
+    assert.equal(await page.locator('#customer-steps').isVisible(), false, 'one journey indicator on Drops');
     await shot('armed');
 
     // Reload after arming shows the same committed receipt.
@@ -175,6 +176,7 @@ try {
       return response.text();
     }, { code: SIAM, revision: receipt.watch.revision });
     assert.doesNotMatch(emailed, /judge@/); assert.equal(JSON.parse(emailed).watch.delivery.maskedEmail, 'j***@example.test');
+    assert.equal(JSON.parse(emailed).watch.revision, receipt.watch.revision, 'same email and minimum is an identical retry');
     await page.reload(); await visible('armed-strip');
     // Re-arm with new minima (existing Drops screens consume the receipt); the saved address shows masked and is kept.
     await page.goBack(); await page.goForward(); await visible('armed-strip');
@@ -190,7 +192,7 @@ try {
     await shot('empty');
     await page.locator('#lower-minimum').click(); await visible('setup-screen'); await arm(1000);
     assert.equal(await page.locator('#offers .offer-ticket').count(), 3);
-    assert.equal((await page.evaluate(async code => (await (await fetch('/api/booking-demo/q/' + code)).json()).watch, SIAM)).revision, 4);
+    assert.equal((await page.evaluate(async code => (await (await fetch('/api/booking-demo/q/' + code)).json()).watch, SIAM)).revision, receipt.watch.revision + 2);
 
     const first = page.locator('#offers .offer-action').first(); await first.focus(); await page.keyboard.press('Enter');
     await visible('comparison'); assert.match(new URL(page.url()).hash, /^#review-AIRB000180$/);

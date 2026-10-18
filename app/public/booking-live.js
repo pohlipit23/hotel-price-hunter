@@ -24,7 +24,7 @@ export async function startBookingDemo(ui) {
     $('simulated-switch').hidden = screen !== 'confirmed'; $('current-ticket').hidden = screen === 'confirmed';
     $('deal-list').hidden = screen === 'confirmed'; $('price-watch').hidden = catalogueMode || screen === 'confirmed';
     $('armed-strip').hidden = !catalogueMode || screen !== 'options';
-    $('customer-steps').hidden = screen === 'start';
+    $('customer-steps').hidden = catalogueMode || screen === 'start';
     $('content').classList.toggle('has-review', screen === 'review'); $('content').classList.toggle('has-switch', screen === 'confirmed');
     const current = stepIndex[screen] ?? -1;
     document.querySelectorAll('#customer-steps li').forEach((step, index) => {

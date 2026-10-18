@@ -79,7 +79,11 @@ try {
     const arm = async (target, minimum) => {
       await page.goto(origin + '/#setup-' + target); await visible('setup-screen'); await page.locator('#judge-consent').check();
       await page.locator(`input[name="minimum-saving"][value="${minimum}"]`).check();
-      await page.locator('#arm-watch').click(); await visible('armed-strip');
+      await page.locator('#delivery-email').fill('judge-private@example.test');
+      await page.locator('#arm-watch').click(); await visible('handoff');
+      assert.match(await page.locator('#handoff-email').innerText(), /j\*\*\*@example.test/);
+      await page.locator('#open-roomdrop').click(); await visible('armed-strip');
+      assert.equal(await page.locator('#customer-steps').isVisible(), false);
     };
     if (existing && width === 320) {
       const listing = await (await judge.request.get(origin + '/api/booking-demo/catalogue')).json();

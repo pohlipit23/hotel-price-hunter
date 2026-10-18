@@ -2,14 +2,17 @@
 import { randomBytes } from 'node:crypto';
 import { replayResult, watchBinding, currentConfirmation } from './public/booking-live-data.js';
 import { watchBlocker } from './domain/altovo-quotation.mjs';
+import { publicWatch } from './domain/booking-drop-watch.mjs';
 
 export function actionError(code, status = 409, extra = {}) {
   return Object.assign(new Error('Reload RoomDrop and review the current Drops.'), { code, status, ...extra });
 }
 // Part 1's per-code GET can spread this read projection without changing the watch seam.
 export function publicPostWatchState({ scope, bundle }) {
-  const snapshot = { ...bundle, code: bundle.baseline.quotationCode, watch: scope?.watch, confirmation: scope?.confirmation };
-  const binding = watchBinding(scope?.watch);
+  // GET callers already supply a public watch; transaction callers may hold the stored address.
+  const watch = scope?.watch?.delivery?.email ? publicWatch(scope.watch) : scope?.watch;
+  const snapshot = { ...bundle, code: bundle.baseline.quotationCode, watch, confirmation: scope?.confirmation };
+  const binding = watchBinding(watch);
   const current = ['completed', 'empty'].includes(replayResult(snapshot).status)
     && (scope?.contentVersion === undefined || scope.contentVersion === (bundle.contentVersion ?? bundle.snapshotVersion))
     && (scope?.dropSetVersion === undefined || bundle.dropSetVersion === undefined || scope.dropSetVersion === bundle.dropSetVersion);
@@ -23,7 +26,7 @@ export function requireCurrentWatch({ scope, bundle, body, at }) {
   if ((scope?.contentVersion !== undefined && scope.contentVersion !== (bundle.contentVersion ?? bundle.snapshotVersion))
     || (scope?.dropSetVersion !== undefined && bundle.dropSetVersion !== undefined && scope.dropSetVersion !== bundle.dropSetVersion)) throw actionError('DROPS_CHANGED');
   if (!scope?.watch) throw actionError('WATCH_NOT_ARMED');
-  const watch = scope.watch;
+  const watch = publicWatch(scope.watch);
   if ((watch.contentVersion !== undefined && watch.contentVersion !== (bundle.contentVersion ?? bundle.snapshotVersion))
     || (bundle.dropSetVersion !== undefined && watch.dropSetVersion !== bundle.dropSetVersion)) throw actionError('DROPS_CHANGED');
   const binding = watchBinding(watch);

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
 import { createSessionActions, publicPostWatchState } from '../app/quotation-session-actions.mjs';
 import { watchBinding } from '../app/public/booking-live-data.js';
+import { publicWatch, DELIVERY_CONSENT_VERSION } from '../app/domain/booking-drop-watch.mjs';
 import { altovoCatalogueFixture } from './fixtures/altovo-catalogue.mjs';
 
 const at = new Date('2026-10-20T00:00:00Z'), now = () => new Date(at);
@@ -36,6 +37,28 @@ test('session action adapter commits before reporting success and rolls back fai
   const failing = createSessionActions({ sessionStorage: { transact: async (id, change) => { change(structuredClone(session)); throw Error('write unavailable'); } }, now });
   await assert.rejects(failing.confirm(args), /write unavailable/);
   assert.equal(session.byCode[code].confirmation, null);
+});
+
+test('delivery email stays private through confirmation, advice and restored public context', async () => {
+  const { session, bundle, args } = fixture();
+  const watch = session.byCode[code].watch;
+  watch.delivery = { channel: 'email', email: 'judge-private@example.test', consentVersion: DELIVERY_CONSENT_VERSION, status: 'pending-service' };
+  args.body.watchBinding = watchBinding(publicWatch(watch));
+  const state = memory(session), actions = createSessionActions({ sessionStorage: state, now });
+  const receipt = await actions.confirm(args);
+  assert.equal(receipt.watchBinding, args.body.watchBinding);
+  const chat = { ...args, body: { snapshotVersion: bundle.snapshotVersion, watchBinding: args.body.watchBinding, pageContext: 'drops-overview', intent: 'opening' } };
+  const ticket = await actions.reserve(chat);
+  await actions.merge({ ...chat, ticket, advice: { reply: 'Injected safe guidance' }, chat: true });
+  const saved = state.get().byCode[code];
+  for (const watch of [saved.watch, publicWatch(saved.watch)]) {
+    const projected = publicPostWatchState({ scope: { ...saved, watch }, bundle });
+    assert.equal(projected.confirmation.selectionId, receipt.selectionId);
+    assert.equal(projected.conversation.chatHistory.length, 1);
+    assert.doesNotMatch(JSON.stringify({ receipt, ticket, projected }), /judge-private|"email"\s*:/);
+    assert.match(projected.conversation.watchBinding, /j\*\*\*@example.test/);
+  }
+  assert.equal(saved.watch.delivery.email, 'judge-private@example.test');
 });
 test('bootstrap projection hides stale selections/context and allowlists the bounded current conversation', async () => {
   const { session, bundle, args } = fixture(); const state = memory(session);

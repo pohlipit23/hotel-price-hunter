@@ -1,17 +1,20 @@
 # Curated RoomDrop Part 2 release preparation
 
-Status: local acceptance is complete after the authorised Part 1 merge through
-33bb55f (contract v5). Source c7de6a4 renders reviewed Drop photos, follows each
-hash route's saved watch, keeps Gemini clear of card text at 320/390 px, and uses
-the judge arm helper. F9a/F10a belong to Codex; Claude's F6/F7a/F11a are integrated.
-No push, deploy, production import or live call is included.
+Status: the final Part 1 email/hand-off/UI slice (1f82761, a32e350, 410ba31) is
+integrated, with masked watch bindings and a single journey indicator. Arm uses
+the judge helper, including deliveryEmail. Contract v7 local acceptance: npm
+398 pass/35 skips, core emulator 71/71, Firestore browser five widths and judge
+browser three widths pass. Gateway Drops/photos remain pinned; engine capture
+commits are excluded. See the current verification section and shared ignored
+deployment plan. No push, deploy, production import or live call is included.
 
 Both hosted entrypoints require Firestore, the canonical customer profile and an
 exact reviewed code/version manifest. They never import, seed or use a memory/file
 fallback at hosted startup. The production emulator guard remains mandatory.
-Part 1 storage/session/arm modules and setup HTML are unchanged from 33bb55f.
+The private delivery address stays in the stored session; public bindings and
+receipts contain only its masked projection. Email delivery is not enabled.
 
-| Frozen local candidate | Value |
+| Historical v5 local candidate (rebuild for v7) | Value |
 | --- | --- |
 | Runtime source | c7de6a474254078481944d3fa7e20b6446cdd2b4 |
 | Context SHA-256 | 1efce687edc69efc6260702f6377627c5965a8690bdcf1f2b763d98530281224 |
