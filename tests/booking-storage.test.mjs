@@ -165,7 +165,7 @@ test('importer dry-runs by default and refuses non-emulator or production writes
     [[input, ...emulator], { NODE_ENV: 'production' }, 'PRODUCTION_IMPORT_REFUSED'],
     [[input, '--project=demo-roomdrop-part1'], {}, 'IMPORT_ARGUMENTS_INVALID'],
     [[input, '--force'], {}, 'IMPORT_ARGUMENTS_INVALID'],
-    [['--catalogue=../../package.json'], {}, 'CATALOGUE_PATH_OUTSIDE_WORKSPACE'],
+    [['--catalogue=..'], {}, 'CATALOGUE_PATH_OUTSIDE_WORKSPACE'],
     [['--catalogue=tests/fixtures/absent.json'], {}, 'CATALOGUE_FILE_UNAVAILABLE'],
     [['--catalogue=package.json'], {}, 'CATALOGUE_INVALID'],
   ];
