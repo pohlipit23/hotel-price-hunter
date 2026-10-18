@@ -136,7 +136,7 @@ Approved two-part delivery (18 October 2026). Mixed F tasks are split into `a`
   receipt capture status, preserve stale/unavailable outcomes and pass storage as
   the sole catalogue source. `booking-v3.browser.mjs` proves the request behaviour
   against an injected v3 endpoint; it does not substitute for integrated acceptance.
-  Current integration: merge `b1eda30` includes only pinned `d14f70f`; the real
+  First integration: merge `b1eda30` includes only pinned `d14f70f`; the real
   six-code catalogue is imported into the authorised Part 2 emulator. Actual-UTC
   browser checks pass at four widths, core emulator tests pass 48/48, and the full
   Node run passes 370 with 29 explicit skips. Both hosted entrypoints and the
@@ -144,6 +144,13 @@ Approved two-part delivery (18 October 2026). Mixed F tasks are split into `a`
   F3b/F4b/F5b/F7b/F8/F9a/F9b/F10a/F10b have local acceptance; final F11b waits
   for Claude's F6/F7a/F11a and a
   later authorised merge. See the current Part 2 integration verification section.
+  Subsequent authorised integration: merge `f47960e` includes pinned `8423825`,
+  with the optional-revision fix and setup screens. The arm fetch delegates to
+  the judge helper, and Gemini launches from the Drops/Review headings without
+  covering content. Full Node: 379 passed, 29 skipped; core emulator: 50 passed;
+  real-capture and placement browser gates pass four widths, including stale tabs.
+  The refreshed local image is pinned to `f47960e`. Photo capture and final F11a
+  evidence remain with Claude; no later merge or release action is authorised.
 - Both parts branch from `roomdrop/judge-flow-base`, a snapshot of pre-existing
   shared-checkout work authored by neither part. Part 2 may start against the
   current memory-backed `/watch` receipt and switches to the Firestore-backed

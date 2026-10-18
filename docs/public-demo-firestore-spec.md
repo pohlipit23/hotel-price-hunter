@@ -341,6 +341,20 @@ with `WATCH_REVISION_STALE`, whereas the v3 interface notes describe omission as
 no stale check. This is source inspection, not an executed Part 1 arm test. The
 Part 2 client always supplies the field and does not depend on omission semantics.
 
+#### Authorised 8423825 setup integration
+
+The subsequent user-authorised merge includes `8423825` only, with Part 1's
+optional-revision fix `5a85d4a` and the F6/F7a setup screens. The earlier omitted-
+revision discrepancy is resolved by that parent. Part 2's arm fetch delegates to
+`judge.armRequestBody(data, minimum)` rather than duplicating its payload logic.
+An actual-emulator two-tab check proves a stale tab cannot overwrite a newer setup.
+
+The Gemini launch button now sits in the Drops or Review heading, in document
+flow, retaining the same dialog, question state and keyboard behaviour. Geometry
+and browser checks cover 320/768/1024/1440 px; prices and consent controls are not
+covered by the button. No Part 1 setup source was edited. Photo capture remains
+with Claude and is not part of this merge; a later merge needs its own go-ahead.
+
 ### The seam: the atomic arm operation and its receipt
 
 "Starts the watcher" means: valid consent and minimum saved, armed state

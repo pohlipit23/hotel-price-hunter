@@ -613,7 +613,7 @@ git diff --check
 daily-watch test binds explicitly to 8081 / `demo-roomdrop-iap-qa`. The six inherited
 integration skips are reported as skips. Memory tests are not Firestore proof.
 
-## Part 2 - Authorised d14f70f integration (current)
+## Part 2 - Authorised d14f70f integration (previous candidate)
 
 The user authorised merging only `d14f70fe6b5ac1dbba19844679e5b45250748627`.
 Merge commit `b1eda30c341377104937d3cde2b5e0317bdb20c4` has that exact second parent.
@@ -699,3 +699,52 @@ $env:RUN_FIRESTORE_INTEGRATION='1'
 node --test tests\quotation-session-storage.test.mjs tests\booking-drop-watch.test.mjs tests\booking-catalogue.test.mjs tests\quotation-demo-server.test.mjs
 Remove-Item Env:RUN_FIRESTORE_INTEGRATION -ErrorAction SilentlyContinue
 ```
+
+## Part 2 - Authorised 8423825 setup integration (current)
+
+The user authorised the next pinned merge through `8423825`; merge commit
+`f47960e9734bfe1933803ecb504cfee6d68b22fd` has that exact second parent.
+The owner-authored `5a85d4a` fix resolves the earlier omitted-revision discrepancy.
+Part 2 now delegates the request body to `judge.armRequestBody(data, minimum)`.
+Storage, arm, judge helpers, setup HTML/CSS and `drop-watch.js` match `8423825`
+unchanged. Later image-capture work is excluded.
+
+The 320 px overlap was reproduced with a failing browser geometry check before
+the fix. The Gemini launcher is now in the Drops or Review heading, in normal
+document flow, rather than floating over prices or consent controls. Its label,
+dialog, shared question state and keyboard operation are retained.
+
+| Current proof | Result | Evidence under the worktree's ignored `.local/` |
+| --- | --- | --- |
+| Full Node suite | 408 tests, 379 passed, 0 failed, 29 skipped | `integration/setup-merge-node-tests.log` |
+| Core emulator tests on 8281/demo-roomdrop-part2 | 50 passed, 0 failed, 0 skipped | `integration/setup-merge-core-emulator.log` |
+| Launcher placement and browser functionality | Pass at 320/768/1024/1440 px on Drops and Review; no overlap/overflow, dialog/chat/refresh/navigation pass | `gemini-placement-red.log`, `gemini-placement-green.log`, `part2-browser/result.json`; screenshots `drops-320.png` and `review-320.png` |
+| Actual real-capture emulator browser | Pass at four widths: real arm, confirm, restart, context, two judges/two codes, rearm and stale-tab rejection | `integration/setup-merge-real-browser.log`, `part2-firestore-real-browser/result.json`, including `stale-tab-*.png` |
+| v3 request browser | Pass at four widths; current revision sent, stale/503 do not overwrite receipt | `integration/setup-merge-v3-browser.log` |
+| Incoming setup/judge browser | Pass at 320/768/1440 px, keyboard, failure/retry, armed receipt, refresh, cannot-start and time-dependent eligibility | `integration/setup-merge-judge-browser.log`, `judge-flow/browser/result.json` |
+| Historical single-snapshot browser | Pass at 320/768/1440 px, review, acknowledgement, confirm, reload and return focus | `integration/setup-merge-single-browser.log` |
+| Refreshed frozen image | Pass: both hosted entrypoints, real arm/confirm/retry/restart/isolation, unavailable model and unchanged shared facts | `integration/setup-merge-image-smoke.log` |
+| Production emulator guards in refreshed image | Both entrypoints refuse with bounded exit 1, network disabled | `integration/setup-merge-image-guards.json` |
+
+The incoming judge-browser harness initially expected older Part 2 failure text
+and a capture-only detail line. Its two display assertions were aligned with the
+existing unavailable message and explicit replay/capture timestamps, preserving
+and strengthening receipt/no-false-arm checks. No setup implementation was edited
+and no Part 1 evidence text was replaced. Claude still owns final F11a evidence.
+
+| Refreshed integration pin | Value |
+| --- | --- |
+| Runtime source | `f47960e9734bfe1933803ecb504cfee6d68b22fd` |
+| Context SHA-256 | `c50762a10fdb3df936fa16b5e42bf536ef0643543c8e02f0280a4d3e50ce951d` |
+| Catalogue manifest SHA-256 | `cb0a3fbe3146c8181844a574333389d769ed6780481849dd20fc6e5c86dc4dc5` |
+| Local image | `roomdrop-booking:f47960e9734b-c50762a10fdb` |
+| Local image ID | `sha256:132c1a1e2e4c5dc062944300868bb4ba886262d0d3cc69729a36134c4976c1fa` |
+| Packet | `integration/setup-merge-release-pin.json`, `.local/booking-release-d1c699b5-5641-4da1-b115-f94f6aff0637/manifest.json` |
+
+The image smoke compares served bytes for the new judge helper, Gemini CSS,
+booking CSS and adviser/booking scripts. Real catalogue facts remain unchanged;
+no new capture or import was performed during this merge. Model responses remain
+injected, and external browser requests/page errors are zero. The image ID is
+local only; no registry push, deployment, production import, live call, access/TTL
+change or scheduler execution occurred. Photo capture and final release/F11a
+handoff remain pending with Claude and require a later authorised merge.

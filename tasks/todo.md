@@ -292,8 +292,9 @@ Ownership update authorised by the user on 18 October: Codex now also owns F9a
 (hosted Firestore wiring) and F10a (packaging), alongside F9b/F10b. The Part 1
 sections above remain historical task records. Claude retains F6/F7a (setup UI,
 `booking-judge.js`, `drop-watch.js`, catalogue/booked/setup HTML/CSS) and F11a
-evidence. Only pinned `d14f70f` is authorised for this merge; later work requires
-another go-ahead. No push, deploy, production import or live upstream call.
+evidence. The initial merge authorised pinned `d14f70f`; a subsequent user go-ahead
+also authorised `8423825`. No later commit or photo work is included. No push,
+deploy, production import or live upstream call.
 
 ### F3b: Session confirmation and context fields (Part 2 of F3)
 
@@ -501,6 +502,26 @@ Contract v3 follow-up (Part 2 only):
 
 Current evidence and exact pins are in the Part 2 integration section of
 `docs/public-demo-firestore-verification.md` and the release document.
+
+### Authorised 8423825 setup merge - current verification
+
+- [x] Merge pinned `8423825` as `f47960e`, including the owner-authored optional
+  revision fix and F6/F7a setup screens. Protected source matches the parent.
+- [x] The arm fetch now sends `judge.armRequestBody(data, minimum)`. An actual
+  same-session two-tab browser test rejects the stale tab without changing the
+  newer receipt, at all four viewport widths.
+- [x] Gemini launches from the Drops/Review headings in document flow. Geometry
+  checks and screenshots at 320/768/1024/1440 px verify that it does not cover
+  card prices or consent/actions. Dialog, history, keyboard and refresh checks pass.
+- [x] Full Node: 408 tests, 379 passed, 0 failed, 29 skipped. Core emulator: 50
+  passed, 0 failed, 0 skipped. Updated judge, v3, real-capture and historical
+  single-snapshot browser regressions pass. Two judge-browser assertions were
+  aligned with existing Part 2 failure copy and replay/capture timestamp detail.
+- [x] Refreshed exact-source image and both hosted entrypoints pass the emulator
+  smoke and network-disabled production-emulator guard; source `f47960e`.
+- [ ] Photo capture remains in progress with Claude, and final F11a/F11b release
+  handoff remains open. No further merge, push, deploy, production import or live
+  call is included in this approval.
 
 ## Hackathon AI restoration, 17 October
 

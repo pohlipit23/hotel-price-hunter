@@ -1,9 +1,10 @@
 # Curated RoomDrop Part 2 release preparation
 
-Status: the user-authorised `d14f70f` merge is committed as `b1eda30` and local
-integrated acceptance passes. The frozen integration candidate includes the
-subsequent F9b hosted-entrypoint correction at `a1a3fcf`. It is not a final
-release: Claude's F6/F7a setup UI and F11a evidence are still pending. No push,
+Status: the user-authorised setup merge through `8423825` is committed as
+`f47960e` and local integrated acceptance passes. The client uses the judge arm
+helper and the Gemini launcher no longer covers card prices or review controls.
+It is not a final release: Claude's photo capture and final F11a evidence remain
+pending. No push,
 deployment, production import, live call or access change is included.
 
 The hosted booking and quotation entrypoints require server Firestore storage,
@@ -21,12 +22,12 @@ F6/F7a/F11a; later Part 1 merges require another user go-ahead.
 
 | Frozen integration pin | Value |
 | --- | --- |
-| Source commit | `a1a3fcfdfe5b83dabb2d830355b9df5b70399710` |
-| Context SHA-256 | `76b5f5316a6e4efa75de1acb0c937744bb6b676f37d900baf455fff7277d20b9` |
+| Source commit | `f47960e9734bfe1933803ecb504cfee6d68b22fd` |
+| Context SHA-256 | `c50762a10fdb3df936fa16b5e42bf536ef0643543c8e02f0280a4d3e50ce951d` |
 | Catalogue manifest SHA-256 | `cb0a3fbe3146c8181844a574333389d769ed6780481849dd20fc6e5c86dc4dc5` |
-| Local image | `roomdrop-booking:a1a3fcfdfe5b-76b5f5316a6e` |
-| Local image ID | `sha256:4e6d38efe613fe980d76af3243da0c8bec9696ba55902704163a25f79ab14bf0` |
-| Local packet | `.local/integration/release-pin.json` and `.local/booking-release-609773ee-c8d2-4aad-8d22-d55b158cf1b1/manifest.json` |
+| Local image | `roomdrop-booking:f47960e9734b-c50762a10fdb` |
+| Local image ID | `sha256:132c1a1e2e4c5dc062944300868bb4ba886262d0d3cc69729a36134c4976c1fa` |
+| Local packet | `.local/integration/setup-merge-release-pin.json` and `.local/booking-release-d1c699b5-5641-4da1-b115-f94f6aff0637/manifest.json` |
 
 This is a local image ID, not verified registry byte evidence. No image was
 pushed. The source and served assets are frozen; the real capture payload is
@@ -34,11 +35,12 @@ absent from the image. The packet contains only reviewed code/version pins.
 
 ## Finish locally before requesting release approval
 
-1. Wait for Claude's F6/F7a/F11a handoff, obtain authority for any later merge,
+1. Wait for Claude's photo-capture/final F11a handoff, obtain authority for any later merge,
    then retest the affected UI and exact combined image. Do not merge the moving
-   branch tip under the earlier permission for `d14f70f`.
+   branch tip under the earlier permission for `8423825`.
 2. Preserve the current durable bootstrap projection and Part 1's arm transaction.
-   The client sends `expectedRevision`; startup uses `bookingStorage` as its sole
+   The client delegates to `judge.armRequestBody` to send `expectedRevision`;
+   startup uses `bookingStorage` as its sole
    source, with loaded version bindings separately named `reviewedCatalogue`.
 3. Complete final content/photo/scenario review and production preservation checks.
    The supplied real catalogue has now been validated and imported locally:
@@ -60,7 +62,7 @@ credentials, supplier references or judge state are packaged in that manifest.
 
 ```powershell
 Set-Location 'C:\Users\pohli\Sites\hotel-price-hunter\.local\roomdrop-part2'
-$sourceCommit = 'a1a3fcfdfe5b83dabb2d830355b9df5b70399710'
+$sourceCommit = 'f47960e9734bfe1933803ecb504cfee6d68b22fd'
 $prepared = node scripts\prepare-booking-release.mjs --prepare "--source=$sourceCommit" --manifest=.local\integration\reviewed-catalogue-manifest.json | ConvertFrom-Json
 $manifestPath = $prepared.manifestPath
 # Verify every hash before building.
