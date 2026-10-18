@@ -117,7 +117,7 @@ Approved two-part delivery (18 October 2026). Mixed F tasks are split into `a`
   selection receipts; F7b replay presentation and Deals/Review/Confirmed; F8
   durable Gemini context; F9b complete hosted entrypoints; F10b frozen release
   export; F11b integrated acceptance and release bundle.
-  Implementation record: receipt/UI and contract-v1 action/startup wiring are
+  Historical pre-integration record: receipt/UI and contract-v1 action/startup wiring are
   implemented on this branch. Real-emulator tests exercise Part 2 transactions
   and HTTP restart recovery through injected contract adapters. Part 1 modules
   are not integrated here, so whole-journey persistence and a production release
@@ -136,6 +136,14 @@ Approved two-part delivery (18 October 2026). Mixed F tasks are split into `a`
   receipt capture status, preserve stale/unavailable outcomes and pass storage as
   the sole catalogue source. `booking-v3.browser.mjs` proves the request behaviour
   against an injected v3 endpoint; it does not substitute for integrated acceptance.
+  Current integration: merge `b1eda30` includes only pinned `d14f70f`; the real
+  six-code catalogue is imported into the authorised Part 2 emulator. Actual-UTC
+  browser checks pass at four widths, core emulator tests pass 48/48, and the full
+  Node run passes 370 with 29 explicit skips. Both hosted entrypoints and the
+  exact-source local image at `a1a3fcf` pass startup/arm/confirm/restart checks.
+  F3b/F4b/F5b/F7b/F8/F9a/F9b/F10a/F10b have local acceptance; final F11b waits
+  for Claude's F6/F7a/F11a and a
+  later authorised merge. See the current Part 2 integration verification section.
 - Both parts branch from `roomdrop/judge-flow-base`, a snapshot of pre-existing
   shared-checkout work authored by neither part. Part 2 may start against the
   current memory-backed `/watch` receipt and switches to the Firestore-backed

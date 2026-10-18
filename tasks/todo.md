@@ -289,7 +289,7 @@ another go-ahead. No push, deploy, production import or live upstream call.
 
 ### F3b: Session confirmation and context fields (Part 2 of F3)
 
-- [ ] Acceptance: extend the F3a session store with `byCode[code]` confirmation
+- [x] Acceptance: extend the F3a session store with `byCode[code]` confirmation
   and bounded conversation context and the session-wide advice counters, in the
   same transactional, hashed, one-hour, 64-session model. Invalidate a
   confirmation or context that no longer belongs to the current watch revision.
@@ -300,7 +300,7 @@ another go-ahead. No push, deploy, production import or live upstream call.
 
 ### F4b: Confirm, advice and chat routes on durable sessions (Part 2 of F4)
 
-- [ ] Acceptance: confirm/advice/chat per-code routes read durable sessions and
+- [x] Acceptance: confirm/advice/chat per-code routes read durable sessions and
   the committed watch receipt; preserve Host/Origin/CSRF, query rejection,
   bounds and no upstream call except the guarded model call outside transactions.
 - Verify: `node --test .\tests\quotation-demo-server.test.mjs` Part 2 cases with
@@ -310,7 +310,7 @@ another go-ahead. No push, deploy, production import or live upstream call.
 
 ### F5b: Membership, safe rearming and idempotent selection receipts (Part 2 of F5)
 
-- [ ] Acceptance: confirm only a current qualifying Drop for an armed watch,
+- [x] Acceptance: confirm only a current qualifying Drop for an armed watch,
   retaining acknowledgements and `reservationCreated:false`, `quoteModified:false`,
   `customerRefund:null`. Same-Drop retries return one selection receipt; a rearm
   invalidates a confirmation outside the new set; stale versions return
@@ -323,13 +323,13 @@ another go-ahead. No push, deploy, production import or live upstream call.
 
 ### Checkpoint F3-F5 (Part 2): Durable judge actions after arming
 
-- [ ] Emulator/API evidence proves guarded confirmation and restart recovery of
+- [x] Emulator/API evidence proves guarded confirmation and restart recovery of
   confirmation/context across independent app/storage instances.
-- [ ] Expired sessions and stale bindings cannot confirm. Relevant tests run.
+- [x] Expired sessions and stale bindings cannot confirm. Relevant tests run.
 
 ### F7b: Connect the replay result to Deals, Review and Confirmed (Part 2 of F7)
 
-- [ ] Acceptance: show armed/replayed results with capture and replay times from
+- [x] Acceptance: show armed/replayed results with capture and replay times from
   the receipt. Feed only the session's qualifying captured Drops to existing
   screens, ranking and labels; preserve reduced-flexibility consent,
   empty/unavailable states, navigation, refresh and idempotent confirmation.
@@ -343,7 +343,7 @@ another go-ahead. No push, deploy, production import or live upstream call.
 
 ### F8: Preserve grounded Gemini context per judge and code
 
-- [ ] Acceptance: use the authorised code's current replayed facts and bounded
+- [x] Acceptance: use the authorised code's current replayed facts and bounded
   context. Atomically reserve session allowance before external inference; late
   replies cannot overwrite another code, a changed watch or newer confirmation.
   Keep existing per-instance throttles and current unavailable behavior.
@@ -363,7 +363,7 @@ another go-ahead. No push, deploy, production import or live upstream call.
 
 ### F9b: Complete the hosted Firestore entrypoints (Part 2 of F9)
 
-- [ ] Acceptance: load the bounded reviewed catalogue manifest without a
+- [x] Acceptance: load the bounded reviewed catalogue manifest without a
   single-booking file fallback for every route. Remove the mandatory snapshot
   copy, close storage cleanly and keep production emulator/credential/origin
   guards intact. Startup never seeds or imports data.
@@ -374,7 +374,7 @@ another go-ahead. No push, deploy, production import or live upstream call.
 
 ### F10b: Export and verify the frozen curated runtime (Part 2 of F10)
 
-- [ ] Acceptance: release preparation includes the full dependency closure and
+- [x] Acceptance: release preparation includes the full dependency closure and
   reviewed code/version catalogue manifest, excluding credentials and private
   captures. Keep the exact-commit source/context lineage and static allowlists.
 - Verify: `node --test .\tests\public-demo-release.test.mjs`; exact-context
@@ -398,7 +398,7 @@ another go-ahead. No push, deploy, production import or live upstream call.
 
 ### Checkpoint F9-F11 (Part 2): Ready for a separate release decision
 
-Part 2 implementation record (18 October, contract v1; acceptance remains open):
+Historical pre-integration component record (18 October, contract v1):
 
 - [x] F3b/F5b component slice: `quotation-session-actions.mjs` adds transactional
   selection/context/allowance operations without writing `watch`. Tests include
@@ -427,7 +427,7 @@ Part 2 implementation record (18 October, contract v1; acceptance remains open):
   then refresh cloud preservation/import/TTL/rollback evidence for approval.
   Test-source images and the earlier memory image are not release candidates.
 
-No original acceptance checkbox above is closed by these component proofs.
+Those component proofs alone did not close acceptance. The authorised merge record below supersedes their integration blockers.
 Evidence and commands: `docs\public-demo-firestore-verification.md` (Part 2) and
 `docs\public-demo-firestore-release.md`.
 
@@ -469,6 +469,30 @@ Contract v3 follow-up (Part 2 only):
 - [ ] After separately approved execution, verify public curated reads, replay
   labels, live eligibility, restart persistence and two-judge isolation, with
   before/after private-service checks. Liveness alone cannot close acceptance.
+
+### Authorised d14f70f integration - current local acceptance
+
+- [x] Merge pinned `d14f70f` as `b1eda30`; protected storage, arm and setup modules
+  match the parent exactly. No later Part 1 work is merged.
+- [x] Transferred F9a: both hosted entrypoints now use the curated customer facade,
+  durable catalogue sessions and the bootstrap confirmation/conversation projection.
+  Production emulator/origin/credential guards remain intact.
+- [x] Transferred F10a: actual storage/arm dependency closure is frozen in the
+  exact-source manifest-only context and the local image passes an emulator smoke.
+- [x] Reviewed real catalogue imported into 8281 / demo-roomdrop-part2 only: six
+  codes, twelve captured Drops, with non-refundable 179/184 refusing arm.
+- [x] Real-capture browser gate passes at 320/768/1024/1440 px, actual UTC, including
+  two judges writing isolated watches, two codes, confirmation/context restart,
+  high-minimum empty replay and unchanged shared facts.
+- [x] Full Node run: 399 tests, 370 passed, 0 failed, 29 skipped. Targeted core
+  emulator run: 48 passed, 0 failed, 0 skipped. The hardcoded 8181 importer test
+  was excluded; the reviewed real importer ran against 8281 instead.
+- [ ] F11b final handoff/release acceptance awaits Claude's F6/F7a and F11a. The
+  current image is an integration candidate. Later merges, any live capture/model
+  call, production import, push, deployment or access change need their authority.
+
+Current evidence and exact pins are in the Part 2 integration section of
+`docs/public-demo-firestore-verification.md` and the release document.
 
 ## Hackathon AI restoration, 17 October
 

@@ -456,7 +456,10 @@ Commands (worktree, emulator `roomdrop-part1-firestore` 127.0.0.1:8181, project
 Still open: the browser flow above, F6/F7a screens (cards, photos, capture note),
 hosted startup wiring (F9a) and the emulator launcher (F11a).
 
-## Part 2 - 18 October 2026
+## Part 2 - 18 October 2026, pre-integration history
+
+The current authorised integration result is recorded at the end of this Part 2
+section. The blockers and component results immediately below are historical.
 
 Worktree: `.local\roomdrop-part2`, branch `codex/roomdrop-part2-app`.
 Base: `3c07af3`. Binding storage interface: v3 supplied by Claude through the user.
@@ -549,3 +552,90 @@ git diff --check
 `RUN_FIRESTORE_INTEGRATION` stays unset here because the unrelated historical
 daily-watch test binds explicitly to 8081 / `demo-roomdrop-iap-qa`. The six inherited
 integration skips are reported as skips. Memory tests are not Firestore proof.
+
+## Part 2 - Authorised d14f70f integration (current)
+
+The user authorised merging only `d14f70fe6b5ac1dbba19844679e5b45250748627`.
+Merge commit `b1eda30c341377104937d3cde2b5e0317bdb20c4` has that exact second parent.
+F9a and F10a ownership transferred to Codex. Claude retains F6/F7a setup UI and
+F11a evidence; no later Part 1 commit has been merged.
+
+The protected `booking-storage.mjs`, `quotation-session-storage.mjs`,
+`domain/booking-drop-watch.mjs`, `domain/altovo-quotation.mjs`, `booking-judge.js`
+and `drop-watch.js` match `d14f70f` unchanged. The arm request/receipt/transaction
+is preserved. The client explicitly sends `expectedRevision`, including on retry.
+Part 2 owns durable post-watch mutations and the filtered bootstrap projection;
+catalogue confirmations and conversation no longer use a process-local mirror.
+
+| Current proof | Result | Raw evidence under the worktree's ignored `.local/` |
+| --- | --- | --- |
+| Reviewed real import, default RoomDrop namespace, demo project/8281 only | Pass: six codes, 12 captured Drops, create-only import | `integration/real-import.json`, `integration/import-input-hashes.json` |
+| Actual-UTC catalogue eligibility and arm | Pass: 180-183 return 200/observed; 179/184 return 409/NON_REFUNDABLE | `part2-firestore-real-browser/result.json`, `catalogueChecks` |
+| Real-capture integrated browser | Pass: 320/768/1024/1440 px; arm, qualifying Drops, confirm, restart, context, two judges writing separate watches, two codes, rearm to empty | `part2-firestore-real-browser/result.json`, 12 screenshots |
+| Shared fact preservation / external requests | Pass: before/after shared booking/Drop-fact equality; zero external browser requests and page errors | Same browser result; only this run's private session namespace is deleted |
+| Full merged Node suite | Pass: 399 tests, 370 passed, 0 failed, 29 skipped | `integration/merged-node-tests-final.log` |
+| Actual core Firestore tests on Part 2 emulator | Pass: 48 passed, 0 failed, 0 skipped | `integration/part1-core-emulator.log` |
+| Exact-source manifest export and Docker build | Pass: actual modules, dependency closure, no payload snapshots/private captures | `integration/release-pin.json`, `integration/docker-build.log` |
+| Packaged runtime with actual emulator injection | Pass: both hosted entrypoints, six-code catalogue, real arm/confirm/retry, restart, judge isolation, unavailable model and unchanged shared facts | `integration/image-smoke.log` |
+| Production emulator guard in final image | Pass: both entrypoints refuse with bounded exit 1, network disabled | `integration/image-guard-results.json`, `integration/*-guard.log` |
+
+The targeted core run covered session, arm, catalogue and quotation server tests.
+It did not run the separate storage test case that hardcodes 8181 / Part 1's
+project. The real importer was instead executed explicitly against the authorised
+8281 / `demo-roomdrop-part2` endpoint. Full-suite skips remain reported separately;
+the two test counts overlap and must not be added together.
+
+The real capture file was
+`C:/Users/pohli/Sites/hotel-price-hunter/.local/altovo-catalogue/catalogue-87ab61f1-25f5-4b18-a98d-7c57a0d34f91.json`,
+SHA-256 `d3df4e16f9e33e2d17ce884b3e92af352b0d837449cc5709e7cf469f9d192039`.
+Its entries were combined with the supplied six-card draft in an ignored local
+import input. At-import card bytes hashed to
+`ffe03a7d6f0377cf2f56320d9a35cdb7fa95190a8316c08da6b44fef1e5080c7`.
+Later draft formatting changed, but canonical card data compares equal. The
+assembled input hashes to
+`f66b7d9a61d4bdbc9d7b71eef65f1b90c6033eb0ab7134b259163c1f09e36761`.
+No captures or private references are committed or included in the image.
+
+### Frozen local integration candidate
+
+| Pin | Value |
+| --- | --- |
+| Runtime source | `a1a3fcfdfe5b83dabb2d830355b9df5b70399710` |
+| Context SHA-256 | `76b5f5316a6e4efa75de1acb0c937744bb6b676f37d900baf455fff7277d20b9` |
+| Catalogue manifest SHA-256 | `cb0a3fbe3146c8181844a574333389d769ed6780481849dd20fc6e5c86dc4dc5` |
+| Local image tag | `roomdrop-booking:a1a3fcfdfe5b-76b5f5316a6e` |
+| Local image ID | `sha256:4e6d38efe613fe980d76af3243da0c8bec9696ba55902704163a25f79ab14bf0` |
+| Context/manifest directory | `.local/booking-release-609773ee-c8d2-4aad-8d22-d55b158cf1b1/` |
+
+The image smoke uses an explicit test factory to connect the frozen server to
+the actual Part 2 emulator. It does not enable an emulator environment switch in
+production. The ordinary command-line guard was tested separately without network.
+The quotation entrypoint now serves the same curated RoomDrop facade as booking;
+the old quotation page cannot bootstrap a catalogue and is not the hosted surface.
+The local image ID is not a verified registry digest; no registry push occurred.
+
+Self-review covered binding/expiry/receipt correctness, bounded source reads,
+transaction purity, request guards, source privacy, cleanup and ownership. No
+external OCR or live model evaluation was run. All model responses in browser/API
+tests were injected; the packaged model-unavailable path made zero model calls.
+A deliberate confirmation-projection mutation was caught by the focused regression
+test; the original bytes were restored and the focused test passed again.
+Evidence: `integration/review-mutation.log`; the runtime source remains unchanged.
+
+F3b/F4b/F5b/F7b/F8/F9a/F9b/F10a/F10b have current local proof. Final F11b release
+acceptance remains open for Claude's F6/F7a/F11a update and retest. No push,
+deployment, production import, live upstream call, IAM/TTL change or schedule ran.
+
+```powershell
+Set-Location 'C:\Users\pohli\Sites\hotel-price-hunter\.local\roomdrop-part2'
+$env:GOOGLE_CLOUD_PROJECT='demo-roomdrop-part2'
+$env:FIRESTORE_EMULATOR_HOST='127.0.0.1:8281'
+node tests\booking-firestore.browser.mjs --existing --catalogue=.local\integration\reviewed-real-catalogue.json
+$env:RUN_ROOMDROP_PART2_FIRESTORE='1'
+Remove-Item Env:RUN_FIRESTORE_INTEGRATION -ErrorAction SilentlyContinue
+npm.cmd test
+# Separate run: these files use the selected 8281 emulator; do not include the daily-watch test.
+$env:RUN_FIRESTORE_INTEGRATION='1'
+node --test tests\quotation-session-storage.test.mjs tests\booking-drop-watch.test.mjs tests\booking-catalogue.test.mjs tests\quotation-demo-server.test.mjs
+Remove-Item Env:RUN_FIRESTORE_INTEGRATION -ErrorAction SilentlyContinue
+```
