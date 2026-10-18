@@ -165,11 +165,15 @@ write shared booking/Drop records.
 
 ### F4a: Serve catalogue and per-code bootstrap APIs (Part 1 of F4)
 
-- [ ] Acceptance: expose bounded path-based catalogue/per-code reads backed by
+- [x] Acceptance: expose bounded path-based catalogue/per-code reads backed by
   Firestore and the reviewed manifest, returning shared facts plus only this
   session's `byCode[code].watch`. Create/restore private sessions; preserve
   canonical Host/Origin/CSRF and query rejection. No public import/share-link input,
   arbitrary-code lookup, capture-file access or Altovo/Gateway call exists.
+- Evidence: commit 70f9547; verification doc, Part 1 F4a and F5a. Injected
+  `bookingStorage`/`sessionStorage`; codes outside the manifest never reach
+  storage. Bootstrap adds `dropSetVersion` and `capture`, catalogue entries add
+  `card` (additive). The emulator suites pass 74/74.
 - Verify: `node --test .\tests\booking-catalogue.test.mjs` (existing base-snapshot
   test, or the proposed `booking-catalogue-server.test.mjs`) and
   `.\tests\quotation-demo-server.test.mjs`; test unknown/encoded/malformed codes,
@@ -183,13 +187,18 @@ write shared booking/Drop records.
 
 This is the Part 1/Part 2 seam.
 
-- [ ] Acceptance: validate actual-time cancellation eligibility, explicit consent
+- [x] Acceptance: validate actual-time cancellation eligibility, explicit consent
   and a minimum of 10.00 in the booking currency. Commit one armed setup/replay
   filtered by `isDisplayedDrop` and the threshold in one transaction, and return
   the spec's receipt only after commit. Identical retries preserve the receipt;
   a stale arm request cannot replace a newer revision; a deliberate new minimum
   creates a new revision for that session/code only. Missing or malformed captures
   fail without commit; a valid empty replay commits honestly.
+- Evidence: commits 9f57104 and 7e9373c; verification doc, Part 1 F4a and F5a.
+  The receipt is the spec shape plus `firstCheck.captureStatus`. A missing
+  `expectedRevision` means 0, so a re-arm must send the current revision.
+  `app\public\booking-live.js` (Part 2) does not send it yet, so the browser
+  re-arm step fails until that coordinated change lands (F7a).
 - Verify: `node --test .\tests\booking-drop-watch.test.mjs` with emulator races,
   lost acknowledgements, raised minima, mixed currency, changing cancellation
   windows, missing versus empty captures and changed Drop sets; zero upstream calls.

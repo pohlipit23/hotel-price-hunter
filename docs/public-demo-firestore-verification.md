@@ -384,3 +384,74 @@ Content versions (first 12 hex characters): 179 `1e490d803265`,
 180 `d7572d0b5c89`, 181 `98132d9fd3ff`, 182 `830d59ea02e1`,
 183 `7d5b74b1aff6`, 184 `d77e996890f5`. This is local emulator evidence only.
 A production import remains a separate LIVE step that needs its own approval.
+
+### F4a and F5a: Storage-backed catalogue, bootstrap and the atomic arm (18 October 2026)
+
+Commits `9f57104` (pure arm), `70f9547` (server wiring) and `7e9373c` (HTTP and
+emulator arm tests). New files: `app\domain\booking-drop-watch.mjs`,
+`tests\booking-drop-watch.test.mjs` and `tests\fixtures\roomdrop-harness.mjs`
+(test harness and a read-only stand-in built from the import plan). Changed:
+`app\quotation-demo-server.mjs` (catalogue `GET`, bootstrap and `/watch`
+branches, plus session plumbing) and `app\booking-demo-server.mjs` (pass-through
+of the injected storage). The final route and receipt shape is in the spec
+section "Arm route as implemented".
+
+Covered against the emulator, with the imported synthetic fixture in per-test
+prefixes and two clients:
+
+- catalogue in card order with cards and request-time blockers and tags;
+- the session document is the cookie digest; the raw cookie is stored nowhere;
+- bootstrap returns the content and Drop-set versions, the capture record and
+  only this session's watch;
+- unknown, lower-case, percent-encoded, over-long and suffixed codes are 404 and
+  never reach `getBooking`; queries are rejected;
+- two judges on one code and one judge on two codes stay isolated;
+- a restart (new server, new storage objects on a second client) keeps the cookie,
+  csrf and committed watch;
+- a Drop set imported while the app runs makes the stored watch stale for that
+  code only: bootstrap shows `null`, the old revision is `WATCH_REVISION_STALE`
+  and a fresh arm starts at revision 1;
+- four identical arms sent at once to two app instances give one revision-1
+  receipt, already readable from the other client; a lost-acknowledgement retry
+  returns the same receipt;
+- three minima racing from revision 0 commit exactly one; the others are 409;
+  a raise to revision 2 cannot be reverted by retrying the winning request;
+- two judges arming one code at once both get revision 1 without overwriting;
+- a deleted Drop document is `503 CAPTURE_UNAVAILABLE` with nothing committed;
+  an `observed-empty` capture commits a completed replay with no Drops;
+- an expired session is `403 DEMO_SESSION_REQUIRED`; a fresh session at the free
+  deadline is `409 WATCH_CANNOT_START` / `FREE_CANCELLATION_ENDED`, uncommitted;
+- no request left loopback and the injected adviser was never called on the
+  arm path.
+
+Without the emulator:
+
+- the pure arm cases: receipt, threshold and the 10.00 floor in JPY, MYR and KWD
+  minor units, request validation, identical and stale retries, a Drop-set
+  reset, eligibility at the arming instant, missing, malformed and mixed-currency
+  captures with no mutation, and isolation of other codes and unknown fields;
+- factory guards: hosted booking storage needs Firestore sessions, and mixed data
+  sources are refused;
+- database failure: `503 CATALOGUE_UNAVAILABLE` or `503 DEMO_UNAVAILABLE`, no SDK
+  text, no cookie, and recovery once storage returns;
+- the existing file-catalogue tests through the same code path. A re-arm there
+  now needs `expectedRevision`.
+
+Commands (worktree, emulator `roomdrop-part1-firestore` 127.0.0.1:8181, project
+`demo-roomdrop-part1`, `RUN_FIRESTORE_INTEGRATION=1`, `NODE_ENV=test`):
+
+- `node --test .\tests\altovo-catalogue.test.mjs .\tests\booking-storage.test.mjs .\tests\quotation-session-storage.test.mjs .\tests\booking-catalogue.test.mjs .\tests\booking-drop-watch.test.mjs .\tests\quotation-demo-server.test.mjs`:
+  tests 74, pass 74, fail 0, skipped 0.
+- The three server files without the emulator variables: tests 33, pass 24,
+  fail 0, skipped 9.
+- `npm test` without emulator variables: tests 373, pass 344, fail 0, skipped 29.
+- Afterwards the emulator held only the S0.6 `roomdropBookingsV1` collection
+  (6 bookings). Every test collection had been deleted.
+- `node .\tests\booking-judge.browser.mjs`: FAILS at the change-minimum step at
+  320 px. The re-arm gets `409 WATCH_REVISION_STALE`, because the arm request in
+  `app\public\booking-live.js` (Part 2 file) sends no `expectedRevision`. The
+  first arm passes. This needs the coordinated one-line change described in the
+  Part 1 report (F7a).
+
+Still open: the browser flow above, F6/F7a screens (cards, photos, capture note),
+hosted startup wiring (F9a) and the emulator launcher (F11a).

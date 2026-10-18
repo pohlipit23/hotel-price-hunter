@@ -280,7 +280,8 @@ Never split this transaction, report a fake success or add another customer step
 or delay. Missing or malformed capture data fails without a commit (unavailable),
 which is distinct from a valid committed empty replay.
 
-Current code (memory-backed, unreviewed base-snapshot work, not Firestore):
+Base-snapshot code before F4a/F5a (memory-backed, superseded; see "Arm route as
+implemented" below):
 
 - Route: `POST /api/booking-demo/q/<code>/watch`, allowlisted in
   `app\booking-demo-server.mjs` (`bookingApi`) and served by
@@ -420,6 +421,57 @@ Expired sessions listed there are deleted in that same transaction. Values must
 be JSON data. Every write keeps fields Part 1 does not own. Part 2 (F3b) adds its
 fields through `transact`, using its own helper next to `codeScope`, and never
 writes `watch`.
+
+#### Arm route as implemented (F4a and F5a, 18 October 2026)
+
+Server factories take injected storage: `createBookingDemoServer`,
+`createQuotationDemoServer` and `createHostedQuotationDemoServer` accept
+`{ bookingStorage, sessionStorage }` in place of `bundle`/`snapshot`/`catalogue`.
+Hosted mode requires `sessionStorage.mode === 'firestore'`. Locally a missing
+`sessionStorage` defaults to the memory adapter. A file catalogue still works
+through the same read interface, with memory sessions. The packaged hosted file
+catalogue keeps its existing process-local sessions until F9a.
+
+- The manifest (`listCatalogue`) is read on first use and retried after a
+  failure. A code outside it is `404 BOOKING_UNAVAILABLE` without any lookup.
+  Each request then re-reads `getBooking(code)`, so a new Drop set is seen at once.
+- `GET /api/booking-demo/catalogue`: entries as before, plus
+  `card: { order, cityName, scenarioLabel, photo } | null`.
+- `GET /api/booking-demo/q/<code>`: as before, plus `dropSetVersion` and
+  `capture: { status, capturedAt }`. `watch` is this session's committed receipt
+  only while it is bound to the current content and Drop-set versions, else `null`.
+- `POST /api/booking-demo/q/<code>/watch`: body keys `snapshotVersion`, `consent`,
+  `minimumSavingMinor` and optional `expectedRevision`. A missing
+  `expectedRevision` means 0 (a first arm): a re-arm must send the current
+  `watch.revision`. The booking is read before the transaction, then
+  `armDropWatch` (`app\domain\booking-drop-watch.mjs`) runs inside one
+  `sessionStorage.transact`, in this order:
+  1. snapshot check;
+  2. identical retry;
+  3. revision staleness;
+  4. eligibility at the request time;
+  5. capture validity;
+  6. replay and commit.
+
+  The receipt is sent only after the commit.
+- An identical retry is the same minimum with `expectedRevision` equal to the
+  committed revision or the one before it. It returns the committed receipt
+  unchanged. A new minimum on the current revision creates revision + 1. A new
+  Drop set or content version resets the watch, and the revision then starts at 1.
+- Receipt: exactly the proposed shape above, plus one additive field,
+  `watch.firstCheck.captureStatus` (`observed` or `observed-empty`). It tells an
+  empty search apart from offers that did not qualify.
+  `watch.consent.version` is `roomdrop-drop-watch-consent-2026-10-18`.
+- Errors as listed above, plus `503 CATALOGUE_UNAVAILABLE` (manifest or catalogue
+  unreadable) and `503 DEMO_UNAVAILABLE` (any other storage failure, no SDK
+  detail). A capture that is missing, `not-searched` on an armable booking, or
+  malformed is `503 CAPTURE_UNAVAILABLE` with no commit. Malformed includes a
+  Drop not priced in the booking currency, a missing capture time and an empty
+  capture that holds Drops. A valid `observed` or `observed-empty` capture with no
+  qualifying Drop commits a completed replay with `dropOptionIds: []`.
+- The confirm, advice and chat branches read the armed watch from the durable
+  session. Their own confirmation, history and rate-limit state stays
+  process-local until Part 2 (F4b) moves it into `transact`.
 
 ### Ownership
 
