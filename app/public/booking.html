@@ -43,7 +43,7 @@
           <article class="ticket booked-ticket">
             <div class="ticket-photo booked-photo">
               <div id="booked-photo"></div>
-              <span class="photo-tag">Illustrative photo</span>
+              <span id="booked-photo-tag" class="photo-tag">Illustrative photo</span>
               <span class="booked-stamp" aria-hidden="true"><span>Agency</span><strong>Booked</strong></span>
             </div>
             <div class="ticket-tear" aria-hidden="true"></div>
@@ -56,9 +56,6 @@
             </div>
           </article>
           <p id="booked-note" class="honest-note"></p>
-          <div id="booked-ready" class="judge-actions">
-            <button id="setup-drop" class="primary" type="button">Set up a drop</button>
-          </div>
           <section id="booked-blocked" class="cannot-start" aria-labelledby="blocked-title" hidden>
             <span class="cannot-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-6 15L18 6"/></svg></span>
             <div>
@@ -67,6 +64,9 @@
             </div>
             <button id="pick-another" class="secondary" type="button">Pick another booking</button>
           </section>
+          <div id="booked-ready" class="judge-actions">
+            <button id="setup-drop" class="primary" type="button">Set up a drop</button>
+          </div>
         </section>
 
         <section id="setup-screen" class="judge-screen" aria-labelledby="setup-title" hidden>
