@@ -47,7 +47,8 @@ export function plannedBookings(input = curated()) {
       const item = records.get(code); if (!item) return null;
       const bundle = { schemaVersion: 1, snapshotVersion: item.contentVersion, transactionMode: 'selection-only', baseline: item.booking.baseline,
         options: item.drops.map(drop => drop.facts), checkedAt: item.dropSet.checkedAt, completeness: item.dropSet.completeness, customerRefund: null, reservationCreated: false };
-      return { code, contentVersion: item.contentVersion, dropSetVersion: item.dropSetVersion, bundle, capture: { status: item.dropSet.capture.status, capturedAt: item.dropSet.capture.capturedAt } };
+      return structuredClone({ code, contentVersion: item.contentVersion, dropSetVersion: item.dropSetVersion, bundle,
+        capture: { status: item.dropSet.capture.status, capturedAt: item.dropSet.capture.capturedAt } });
     },
   };
 }

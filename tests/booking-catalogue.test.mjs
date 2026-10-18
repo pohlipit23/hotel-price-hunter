@@ -260,4 +260,3 @@ test('Firestore Drop sets: a later capture makes the stored watch stale for that
   const rearmed = await (await v.post(OPEN, 'watch', body)).json();
   assert.deepEqual([rearmed.watch.revision, rearmed.watch.dropSetVersion, rearmed.dropOptionIds], [1, added.entries[0].dropSetVersion, ['option-fixture-flex-premier-later']]);
 });
-
