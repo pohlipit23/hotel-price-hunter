@@ -225,9 +225,64 @@ test('cannot-start quotations are packaged without any upstream call or credenti
   const root = await workspace(t, [grandHyattProjection()]);
   const report = await prepareCatalogue(['--approved-codes=AIRB000179', '--execute'], { root, fetchImpl: refuseNetwork, now: NOW, env: {} });
   assert.equal(report.status, 'prepared', report.reason);
-  assert.deepEqual(report.entries, [{ code: 'AIRB000179', hotel: 'Grand Hyatt Kuala Lumpur', blocker: 'NON_REFUNDABLE', capture: 'not-searched', optionCount: 0 }]);
+  assert.deepEqual(report.entries, [{ code: 'AIRB000179', hotel: 'Grand Hyatt Kuala Lumpur', blocker: 'NON_REFUNDABLE', capture: 'not-searched', optionCount: 0, imageSources: { hotel: false, drops: 0 } }]);
   const refused = await prepareCatalogue(['--approved-codes=AIRB000179', '--execute'], { root, fetchImpl: refuseNetwork, now: NOW, env: { K_SERVICE: 'x' } });
   assert.equal(refused.status, 'blocked');
+});
+
+// Gateway image shapes: hotel `avatar.urls.{sm,md,lg}` (mirrored as `avatar.sm/md/lg`), room `images[]` with `urls` and `caption`.
+const urls = name => ({ sm: `https://img.example.test/${name}-sm.jpg`, md: `https://img.example.test/${name}-md.jpg`, lg: `https://img.example.test/${name}-lg.jpg` });
+const withImages = (result, { avatar, roomImages = [] } = {}) => {
+  const [source] = result.data; source.avatar = avatar;
+  source.rooms = roomImages.map((images, index) => ({ ...source.rooms[0], room_name: `Room ${index + 1}`, room_type_id: `room-type-${index}`,
+    images, rates: source.rooms[0].rates.filter((_, rateIndex) => rateIndex === index) }));
+  return result;
+};
+const prepareWith = async (t, response) => {
+  const root = await workspace(t);
+  const report = await prepareCatalogue(EXECUTE, { root, fetchImpl: fakeGateway(response).fetchImpl, now: NOW, env: {} });
+  assert.equal(report.status, 'prepared', report.reason);
+  return { report, written: JSON.parse(await readFile(report.privateCatalogue, 'utf8')) };
+};
+const siamEntry = written => written.entries.find(entry => entry.code === 'AIRB000180');
+
+test('a capture keeps the hotel and each Drop photo as remote source URLs for a later reviewed download, never as renderable fields', async t => {
+  const response = withImages(searchResult([rate(500), rate(510, { board_basis: 'Room only' })]), {
+    avatar: { caption: null, id: null, urls: urls('hotel'), file_ids: null, ...urls('hotel') },
+    roomImages: [[{ caption: 'Deluxe twin', urls: urls('room-a') }, { caption: 'Second', urls: urls('room-a2') }], []],
+  });
+  const { written, report } = await prepareWith(t, response);
+  const siam = siamEntry(written);
+  const [first, second] = siam.bundle.options;
+  assert.deepEqual(siam.imageSources, {
+    kind: 'remote-source-urls-pending-review', renderable: false,
+    hotel: { url: 'https://img.example.test/hotel-md.jpg', caption: null },
+    drops: [{ optionId: first.optionId, url: 'https://img.example.test/room-a-md.jpg', caption: 'Deluxe twin' },
+      { optionId: second.optionId, url: null, caption: null }],
+  });
+  // The cannot-start quotation had no search, so no source photo is known.
+  assert.deepEqual(written.entries.find(entry => entry.code === 'AIRB000179').imageSources,
+    { kind: 'remote-source-urls-pending-review', renderable: false, hotel: null, drops: [] });
+  // Bundles stay exactly as before: image sources sit beside them, outside the integrity hash.
+  assert.doesNotMatch(JSON.stringify(siam.bundle), /img\.example/);
+  assert.deepEqual(report.entries.map(entry => [entry.code, entry.imageSources]), [['AIRB000179', { hotel: false, drops: 0 }], ['AIRB000180', { hotel: true, drops: 1 }]]);
+});
+
+test('image sources accept https only, fall back md, lg, sm, and record a missing avatar or empty images as null', async t => {
+  const insecure = withImages(searchResult([rate(500), rate(510, { board_basis: 'Room only' })]), {
+    avatar: { caption: 'Front', urls: { md: 'http://img.example.test/hotel-md.jpg', lg: 'https://img.example.test/hotel-lg.jpg' } },
+    roomImages: [[{ caption: 'x', urls: { md: 'javascript:alert(1)', lg: '//img.example.test/a.jpg', sm: 'https://user:pw@img.example.test/a.jpg' } }],
+      [{ urls: { sm: 'https://img.example.test/room-b-sm.jpg' } }]],
+  });
+  const siam = siamEntry((await prepareWith(t, insecure)).written);
+  assert.deepEqual(siam.imageSources.hotel, { url: 'https://img.example.test/hotel-lg.jpg', caption: 'Front' });
+  assert.deepEqual(siam.imageSources.drops.map(drop => [drop.url, drop.caption]), [[null, null], ['https://img.example.test/room-b-sm.jpg', null]]);
+  const flatAvatar = withImages(searchResult([rate(500)]), { avatar: { urls: null, md: 'https://img.example.test/flat-md.jpg' }, roomImages: [[]] });
+  assert.deepEqual(siamEntry((await prepareWith(t, flatAvatar)).written).imageSources.hotel, { url: 'https://img.example.test/flat-md.jpg', caption: null });
+  for (const avatar of [undefined, null, 'https://img.example.test/not-an-object.jpg', { urls: { md: 'ftp://img.example.test/a.jpg' } }]) {
+    const missing = siamEntry((await prepareWith(t, withImages(searchResult([rate(500)]), { avatar, roomImages: [undefined] }))).written);
+    assert.deepEqual([missing.imageSources.hotel, missing.imageSources.drops.map(drop => drop.url)], [null, [null]], String(avatar));
+  }
 });
 
 test('prepared bundles project to a display-safe public catalogue with private supplier fields left behind', async t => {
