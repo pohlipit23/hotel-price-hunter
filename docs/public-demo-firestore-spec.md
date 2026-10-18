@@ -340,6 +340,87 @@ change the arm request, transaction, error codes or receipt fields without
 coordinating with Part 1 and recording the change here; it may add its own fields
 outside `watch` (for example confirmation and context under `byCode[code]`).
 
+#### Storage seam (F2 and F3a, implemented 18 October 2026)
+
+These signatures implement the orchestrator contract
+`.local\roomdrop-part1-interfaces.md` draft v1. Error `.code` values are binding.
+
+`app\booking-storage.mjs` holds the shared, create-only catalogue records. Part 2
+only reads them.
+
+```js
+createBookingStorage({ firestore, prefix = 'roomdrop' })
+// Collections: `${prefix}BookingsV1/{code}`, `.../dropSets/{000001..}`, `.../drops/{dropId}`.
+listCatalogue()
+// -> [{ code, order, contentVersion, dropSetVersion, card: { order, cityName, scenarioLabel, photo } }]
+//    ordered by card.order, at most 20 entries.
+getBooking(code)
+// -> { code, contentVersion, dropSetVersion, bundle, capture: { status, capturedAt } } | null
+//    null for a malformed or unknown code; no lookup runs for a malformed code.
+//    bundle = { schemaVersion: 1, snapshotVersion: contentVersion, transactionMode: 'selection-only',
+//    baseline, options (the current Drop set, ranked), checkedAt, completeness, customerRefund: null,
+//    reservationCreated: false }. It has no privateReferences; hosted mode wraps it as selection-only.
+//    capture.status is 'observed' | 'observed-empty' | 'not-searched'.
+getDrops(code, { dropSetVersion } = {})
+// -> { dropSetVersion, captureStatus: 'observed' | 'observed-empty', capturedAt, drops: [option facts] }
+//    throws CAPTURE_UNAVAILABLE (not-searched, or a missing/mismatched Drop document),
+//    DROP_SET_CHANGED (a given dropSetVersion is not the current one),
+//    BOOKING_UNAVAILABLE (malformed or unknown code; an addition to contract v1).
+importBundle(input, { execute = false, now } = {})
+// Admin/importer only. input = { schemaVersion: 1, entries: [{ code, blocker, capture, bundle }], cards: [...] }.
+// -> { mode: 'dry-run' | 'executed', importedAt?, entries: [{ code, contentVersion, dropSetVersion,
+//      captureStatus, dropCount, result: 'validated' | 'created' | 'unchanged' | 'drop-set-added' }] }
+// One transaction for the whole input. Error codes: BOOKING_CHANGED, DROP_CONFLICT, DROP_DUPLICATE,
+// CAPTURE_MISSING, CAPTURE_MISMATCH, BUNDLE_INTEGRITY_FAILED, BUNDLE_INVALID, CARD_INVALID,
+// CATALOGUE_INVALID, PRIVATE_FIELD_REJECTED, VISITOR_STATE_REJECTED, DROP_SET_LIMIT, STORAGE_UNAVAILABLE.
+loadHostedCatalogue(bookingStorage)
+// -> { entries: [{ code, contentVersion, dropSetVersion, bundle }] }; throws CATALOGUE_UNAVAILABLE.
+createRoomdropFirestore(environment = process.env)
+// Server client with the app/storage.mjs guards: Firestore only, and the emulator only on loopback
+// outside Cloud Run/production.
+```
+
+`contentVersion` is the SHA-256 of the key-sorted booking record (code, baseline,
+card). A changed card label is therefore also `BOOKING_CHANGED`. `dropSetVersion`
+hashes the capture record, the Drop facts in rank order, and the content version.
+Import timestamps are excluded from both. A later capture adds the next
+`dropSets` sequence. Earlier Drop and Drop-set documents are never rewritten, and
+the current set is the highest sequence. `snapshotVersion` in the arm request is
+compared with `contentVersion`. The session entry also binds `dropSetVersion`.
+
+`app\quotation-session-storage.mjs` holds the judges' private sessions:
+
+```js
+createFirestoreSessionStorage({ firestore, now, prefix = 'roomdrop', maxSessions = 64, ttlMs = 3_600_000, catalogueCodes = null })
+createMemorySessionStorage({ now, maxSessions, ttlMs, catalogueCodes, environment = process.env })
+// The memory adapter is for tests and loopback runs only. It throws under NODE_ENV=production,
+// K_SERVICE or CLOUD_RUN_JOB.
+// Both return { mode, create(), get(cookieValue), transact(cookieValue, fn) }:
+create()               // -> { cookieValue, session }; throws SESSION_CAPACITY, STORAGE_UNAVAILABLE
+get(cookieValue)       // -> session | null (malformed, unknown or expired); throws STORAGE_UNAVAILABLE
+transact(cookieValue, fn)
+// One transaction. fn(session) mutates a private copy in place, synchronously, and returns a result.
+// The result resolves only after the commit. Firestore may run fn more than once on retry, so fn
+// must be pure: no network, Gemini or Firestore calls. Errors thrown by fn propagate unchanged and
+// commit nothing. Throws DEMO_SESSION_REQUIRED (malformed, missing or expired), STORAGE_UNAVAILABLE,
+// BOOKING_UNAVAILABLE (a byCode key outside catalogueCodes), and SESSION_STATE_INVALID (csrfToken or
+// expiresAt changed, more than 20 codes, an entry without 64-hex versions, an async fn, or over 200 kB).
+codeScope(session, code, { contentVersion, dropSetVersion })
+// -> session.byCode[code], created as { contentVersion, dropSetVersion, watch: null } if absent.
+// If the stored versions differ, it rebinds them and resets only `watch`. Throws BOOKING_UNAVAILABLE
+// for a malformed code and SESSION_STATE_INVALID for malformed versions.
+```
+
+A session is `{ csrfToken, expiresAt (epoch ms), byCode }`, stored at
+`${prefix}PublicSessionsV1/{sha256(cookieValue)}`. The document also holds a
+hidden `ttlAt` timestamp for a TTL policy that needs separate approval. The raw
+cookie value is never stored. Capacity is counted in one shared document,
+`${prefix}PublicSessionsV1Capacity/live`, inside the create transaction.
+Expired sessions listed there are deleted in that same transaction. Values must
+be JSON data. Every write keeps fields Part 1 does not own. Part 2 (F3b) adds its
+fields through `transact`, using its own helper next to `codeScope`, and never
+writes `watch`.
+
 ### Ownership
 
 - Part 1: Claude, worktree `.local\roomdrop-part1`, branch

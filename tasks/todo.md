@@ -103,11 +103,15 @@ confirm-quote, create supplier bookings or commit `.local\`.
 Shared storage foundation: Part 2 reads Drops through this module and does not
 write shared booking/Drop records.
 
-- [ ] Acceptance: default-dry-run importer creates reviewed air1 booking records
+- [x] Acceptance: default-dry-run importer creates reviewed air1 booking records
   and captured Drops, with explicit manifest/card metadata. Identical concurrent
   import replays safely; changed facts return `BOOKING_CHANGED`. Publish no partial
   bundle, duplicate Drop or missing-capture-as-empty result. No visitor choices
   appear on shared records; no other data is changed.
+- Evidence: commit a9f42d9; verification doc, Part 1 F2. 11 tests in the new file
+  pass against the emulator with two clients. The read API is documented in the
+  spec seam section. Only the synthetic fixture has been imported so far; real
+  reviewed captures stay with S0.3 to S0.6.
 - Verify: `node --test .\tests\booking-storage.test.mjs` against two emulator
   clients; include private-field rejection, interrupted import, conflict, content
   versions and code/capture mismatch. Confirm only test-owned documents change.
@@ -118,19 +122,24 @@ write shared booking/Drop records.
 
 ### Checkpoint F0-F2: Validated catalogue storage
 
-- [ ] Adapter/import tests pass with the emulator. Raw responses, source tokens,
+- [x] Adapter/import tests pass with the emulator. Raw responses, source tokens,
   supplier references and `.local\` captures are absent from tracked fixtures.
+  (18 Oct: 41/41 pass against the emulator; the fixtures hold only synthetic
+  placeholder references.)
 - [ ] Coverage reports distinguish two source projections, actual captured Drops
   and remaining owner-created catalogue entries. No additional live calls implied.
 
 ### F3a: Persist isolated sessions and the per-code watch entry (Part 1 of F3)
 
-- [ ] Acceptance: hashed cookie-keyed sessions retain one-hour expiry, CSRF and
+- [x] Acceptance: hashed cookie-keyed sessions retain one-hour expiry, CSRF and
   `byCode[code].watch` (setup and replay receipt). Two judges sharing a code and
   one judge visiting two codes remain isolated. Maintain the transactional
   64-session cap; no code outside the bounded catalogue may allocate state.
   Shared storage foundation for Part 2: the module exposes a transaction helper
   that F3b extends with confirmation/context fields.
+- Evidence: commit 5535935; verification doc, Part 1 F3a. 15 tests pass against
+  the emulator. `transact` and `codeScope` are documented in the spec seam
+  section. The HTTP server still uses its in-process Map until F4a and F5a.
 - Verify: `node --test .\tests\quotation-session-storage.test.mjs` using separate
   emulator clients; cover restart, expiry, capacity contention, per-code version
   invalidation of the watch entry, failed writes and no production memory fallback.

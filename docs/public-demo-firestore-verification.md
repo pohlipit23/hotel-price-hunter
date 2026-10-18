@@ -191,3 +191,90 @@ Still open:
 - no Drops exist for AIRB000180;
 - card photo, city name and scenario label are curated S0.5 facts and are not
   part of the bundle yet.
+
+### F2: Immutable booking and Drop storage and the guarded importer (18 October 2026)
+
+Commit `a9f42d9`. New files:
+
+- `app\booking-storage.mjs`
+- `scripts\import-altovo-catalogue.mjs`
+- `tests\booking-storage.test.mjs`
+- `tests\fixtures\curated-bookings.json`
+
+The fixture is synthetic. Its booking facts are the tracked F1 fixture facts. Its
+three Drops, option ids and `privateReferences` values are invented, and
+`privateReferences` is never copied into any record.
+
+Covered:
+
+- the dry run touches no Firestore client;
+- private fields refused, both supplier keys in options and baseline;
+- visitor state refused in the baseline and the card manifest;
+- a missing or failed capture is refused (`CAPTURE_MISSING`);
+- a valid `observed-empty` capture is accepted and published as such;
+- a cannot-start booking is published as `not-searched`, and `getDrops` returns
+  `CAPTURE_UNAVAILABLE` for it, never an empty search;
+- capture and code mismatches, bundle integrity hash, duplicate Drop ids and card
+  validation;
+- importer argument guards: `EMULATOR_REQUIRED`, `PRODUCTION_IMPORT_NOT_ENABLED`
+  (even with `--production-import-approved`), `PRODUCTION_IMPORT_REFUSED`, and
+  workspace path checks.
+
+Emulator cases use two clients and a per-test `test-<uuid>-roomdrop` prefix:
+
+- reads from the second client;
+- three concurrent identical imports give one `created` and two `unchanged`, with
+  3 Drops and 1 Drop set;
+- a later identical retry keeps the original `importedAt`;
+- changed facts and changed card labels give `BOOKING_CHANGED`;
+- an interrupted two-code import publishes neither code;
+- a later capture adds Drop set 2 with the same content version;
+- rebinding an earlier Drop id gives `DROP_CONFLICT`;
+- the importer CLI against the emulator, then `loadHostedCatalogue`;
+- no root collection other than the test's own changes.
+
+After the runs the emulator had 0 root collections left.
+
+### F3a: Durable sessions and the per-code watch entry (18 October 2026)
+
+Commit `5535935`. New files: `app\quotation-session-storage.mjs` and
+`tests\quotation-session-storage.test.mjs`. The memory adapter and the Firestore
+adapter run the same contract cases.
+
+Covered:
+
+- the cookie digest is the document id, and the raw cookie appears in no stored
+  field;
+- one-hour expiry with an injected clock (read gives `null`, write gives
+  `DEMO_SESSION_REQUIRED`);
+- refused mutations commit nothing: a thrown domain error, a code outside the
+  catalogue (`BOOKING_UNAVAILABLE`), a changed csrfToken or expiresAt, and an
+  async callback;
+- unknown Part 2 fields are preserved;
+- restart, using a new client instance;
+- two judges on one code, and one judge on two codes, isolated under concurrent
+  transactions from two clients;
+- a new Drop-set version resets only that judge's `watch` for that code;
+- 10 concurrent creates against a cap of 4, from two clients: exactly 4 created;
+- the default cap of 64, then `SESSION_CAPACITY`;
+- an expired session frees its place and its document is deleted;
+- an unreachable database gives `STORAGE_UNAVAILABLE`, with no fallback;
+- the memory adapter is refused under production or Cloud Run variables.
+
+A terminated SDK client was not used for the failure case, because the SDK then
+raises unhandled rejections. That case uses a refusing database stand-in instead.
+
+Commands (worktree, emulator `roomdrop-part1-firestore` 127.0.0.1:8181, project
+`demo-roomdrop-part1`, `RUN_FIRESTORE_INTEGRATION=1`, `NODE_ENV=test`):
+
+- `node --test .\tests\altovo-catalogue.test.mjs .\tests\booking-storage.test.mjs .\tests\quotation-session-storage.test.mjs`:
+  tests 41, pass 41, fail 0, skipped 0.
+- The same two new files without the emulator variables: tests 26, pass 12,
+  fail 0, skipped 14 (the emulator cases).
+- `npm test` without emulator variables: tests 352, pass 332, fail 0, skipped 20.
+
+Still open:
+
+- S0.6 needs real reviewed captures, so only the synthetic fixture has been
+  imported;
+- nothing is wired into the HTTP server yet (F4a, F5a).
