@@ -29,6 +29,79 @@
         </ol>
         <p id="switch-announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
 
+        <section id="catalogue-screen" class="judge-screen" aria-labelledby="catalogue-title" hidden>
+          <div class="judge-intro">
+            <p class="eyebrow">Judge demo</p>
+            <h1 id="catalogue-title" tabindex="-1">Pick a booking</h1>
+            <p id="catalogue-note" class="muted"></p>
+          </div>
+          <div id="catalogue-list" class="catalogue-grid"></div>
+        </section>
+
+        <section id="booked-screen" class="judge-screen" aria-labelledby="booked-title" hidden>
+          <a id="booked-back" class="back" href="#start"><span aria-hidden="true">‹</span> All bookings</a>
+          <article class="ticket booked-ticket">
+            <div class="ticket-photo booked-photo">
+              <div id="booked-photo"></div>
+              <span class="photo-tag">Illustrative photo</span>
+              <span class="booked-stamp" aria-hidden="true"><span>Agency</span><strong>Booked</strong></span>
+            </div>
+            <div class="ticket-tear" aria-hidden="true"></div>
+            <div class="booked-caption">
+              <p class="eyebrow">Your agency booked this</p>
+              <h1 id="booked-title" tabindex="-1"></h1>
+              <p id="booked-place" class="muted"></p>
+              <dl id="booked-facts" class="booked-facts"></dl>
+              <div class="booked-total"><span>Whole stay</span><strong id="booked-price"></strong></div>
+            </div>
+          </article>
+          <p id="booked-note" class="honest-note"></p>
+          <div id="booked-ready" class="judge-actions">
+            <button id="setup-drop" class="primary" type="button">Set up a drop</button>
+          </div>
+          <section id="booked-blocked" class="cannot-start" aria-labelledby="blocked-title" hidden>
+            <span class="cannot-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-6 15L18 6"/></svg></span>
+            <div>
+              <h2 id="blocked-title"></h2>
+              <p id="blocked-text" class="small"></p>
+            </div>
+            <button id="pick-another" class="secondary" type="button">Pick another booking</button>
+          </section>
+        </section>
+
+        <section id="setup-screen" class="judge-screen" aria-labelledby="setup-title" hidden>
+          <a id="setup-back" class="back" href="#booked"><span aria-hidden="true">‹</span> Your booking</a>
+          <div class="setup-card">
+            <div class="setup-heading">
+              <span class="watch-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11Z"/><path d="M9 14h6"/></svg></span>
+              <div>
+                <p class="eyebrow">Drop Watch</p>
+                <h1 id="setup-title" tabindex="-1">Set up your drop</h1>
+                <p id="setup-booking" class="small muted"></p>
+              </div>
+            </div>
+            <fieldset id="minimum-choices" class="minimum-choices">
+              <legend>Tell me about drops of at least</legend>
+              <div id="minimum-options" class="chip-row"></div>
+            </fieldset>
+            <label class="watch-consent-box" for="judge-consent">
+              <input id="judge-consent" type="checkbox">
+              <span>RoomDrop may check this booking for cheaper equivalent rooms and show them to me. Nothing changes without my approval.</span>
+            </label>
+            <p id="setup-message" role="status" class="inline-message"></p>
+            <button id="arm-watch" class="primary" type="button">Arm my Drop Watch</button>
+          </div>
+        </section>
+
+        <section id="checking-screen" class="judge-screen" aria-labelledby="checking-title" hidden>
+          <div class="checking-card">
+            <div class="checking-drops" aria-hidden="true"><span></span><span></span><span></span></div>
+            <h1 id="checking-title" tabindex="-1">Checking for drops</h1>
+            <p id="checking-status" class="checking-status" role="status" aria-live="polite" aria-atomic="true"></p>
+            <p id="checking-replay" class="replay-tag"></p>
+          </div>
+        </section>
+
         <section id="booking-summary" aria-labelledby="hotel">
           <article id="current-ticket" class="ticket current-ticket">
             <div class="ticket-caption">
@@ -97,6 +170,15 @@
             </details>
           </section>
 
+          <section id="armed-strip" class="armed-strip" aria-labelledby="armed-title" hidden>
+            <span class="armed-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11Z"/><path d="m9 14 2 2 4-4"/></svg></span>
+            <div class="armed-copy">
+              <h2 id="armed-title" tabindex="-1">Drop Watch armed</h2>
+              <p id="armed-detail" class="small muted"></p>
+            </div>
+            <button id="change-minimum" class="secondary" type="button">Change minimum</button>
+          </section>
+
           <section id="deal-list" class="alternatives" aria-labelledby="changes-title">
             <div class="section-heading">
               <div>
@@ -107,6 +189,7 @@
             </div>
             <div id="offers" class="offers"></div>
             <p id="offer-empty" class="empty-offers" hidden></p>
+            <button id="lower-minimum" class="secondary lower-minimum" type="button" hidden>Lower my minimum</button>
           </section>
 
           <section id="price-watch" class="price-watch" aria-labelledby="watch-title" aria-busy="false">

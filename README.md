@@ -1,5 +1,40 @@
 # RoomDrop · Hotel Price Hunter prototype
 
+## AI Builder Cup submission
+
+**Book early. Still catch the drop.** RoomDrop helps travellers lock in a hotel early without missing a cheaper rate later. Team **Triple-8** (Pete & AJ).
+
+<p align="center">
+  <a href="https://drive.google.com/file/d/1Iu0Ez6zHkELRL_WAx1VQqZyj_qrv8kjp/view?usp=sharing">
+    <img src="submission/roomdrop-promo-thumb.jpg" alt="Play the RoomDrop 10-second promo" width="280">
+  </a>
+  <br>
+  <sub>RoomDrop in 10 seconds. Click to play.</sub>
+</p>
+
+| | |
+|---|---|
+| Live prototype | https://hotel-price-hunter-2qbcpylngq-as.a.run.app/ |
+| Promo video (10 s) | [Watch on Google Drive](https://drive.google.com/file/d/1Iu0Ez6zHkELRL_WAx1VQqZyj_qrv8kjp/view?usp=sharing) |
+| Demo video (3-4 min) | _Link coming soon_ |
+| Pitch deck | [submission/RoomDrop - AI Builder Cup Submission.pptx](<submission/RoomDrop - AI Builder Cup Submission.pptx>) |
+| Brief description | [submission/brief-description.md](submission/brief-description.md) |
+
+**What it does.** RoomDrop re-shops the same stay and shows "drops": cheaper rooms at the same hotel and dates, each with a saving stamp and its cancellation and refund caveats. Travellers peek at a drop, ask Gemini about it, acknowledge any lost flexibility and confirm. Agencies can use the same engine internally to re-shop held bookings, cut supplier cost and raise margin.
+
+**How it uses Google Cloud.**
+
+- **Cloud Run** (asia-southeast1) hosts the Node.js customer app, a private IAP-protected agency service and the `roomdrop-price-watch` Cloud Run Job.
+- **Gemini 3.8 Flash on Vertex AI** powers Ask Gemini, with schema-bound JSON replies that the server validates against the facts on screen.
+- **Cloud Firestore** stores bookings, drops, Drop Watch consent, sessions and agency cases, using transactions and TTL.
+- **Firebase** emulator configuration (`firebase.json`) runs Firestore locally for development and tests.
+
+**Try it.** Open the live prototype, pick the best drop, tap **Peek at this drop**, ask Gemini a question, then confirm. The demo stops at confirmation: no payment, rebooking or refund takes place.
+
+**Run the tests.** `npm ci --ignore-scripts; npm test`
+
+## Project notes
+
 **Current production AI:** the existing booking review now uses **Gemini 3.8 Flash** (`gemini-3.8-flash`, global, LOW thinking). Open a drop and use **Ask Gemini**. Revision `hotel-price-hunter-00015-b8d` is live with all traffic; 270 regression tests and three real production advice checks passed. The booking layout, public access and agency/watch/data boundaries were preserved. See [production release](docs/gemini-production-release.md), [earlier evaluation](docs/gemini-38-evaluation.md) and `.env.quotation.example`.
 
 The Gemini stay adviser restores the original hackathon AI requirement in selected-room review. Travellers ask about price, room/meal differences and uncertain plans, with two previous exchanges retained per option. Gemini understands the priority and selects grounded recommendations; application code renders prices and enforces selection-only authority. See [the contract](docs/quotation-gemini-contract.md) and [initial restoration verification](docs/quotation-gemini-verification.md). Historical milestone/deployment paragraphs below describe earlier releases.

@@ -4,6 +4,7 @@ import { createQuotationDemoServer, createHostedQuotationDemoServer } from './qu
 const assets = new Map([
   ['/', ['booking.html', 'text/html']], ['/booking.js', ['booking.js', 'text/javascript']],
   ['/booking-live.js', ['booking-live.js', 'text/javascript']], ['/booking-live-data.js', ['booking-live-data.js', 'text/javascript']],
+  ['/booking-judge.js', ['booking-judge.js', 'text/javascript']], ['/drop-watch.js', ['drop-watch.js', 'text/javascript']],
   ['/drop-eligibility.js', ['drop-eligibility.js', 'text/javascript']],
   ['/booking.css', ['booking.css', 'text/css']], ['/pricing.js', ['pricing.js', 'text/javascript']],
   ['/watch.js', ['watch.js', 'text/javascript']], ['/stay-photos.js', ['stay-photos.js', 'text/javascript']],
@@ -12,13 +13,17 @@ const assets = new Map([
   ['/assets/roomdrop-key-icon.png', ['assets/roomdrop-key-icon.png', 'image/png']],
   ['/assets/illustrative-stays.jpg', ['assets/illustrative-stays.jpg', 'image/jpeg']],
 ]);
-export function createBookingDemoServer({ bundle, snapshot, environment, now, advisor } = {}) {
-  const server = environment ? createHostedQuotationDemoServer({ snapshot, environment, now, advisor }) : createQuotationDemoServer({ bundle, now, advisor });
+// Booking API paths map one to one onto the quotation API; query strings never match and stay unavailable.
+const bookingApi = /^\/api\/booking-demo(\/(?:confirm|advice|chat|catalogue|q\/[A-Z0-9]{4,20}(?:\/(?:watch|confirm|advice|chat))?))?$/;
+export function createBookingDemoServer({ bundle, snapshot, catalogue, environment, now, advisor } = {}) {
+  const server = environment ? createHostedQuotationDemoServer({ snapshot, catalogue, environment, now, advisor })
+    : createQuotationDemoServer({ bundle, catalogue, now, advisor });
+  const mode = catalogue ? 'catalogue' : 'single';
   const delegate = server.listeners('request')[0];
   server.removeListener('request', delegate);
   server.on('request', async (req, res) => {
-    const api = { '/api/booking-demo': '/api/quotation-demo', '/api/booking-demo/confirm': '/api/quotation-demo/confirm', '/api/booking-demo/advice': '/api/quotation-demo/advice', '/api/booking-demo/chat': '/api/quotation-demo/chat' };
-    if (Object.hasOwn(api, req.url)) { req.url = api[req.url]; return delegate(req, res); }
+    const api = bookingApi.exec(req.url);
+    if (api) { req.url = '/api/quotation-demo' + (api[1] ?? ''); return delegate(req, res); }
     if (req.url === '/health' || req.url === '/healthz') return delegate(req, res);
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
@@ -31,7 +36,7 @@ export function createBookingDemoServer({ bundle, snapshot, environment, now, ad
     try {
       const [path, type] = assets.get(req.url);
       let content = await readFile(new URL('./public/' + path, import.meta.url));
-      if (req.url === '/') content = content.toString().replace('<body>', '<body data-live-booking="true">').replace('Fictional demo', 'Booking demo')
+      if (req.url === '/') content = content.toString().replace('<body>', `<body data-live-booking="true" data-booking-mode="${mode}">`).replace('Fictional demo', 'Booking demo')
         .replace('</head>', '<link rel="stylesheet" href="/stay-advice.css"></head>')
         .replace(/\s*<link[^>]+https:\/\/fonts\.[^>]+>/g, '');
       res.writeHead(200, { 'Content-Type': type + (type.startsWith('text/') ? '; charset=utf-8' : '') }); res.end(content);

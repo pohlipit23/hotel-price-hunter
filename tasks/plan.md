@@ -1,104 +1,166 @@
-# Hotel Price Hunter: proposed starting plan
+# Hotel Price Hunter: implementation plan
 
-## Public demo Firestore persistence — 18 October
+## Curated RoomDrop judge flow and Firestore persistence - 18 October
 
-Current scope: the user agreed to an immutable Firestore copy of the sanitised
-EasyGDS starting quotation and captured comparison options, with each anonymous
-session referencing that exact snapshot. The approved design is recorded in
-`docs/public-demo-firestore-spec.md`. This section extends the existing project
-plan; earlier evidence and incomplete tasks below remain preserved.
+Source of truth: `docs\public-demo-firestore-spec.md`, updated with the approved
+judge-flow decisions in `docs\roomdrop-booking-setup-handoff.md`, and `GLOSSARY.md`.
+Status: proposed implementation plan; waiting for approval before application
+coding. The user explicitly requested the spec update and this plan together.
+Earlier unchecked intake tasks are superseded for this tranche; historical
+completed work and other open project tasks remain below.
 
-Status: implementation plan and task list prepared for human review. No app code,
-production import, deployment or IAM change is part of this planning step.
+Concurrent application changes appeared during planning: file-backed catalogue
+routes, per-code memory state, hosted packaging, `app\public\drop-watch.js` and
+`scripts\serve-booking-demo.mjs`. They were not authored or modified by this task.
+F0 must reconcile the actual current tree and reuse compatible work before any
+new implementation. New filenames below are proposed, not ownership claims or
+instructions to overwrite another writer's changes.
 
-### Architecture and dependencies
+### Approved behavior and superseded assumptions
 
-1. Controlled import creates `roomdropDemoSnapshotsV1/{snapshotVersion}` from the
-   approved display projection. Identical retries are safe; conflicting content
-   cannot overwrite an existing version. Import is offline by default and makes
-   no EasyGDS/Gateway/model request. Production execution needs release approval.
-2. Sessions in `roomdropPublicSessionsV1/{sha256(cookieToken)}` reference that
-   immutable snapshot. Use the existing server Firestore dependency and attached
-   Cloud Run identity. Keep simulation/agency/watch collections separate.
-3. Session storage owns atomic receipt changes, expiry, counters and bounded
-   context merges. A private bounded capacity record coordinates the 64-live-session
-   limit across instances; expired entries release capacity without broad scans.
-   Only session documents receive TTL. Transaction callbacks have no external calls.
-4. Hosted startup requires an exact `ROOMDROP_SNAPSHOT_VERSION` pin and reads the
-   validated Firestore document before accepting requests. Production has neither
-   automatic seeding nor file/memory fallback. Test factories accept explicit
-   test storage; a local emulator launcher exercises the actual Firestore adapter.
-5. Preserve the UI and API projection. Gemini allowance is reserved in a storage
-   transaction, then the provider call runs outside it. A guarded merge appends
-   context without overwriting selections. Instance limits retain their existing
-   scope; this change does not create a global model-call budget.
+- Owner-created air1 staging quotations enter through guarded admin capture/import.
+  Judges select imported catalogue cards; there is no public share-link intake,
+  arbitrary-code lookup, customer login or generated invitation in this tranche.
+- Shared Original Booking facts and Drops are immutable. Store judge choices,
+  consent, minimum saving, first-check replay and confirmation only under
+  `session.byCode[code]`. One judge cannot overwrite another judge's Drop Watch.
+- Preserve the latest spec's agency minimum of 10.00 in the booking currency.
+  Arming performs a pure immediate replay of that booking's captured Drops,
+  filtered by `isDisplayedDrop` and the chosen minimum, with visible capture/replay
+  labels. There is no pending scheduled first check or runtime supplier request.
+- Add the start-page card grid and RoomDrop Original Booking confirmation page,
+  then setup/armed/replay screens feeding the existing Deals/Review/Confirmed flow.
+  The factual staging note remains visible beside "Your agency booked this".
+- Confirming a Drop requires that session's armed watch and current qualifying
+  membership. It remains a selection receipt, with no Altovo quotation creation,
+  supplier booking, money movement or change to the Current Booking.
 
-Build order: F1 import/read path → F2 durable session storage → F3 selection API →
-F4 advice integration → F5 hosted packaging → F6 acceptance/release preparation.
-Work is sequential because these steps share storage and server contracts.
-The detailed checklist and checkpoints live in `tasks/todo.md`.
+### Data and runtime design
+
+1. Review existing `app\domain\altovo-quotation.mjs` and
+   `scripts\prepare-altovo-catalogue.mjs` before modifying them. The actual share
+   payload needs a dedicated adapter, not `quotationBaseline()`. Capture provenance
+   and exact price/currency bindings; validate `non_refundable` and UTC schedules,
+   never the 1970 sentinel or a guessed deadline timezone. Keep absent guest-age
+   facts absent and mark my/my/adults-only Gateway search as agency defaults.
+2. Prepare one complete sanitised bundle per curated code, with photo/card/scenario
+   metadata and captured Drops. Two quotation projections currently exist; no
+   complete six-entry catalogue or per-booking Gateway results are assumed.
+   Additional owner-created entries and bounded captures are separate prerequisites.
+3. Create immutable `roomdropBookingsV1/{code}` records and append-only
+   `drops/{dropId}` documents through `scripts\import-altovo-catalogue.mjs`, dry-run
+   by default. Validate complete bundles and publish only a complete reviewed set.
+   Identical replay is safe; changed Original Booking facts fail `BOOKING_CHANGED`.
+   Distinguish a valid empty result from a missing/failed capture.
+4. Pin a bounded reviewed catalogue manifest of allowed codes and content/Drop-set
+   versions in the release. Read display records from Firestore; the manifest
+   contains no private quotation payload or credentials. Public APIs validate
+   membership before document access and cannot import or refresh records.
+5. Persist SHA-256 cookie-keyed anonymous sessions, fixed one-hour expiry, CSRF,
+   session-wide advice counters and per-code watch/receipt/context. Use explicit
+   versioned commands so identical retries replay while stale retries cannot undo
+   newer setup. Changed Drop bindings invalidate only the affected entry.
+6. Arming evaluates current cancellation eligibility and saves consent, threshold,
+   armed time and one completed captured-replay result atomically. Rearming with a
+   deliberate new minimum creates a new watch revision in that entry only.
+   Confirmation requires the current armed qualifying set and acknowledgements.
+7. Add path-based routes such as `/api/booking-demo/catalogue` and
+   `/api/booking-demo/q/<code>` with explicit action suffixes. Change exact URL
+   rewrites/static allowlists deliberately; keep no query lookup, canonical Host,
+   Origin/CSRF, request bounds and production emulator/credential guards.
+8. Keep Gemini outside retryable transactions. Reserve the session allowance,
+   then merge context for the exact code/watch/Drop versions without overwriting
+   newer confirmations. Preserve four requests/minute/session, existing twenty
+   requests/minute/instance and two concurrent calls/instance.
+9. Use the existing Firestore dependency and runtime identity. Keep session capacity
+   bounded at 64 live sessions with shared transactional accounting; reads and
+   per-session code maps are catalogue-bounded. No memory/file fallback in hosted
+   mode. Session TTL alone is proposed; shared bookings/Drops survive sessions
+   and source-link expiry. Existing simulation/agency/watch data remains separate.
+
+### Implementation order and checkpoints
+
+Detailed acceptance and file ownership are in `tasks\todo.md`. Work is sequential:
+
+- F0-F2: audit captures/scaffolding, validate the adapter, then import/read one
+  complete booking/Drops bundle through the emulator.
+- F3-F5: durable per-code sessions, catalogue HTTP bootstrap, then atomic arming,
+  replay and selection guards.
+- F6-F8: start/Original Booking screens, setup-to-Deals flow, then durable Gemini
+  context. Check both judges on one booking and one judge across two bookings.
+- F9-F11: hosted entrypoints, frozen release export, browser/restart acceptance and a
+  concrete release bundle for a separate deployment/import decision.
+
+No task is marked complete by this plan. All proposed tasks are small or medium
+and name at most five likely files. Extra files require an explicit task split.
 
 ### Verification commands
 
-After confirming the intended emulator already exists, use only its loopback
-endpoint and the established `demo-roomdrop-iap-qa` namespace. Set
-`RUN_FIRESTORE_INTEGRATION=1`, `NODE_ENV=test`, and remove Cloud Run and live-model
-activation variables as documented in the spec. Never flush a shared emulator.
+Use PowerShell and the existing loopback emulator; never flush shared state.
+The proposed new harnesses below are not existing verification evidence.
 
 ```powershell
-node --test tests/quotation-snapshot-storage.test.mjs tests/quotation-snapshot-import.test.mjs
-node --test tests/quotation-session-storage.test.mjs
-node --test tests/quotation-demo-server.test.mjs tests/booking-live.test.mjs
-node --test tests/quotation-advice-server.test.mjs tests/booking-advice.test.mjs
-node --test tests/quotation-cloud.test.mjs tests/public-demo-release.test.mjs
-node --test tests/*.test.mjs
+Set-Location 'C:\Users\pohli\Sites\hotel-price-hunter'
+$env:GOOGLE_CLOUD_PROJECT='demo-roomdrop-iap-qa'
+$env:FIRESTORE_EMULATOR_HOST='127.0.0.1:8081'
+$env:RUN_FIRESTORE_INTEGRATION='1'
+$env:NODE_ENV='test'
+Remove-Item Env:K_SERVICE,Env:CLOUD_RUN_JOB,Env:STORAGE_MODE,Env:GEMINI_MODEL,Env:GOOGLE_CLOUD_LOCATION,Env:QUOTATION_ADVICE_ENABLED -ErrorAction SilentlyContinue
+node --test .\tests\altovo-catalogue.test.mjs .\tests\booking-storage.test.mjs
+node --test .\tests\quotation-session-storage.test.mjs .\tests\booking-catalogue-server.test.mjs
+node --test .\tests\booking-drop-watch.test.mjs .\tests\booking-live.test.mjs
+node --test .\tests\quotation-advice-server.test.mjs .\tests\booking-advice.test.mjs
+node --test .\tests\quotation-cloud.test.mjs .\tests\public-demo-release.test.mjs
+node .\tests\booking-firestore.browser.mjs
+npm test
 git diff --check
 ```
 
-New test names above are planned outputs. The new CLI defaults to validation only:
-`node scripts/import-demo-snapshot.mjs --snapshot=.local/quotation-demo/ACCEPTED-CAPTURE.json`.
-Actual emulator import adds `--execute --project=demo-roomdrop-iap-qa
---database=(default) --emulator=127.0.0.1:8081`, with PowerShell quoting applied to
-the database argument. The accepted path is resolved from the existing capture;
-do not hard-code a private file into tracked source.
+The importer command proposed for local dry-run is
+`node .\scripts\import-altovo-catalogue.mjs --catalogue=.local\altovo-catalogue\REVIEWED-CATALOGUE.json`.
+An emulator write additionally requires `--execute --project=demo-roomdrop-iap-qa
+--database="(default)" --emulator=127.0.0.1:8081`. Implement explicit guards and
+canonical workspace path checks before executing it; the actual input path and
+manifest are chosen from inspected captures, not hard-coded private evidence.
+Do not execute the existing capture script with `--execute` during offline tests.
 
-Add `scripts/serve-booking-firestore-demo.mjs` with explicit snapshot-version,
-loopback emulator and port arguments for local review; it must use the imported
-record rather than reading the baseline from a local bundle. Add
-`tests/booking-firestore.browser.mjs` to own two temporary servers and exercise
-restart/cookie recovery and separate browser contexts with an injected provider.
-Keep `tests/booking-live.browser.mjs` as the existing UI-only regression.
+Build the exact emitted context with `docker build --tag roomdrop-firestore-review
+CONTEXT_DIRECTORY`. Startup failure smoke uses `docker run --rm --network=none
+roomdrop-firestore-review`; a successful production-mode smoke must use the
+packaged app with explicit emulator/test dependency injection without weakening
+hosted production guards. Record the final executable harness/build/start commands
+in the verification report. The pitch Worker build/deploy is a separate product.
 
-For the hosted artifact, extend `scripts/prepare-booking-release.mjs` to preserve
-exact-commit and dependency allowlists while pinning the snapshot version.
-Build its emitted context with `docker build --network=none --tag
-roomdrop-firestore-review CONTEXT_DIRECTORY` after satisfying the existing npm
-dependency layer; an uncached dependency-install build requires network and is
-not a network-disabled startup claim. Run the resulting container smoke with
-`docker run --rm --network=none roomdrop-firestore-review`: missing database
-access must fail safely. Separately verify successful startup and APIs against
-the emulator with the exact packaged app and an injected test configuration.
-Record executable commands, image/context hashes and cleanup in the verification
-document when the final implementation determines the precise harness arguments.
+### Content and acceptance prerequisites
 
-### Risks and release boundaries
+The handoff records AIRB000179 as non-refundable and AIRB000180 as refundable.
+Verify their allowlisted projections and cancellation schedules locally. Use
+injected responses and test-only clocks for boundary cases; do not change real
+capture dates/deadlines to manufacture a closing-soon or armable public scenario.
+A missing child-age/nationality field, supplier-net field or legacy token must
+never leak into a public projection or become invented source evidence.
 
-| Risk | Required control |
-| --- | --- |
-| Old receipts shown against new options | Pin and validate snapshot versions; rotate stale sessions |
-| Concurrent writes erase selection or bypass limits | Transactional storage and real-emulator cross-client tests |
-| Transaction retries repeat paid inference | Provider calls outside callbacks; injected-provider count assertions |
-| Raw supplier or customer data imported | Existing display projection plus recursive validation and import tests |
-| Firestore failure appears as a successful confirmation | Commit before response; safe retries and no memory fallback |
-| Dirty checkout differs from release artifact | Preserve unrelated work; export exact reviewed commit and allowlist |
-| Older image rollback stops persistence | Retain snapshots; document reset/data compatibility before deployment |
+Keep the desired six-card scenario matrix separate from implementation acceptance:
+two samples can verify storage mechanics, while complete catalogue content needs
+owner-created quotations and corresponding reviewed captures. Card photo/city and
+scenario descriptions must be supplied as curated facts, not invented metadata.
 
-No unresolved product choice blocks local implementation once this plan is
-approved. Before live release, verify the actual database, runtime identity and
-permissions; prepare the exact create-only import, TTL command, env/image changes,
-before/after checks and rollback. Present that tested bundle for final approval.
-Do not infer permission for production writes, deployment, extra Gemini calls,
-Firebase Hosting, source publication or supplier refresh from design agreement.
+### Release and approval boundaries
+
+The approved judge-flow decisions settle this tranche's anonymous access,
+per-session ownership, immediate replay, start/confirmation pages and Deals
+handoff. Broader invitation identity (#7), general booking contracts (#6), setup
+prototype (#8) and future Drop-to-quotation behavior (#9) remain tracker references;
+this plan neither closes them remotely nor authorizes deferred capabilities.
+Research branches remain read-only and are never merged.
+
+Before a separately approved release, verify database and runtime permissions,
+reviewed catalogue manifest/import set, current scenario eligibility, exact image/
+configuration changes, session TTL, rollback and preservation of private services
+and data. The first persistent release may require fresh anonymous sessions.
+Do not import production Firestore data, deploy, change IAM/TTL, capture more live
+quotations/Gateway rates, make extra model calls, push source or commit `.local\`
+without the relevant authority. This task ends at plan approval, before coding.
 
 ## Gemini restored and deployed, 18 October
 
