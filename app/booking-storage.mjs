@@ -47,11 +47,31 @@ function inspect(value) {
   }
 }
 
+// A photo is only ever a reviewed asset already shipped in app/public/assets, never a remote URL.
+export const PHOTO_ASSET = /^assets\/[a-z0-9-]{1,80}\.(?:jpg|png|webp)$/;
+const validPhoto = photo => exactKeys(photo, ['asset', 'alt']) && PHOTO_ASSET.test(photo.asset ?? '') && label(photo.alt);
+
 function validCard(card) {
   if (!exactKeys(card, CARD_KEYS) || !CODE.test(card.code) || !Number.isSafeInteger(card.order) || card.order < 1 || card.order > MAX_CATALOGUE
     || !label(card.cityName) || !label(card.scenarioLabel)) return false;
-  if (card.photo === null) return true;
-  return exactKeys(card.photo, ['asset', 'alt']) && /^assets\/[a-z0-9-]{1,80}\.(?:jpg|png|webp)$/.test(card.photo.asset) && label(card.photo.alt);
+  return card.photo === null || validPhoto(card.photo);
+}
+
+// Prepared captures may carry remote photo source URLs for a later reviewed download. They are
+// accepted only as explicitly non-renderable, and are never copied into any record.
+const IMAGE_SOURCES_KIND = 'remote-source-urls-pending-review';
+const validImageSources = sources => sources === undefined || (plain(sources) && sources.kind === IMAGE_SOURCES_KIND && sources.renderable === false);
+
+// Optional reviewed image manifest: { [code]: { hotel?: photo | null, drops?: { [optionId]: photo | null } } }.
+// A hotel photo fills an empty card photo; a Drop photo becomes that Drop's `photo` fact.
+function imageManifest(images, codes) {
+  if (images === undefined) return new Map();
+  if (!plain(images) || Object.keys(images).some(code => !codes.includes(code))) fail('IMAGE_MANIFEST_INVALID');
+  return new Map(Object.entries(images).map(([code, entry]) => {
+    if (!exactKeys(entry, ['hotel', 'drops']) || (entry.hotel != null && !validPhoto(entry.hotel))
+      || (entry.drops !== undefined && (!plain(entry.drops) || Object.values(entry.drops).some(photo => photo !== null && !validPhoto(photo))))) fail('IMAGE_MANIFEST_INVALID');
+    return [code, { hotel: entry.hotel ?? null, drops: entry.drops ?? {} }];
+  }));
 }
 
 function validBaseline(baseline, code) {
@@ -105,9 +125,11 @@ export function planCatalogueImport(input) {
     cards.set(card.code, card);
   }
   if (cards.size !== codes.length || codes.some(code => !cards.has(code)) || new Set([...cards.values()].map(card => card.order)).size !== cards.size) fail('CARD_INVALID');
+  const images = imageManifest(input.images, codes);
   return input.entries.map(entry => {
     const { code, bundle } = entry;
-    if (!exactKeys(entry, ['code', 'blocker', 'capture', 'bundle']) || !exactKeys(bundle, BUNDLE_KEYS)) fail('BUNDLE_INVALID');
+    if (!exactKeys(entry, ['code', 'blocker', 'capture', 'bundle', 'imageSources']) || !exactKeys(bundle, BUNDLE_KEYS)
+      || !validImageSources(entry.imageSources)) fail('BUNDLE_INVALID');
     const { privateReferences, ...shared } = bundle;
     inspect(shared); inspect(entry.capture);
     if (bundle.schemaVersion !== 1 || bundle.transactionMode !== 'selection-only' || bundle.customerRefund !== null || bundle.reservationCreated !== false
@@ -118,9 +140,20 @@ export function planCatalogueImport(input) {
     if (new Set(bundle.options.map(option => option.optionId)).size !== bundle.options.length) fail('DROP_DUPLICATE');
     const capture = validCapture(entry);
     const { code: _code, ...card } = cards.get(code);
+    const reviewed = images.get(code) ?? { hotel: null, drops: {} };
+    if (Object.keys(reviewed.drops).some(id => !bundle.options.some(option => option.optionId === id))) fail('IMAGE_MANIFEST_INVALID');
+    if (reviewed.hotel) {
+      if (card.photo === null) card.photo = { asset: reviewed.hotel.asset, alt: reviewed.hotel.alt };
+      else if (canonicalJson(card.photo) !== canonicalJson(reviewed.hotel)) fail('IMAGE_MANIFEST_CONFLICT');
+    }
     const booking = { schemaVersion: 1, code, baseline: bundle.baseline, card };
     const contentVersion = sha256(canonicalJson(booking));
-    const drops = bundle.options.map(option => Object.fromEntries(OPTION_KEYS.map(key => [key, option[key]])));
+    // A Drop without a reviewed photo has no `photo` key, so earlier Drop-set versions stay stable.
+    const drops = bundle.options.map(option => {
+      const facts = Object.fromEntries(OPTION_KEYS.map(key => [key, option[key]]));
+      const photo = reviewed.drops[option.optionId];
+      return photo ? { ...facts, photo: { asset: photo.asset, alt: photo.alt } } : facts;
+    });
     const dropSetCore = { schemaVersion: 1, code, contentVersion, capture, checkedAt: bundle.checkedAt, completeness: bundle.completeness, dropIds: drops.map(drop => drop.optionId) };
     const dropSetVersion = sha256(canonicalJson({ ...dropSetCore, drops }));
     return {
