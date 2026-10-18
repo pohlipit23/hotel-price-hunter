@@ -1,5 +1,6 @@
 const $ = id => document.getElementById(id);
 let state; let selected; let busy = false;
+let adviceGeneration = 0; let adviceController;
 const node = (tag, text, className) => { const element = document.createElement(tag); if (text !== undefined) element.textContent = text; if (className) element.className = className; return element; };
 const money = amount => new Intl.NumberFormat('en-GB', { style: 'currency', currency: amount.currency, currencyDisplay: 'code' })
   .format(amount.totalMinor / 10 ** new Intl.NumberFormat('en', { style: 'currency', currency: amount.currency }).resolvedOptions().maximumFractionDigits);
@@ -7,6 +8,7 @@ const sourceMoney = price => `${price.currency} ${price.amount}`;
 const day = date => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(date + 'T12:00:00Z'));
 const terms = option => option.freeCancellation === true ? 'Free cancellation flag · verify full terms' : option.freeCancellation === false ? 'Non-refundable option' : 'Cancellation terms unverified';
 function show(screen, push = true) {
+  if (screen !== 'review') resetAdvice();
   for (const key of ['options', 'review', 'confirmed']) $(`quote-${key}-screen`).hidden = key !== screen;
   const step = ['options', 'review', 'confirmed'].indexOf(screen);
   [...$('quote-steps').children].forEach((item, index) => { item.removeAttribute('aria-current'); item.classList.toggle('passed', index < step); if (index === step) item.setAttribute('aria-current', 'step'); });
@@ -22,10 +24,59 @@ function facts(option, target) {
   target.replaceChildren(heading, list);
 }
 function review(option, push = true) {
+  resetAdvice();
   selected = option; $('quote-demo-consent').checked = false; $('quote-flexibility-consent').checked = false;
   $('quote-review-error').textContent = ''; $('quote-flexibility-label').hidden = option.freeCancellation === true;
   facts(option, $('quote-review-facts')); show('review', push);
 }
+function resetAdvice() {
+  adviceGeneration++; adviceController?.abort(); adviceController = undefined;
+  $('quote-advice-answer').replaceChildren(); $('quote-advice-answer').hidden = true;
+  $('quote-advice-question').value = '';
+  $('quote-ask-gemini').disabled = !state?.model?.available;
+  $('quote-ask-gemini').removeAttribute('aria-busy');
+  $('quote-advice-status').textContent = state?.model?.available
+    ? 'Ask a question to get advice for this selected room.' : 'Gemini advice is unavailable. You can still review and select a room.';
+}
+for (const button of document.querySelectorAll('[data-advice-question]')) button.addEventListener('click', () => {
+  $('quote-advice-question').value = button.dataset.adviceQuestion; $('quote-advice-question').focus();
+});
+$('quote-advice-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!selected || adviceController || !state.model?.available) return;
+  const message = $('quote-advice-question').value.trim();
+  if (!message) return;
+  const generation = ++adviceGeneration; const optionId = selected.optionId; const snapshotVersion = state.snapshotVersion;
+  const controller = new AbortController(); adviceController = controller;
+  const timeout = setTimeout(() => controller.abort(), 25000);
+  $('quote-ask-gemini').disabled = true; $('quote-ask-gemini').setAttribute('aria-busy', 'true');
+  $('quote-advice-answer').hidden = true; $('quote-advice-status').textContent = 'Gemini is comparing this room with your quotation…';
+  try {
+    const response = await fetch('/api/quotation-demo/advice', { method: 'POST', credentials: 'same-origin', signal: controller.signal,
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': state.csrfToken }, body: JSON.stringify({ optionId, snapshotVersion, message }) });
+    if (generation !== adviceGeneration) return;
+    if (!response.ok) {
+      $('quote-advice-status').textContent = response.status === 429 ? 'Please wait a minute before asking again. Your room choice is unchanged.'
+        : response.status === 401 || response.status === 409 ? 'Reload the options before asking about this comparison again.'
+          : 'Gemini could not answer. Your room choice is unchanged; you can try again.';
+      return;
+    }
+    const result = await response.json();
+    if (generation !== adviceGeneration || selected?.optionId !== result.optionId || result.snapshotVersion !== state.snapshotVersion) return;
+    const advice = result.advice; const list = node('ul');
+    for (const tradeoff of advice.tradeoffs) list.append(node('li', tradeoff));
+    const priorities = { price: 'Price', flexibility: 'Flexibility', 'room-details': 'Room details', balanced: 'Balanced comparison' };
+    $('quote-advice-answer').replaceChildren(node('p', advice.summary, 'quote-advice-summary'), node('p', `Your priority: ${priorities[advice.priority]}`, 'small muted'), list,
+      node('p', advice.priceContext, 'small'), node('p', advice.limitations, 'small muted'));
+    $('quote-advice-answer').hidden = false;
+    $('quote-advice-status').textContent = result.source === 'test-injected' ? 'Test response · no live Gemini call' : 'Advice from Gemini · Google Vertex AI';
+  } catch {
+    if (generation === adviceGeneration) $('quote-advice-status').textContent = 'Gemini could not answer. Your room choice is unchanged; you can try again.';
+  } finally {
+    clearTimeout(timeout);
+    if (generation === adviceGeneration) { adviceController = undefined; $('quote-ask-gemini').disabled = false; $('quote-ask-gemini').removeAttribute('aria-busy'); }
+  }
+});
 function confirmed(confirmation, push = true) {
   selected = state.options.find(option => option.optionId === confirmation.optionId);
   if (!selected) return;

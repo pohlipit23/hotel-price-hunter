@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Direction B · The Concierge · RoomDrop UX study</title>
+<style>
+:root{
+  color-scheme: light;
+  --page:#fbf7ef; --surface:#ffffff; --ink:#23201b; --muted:#6d675d; --line:#e7dfd2;
+  --accent:#33418f; --accent-ink:#26306b;
+  --money:#1e6b4f; --money-bg:#e6f2ec; --money-line:#c2ddd0;
+  --risk:#7a5200; --risk-bg:#fff4d6; --risk-line:#eed9a4;
+  --focus:#33418f;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:"DM Sans","Segoe UI",system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box}
+html{background:var(--page);scroll-padding-bottom:220px}
+body{margin:0;background:var(--page);color:var(--ink);font:400 16px/1.55 var(--sans);-webkit-text-size-adjust:100%}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0;text-align:left}
+:focus-visible{outline:3px solid var(--focus);outline-offset:3px;border-radius:6px}
+[hidden]{display:none!important}
+.num{font-variant-numeric:tabular-nums}
+
+.shell{width:min(100%,720px);margin:0 auto;padding:0 16px 132px}
+#pane-list{display:none}
+@media (min-width:1024px){
+  .shell{width:min(100%,1120px);display:grid;grid-template-columns:320px minmax(0,1fr);gap:28px;align-items:start}
+  #pane-list{display:block;position:sticky;top:16px}
+}
+#pane-list h2{font:700 13px/1.3 var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:4px 0 10px}
+#pane-list button{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);margin-bottom:8px}
+#pane-list button[aria-current="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+#pane-list .r{flex:1 1 auto;min-width:0;font-weight:650;font-size:14px;line-height:1.3}
+#pane-list .s{flex:1 1 100%;font-size:12.5px;color:var(--muted)}
+#pane-list .v{flex:0 0 auto;color:var(--money);font-weight:750;font-size:15px}
+
+.topline{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 0 6px}
+.topline .mark{font:700 17px/1 var(--serif);letter-spacing:-.01em}
+.topline .mark i{font-style:normal;color:var(--accent)}
+.topline .tag{font-size:12px;color:var(--muted)}
+.bookline{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;font-size:13.5px;color:var(--muted);padding:2px 0 14px;border-bottom:1px solid var(--line)}
+.bookline b{color:var(--ink);font-weight:650}
+
+h1{margin:18px 0 6px;font:700 clamp(25px,6.6vw,34px)/1.14 var(--serif);letter-spacing:-.015em}
+.sub{margin:0 0 16px;color:var(--muted);font-size:14.5px}
+
+/* hero */
+.hero{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.hero .ph{position:relative;height:190px;background:#e8e0d2}
+.hero .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.hero .ph .save{position:absolute;right:12px;bottom:12px;background:var(--money);color:#fff;border-radius:10px;padding:8px 12px;text-align:right}
+.hero .ph .save b{display:block;font-size:19px;font-weight:750;letter-spacing:-.02em;line-height:1.1}
+.hero .ph .save span{font-size:11px;opacity:.9}
+.hero .ph .tagp{position:absolute;left:12px;bottom:12px;background:rgba(255,255,255,.92);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--muted)}
+.hero .body{padding:16px}
+.hero .room{font:700 21px/1.2 var(--serif);letter-spacing:-.01em;margin:0 0 4px}
+.hero .meta{margin:0 0 12px;font-size:13.5px;color:var(--muted)}
+.reasons{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:8px}
+.reasons li{display:flex;gap:9px;font-size:14px}
+.reasons li::before{content:"";flex:0 0 7px;width:7px;height:7px;border-radius:50%;background:var(--money);margin-top:7px}
+.reasons li.warn::before{background:var(--risk)}
+.hero .cta{display:flex;gap:10px;flex-wrap:wrap}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:11px 20px;border-radius:12px;font-weight:650;font-size:15px}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-ink)}
+.btn.ghost{border:1px solid var(--line);background:var(--surface)}
+.btn.link{min-height:44px;color:var(--accent);font-weight:650;font-size:14px;padding:10px 4px}
+.btn.wide{width:100%}
+
+/* segmented switcher */
+.seg{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 8px;padding-bottom:2px}
+.seg button{flex:0 0 auto;min-height:42px;padding:8px 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:13.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.seg button[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.under{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;margin:6px 0 0}
+.under .note{font-size:12.5px;color:var(--muted)}
+
+/* steps */
+.dots{display:flex;gap:8px;align-items:center;margin:16px 0 4px}
+.dots .d{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);font-weight:600}
+.dots .d i{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:#efe8db;color:var(--muted);font:700 11px/1 var(--sans);font-style:normal}
+.dots .d[aria-current="step"]{color:var(--ink)}
+.dots .d[aria-current="step"] i{background:var(--accent);color:#fff}
+.dots .d.done i{background:var(--money-bg);color:var(--money)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
+.card h2{margin:0 0 10px;font:700 16px/1.3 var(--serif)}
+.receipt{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px 16px;margin:0;font-size:15px}
+.receipt dt{color:var(--muted)}
+.receipt dd{margin:0;text-align:right;font-weight:600}
+.receipt .drop dt,.receipt .drop dd{color:var(--money);font-weight:750;font-size:17px}
+.receipt .drop{border-top:1px dashed var(--line);padding-top:9px;margin-top:2px}
+.facts{display:grid;gap:10px}
+.fact{display:flex;justify-content:space-between;gap:12px;align-items:baseline;border-bottom:1px dashed var(--line);padding-bottom:9px}
+.fact:last-child{border-bottom:0;padding-bottom:0}
+.fact .k{color:var(--muted);font-size:13.5px}
+.fact .v{font-weight:650;font-size:14px;text-align:right}
+.chip{display:inline-flex;align-items:center;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:600}
+.chip.money{color:var(--money);background:var(--money-bg)}
+.chip.risk{color:var(--risk);background:var(--risk-bg)}
+.riskbox{background:var(--risk-bg);border:1px solid var(--risk-line);border-radius:14px;padding:14px;margin:12px 0 0}
+.riskbox h2{margin:0 0 6px;font:700 15px/1.3 var(--serif);color:var(--risk)}
+.riskbox p{margin:0 0 10px;font-size:13.5px;color:#5d4300}
+.riskbox label{display:flex;gap:10px;align-items:flex-start;font-size:14px;font-weight:600}
+.riskbox input{width:22px;height:22px;margin:1px 0 0;accent-color:var(--risk);flex:0 0 auto}
+.back{display:inline-flex;align-items:center;gap:6px;min-height:44px;color:var(--muted);font-size:14px;font-weight:600;margin:14px 0 0}
+
+/* bar with reserved adviser lane */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(35,32,27,.08)}
+.bar .inner{width:min(100%,720px);margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px 10px;align-items:center}
+@media (min-width:1024px){ .bar .inner{width:min(100%,1120px)} }
+.bar .delta b{display:block;color:var(--money);font-size:19px;font-weight:750;letter-spacing:-.02em}
+.bar .delta span{font-size:11.5px;color:var(--muted)}
+.bar .ask{min-height:48px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;font-size:13.5px;font-weight:650;color:var(--accent);background:var(--surface)}
+.bar .msg{grid-column:1/-1;font-size:13.5px;font-weight:600;color:var(--risk);background:var(--risk-bg);border:1px solid var(--risk-line);border-radius:8px;padding:8px 10px;margin:0}
+
+/* docked adviser sheet */
+dialog.sheet{position:fixed;inset:auto 0 0 0;margin:0;width:100%;max-width:100%;height:min(62vh,560px);border:0;border-top:1px solid var(--line);
+  border-radius:20px 20px 0 0;background:var(--surface);padding:0;color:var(--ink)}
+dialog.sheet::backdrop{background:rgba(35,32,27,.32)}
+.sheet .grip{width:44px;height:5px;border-radius:99px;background:var(--line);margin:10px auto 4px}
+.sheet .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:6px 18px 12px;border-bottom:1px solid var(--line)}
+.sheet .head h2{margin:0;font:700 18px/1.2 var(--serif)}
+.sheet .head p{margin:3px 0 0;font-size:12.5px;color:var(--muted)}
+.sheet .close{min-width:44px;min-height:44px;display:grid;place-items:center;font-size:20px;color:var(--muted)}
+.sheet .log{padding:14px 18px;overflow:auto;height:calc(100% - 190px)}
+.sheet .ctx{border:1px dashed var(--line);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--muted);margin:0 0 12px}
+.sheet .chips{display:flex;flex-wrap:wrap;gap:8px}
+.sheet .chips button{border:1px solid var(--line);border-radius:999px;padding:8px 13px;font-size:13px;font-weight:600;background:var(--page)}
+.sheet .composer{position:absolute;left:0;right:0;bottom:0;padding:10px 18px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--surface);display:flex;gap:8px}
+.sheet .composer input{flex:1;min-height:46px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--page)}
+
+/* compare dialog */
+dialog.table{border:1px solid var(--line);border-radius:18px;padding:0;width:min(94vw,560px);background:var(--surface);color:var(--ink)}
+dialog.table::backdrop{background:rgba(35,32,27,.32)}
+dialog.table .head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+dialog.table h2{margin:0;font:700 18px/1.2 var(--serif)}
+dialog.table table{width:100%;border-collapse:collapse;font-size:13.5px}
+dialog.table th,dialog.table td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+dialog.table th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+dialog.table td.num,dialog.table th.num{text-align:right}
+dialog.table .save{color:var(--money);font-weight:750}
+
+.done-hero{background:var(--money-bg);border:1px solid var(--money-line);border-radius:18px;padding:20px;margin:18px 0}
+.done-hero h1{margin:0 0 6px;color:var(--money)}
+.done-hero p{margin:0;font-size:14.5px;color:#124634}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside id="pane-list" aria-label="Your options"></aside>
+
+  <main>
+    <!-- DEALS -->
+    <section id="view-deals">
+      <div class="topline"><span class="mark">Room<i>Drop</i></span><span class="tag">Design study · fictional data</span></div>
+      <div class="bookline"><b>The Meridian Kuala Lumpur</b><span>Superior Twin · Breakfast</span><span>21–23 Jan · 2 nights · 2 adults</span><span class="num">Paid <b>AED 600</b></span></div>
+
+      <h1 id="h1">One room worth a second look.</h1>
+      <p class="sub">We compared your stay against every rate we could check. Start with the one we would pick — the others are one tap away.</p>
+
+      <div class="seg" role="tablist" aria-label="Choose an option to preview" id="seg"></div>
+
+      <article class="hero" id="hero"></article>
+
+      <div class="under">
+        <button class="btn link" type="button" id="compare-open">Compare all three side by side</button>
+        <span class="note">Savings are whole-stay estimates before final pricing and fees.</span>
+      </div>
+    </section>
+
+    <!-- REVIEW -->
+    <section id="view-review" hidden>
+      <button class="back" id="back" type="button">‹ Back</button>
+      <div class="dots" id="dots" aria-label="Review steps"></div>
+      <h1 id="review-title"></h1>
+
+      <div class="card" id="step-1">
+        <h2>1 · The price, plainly</h2>
+        <dl class="receipt num">
+          <dt>You paid</dt><dd><s>AED 600</s></dd>
+          <dt>This room</dt><dd id="r-new"></dd>
+          <div class="drop"><dt>You keep</dt><dd id="r-drop"></dd></div>
+        </dl>
+      </div>
+
+      <div class="card" id="step-2" hidden>
+        <h2>2 · What actually changes</h2>
+        <div class="facts" id="r-facts"></div>
+      </div>
+
+      <div id="step-3" hidden>
+        <div class="card">
+          <h2>3 · Before you choose</h2>
+          <p style="margin:0;font-size:14px;color:var(--muted)" id="r-flexnote"></p>
+        </div>
+        <div class="riskbox" id="r-risk" hidden>
+          <h2>Final drop · non-refundable</h2>
+          <p>No free cancellation. If your plans change you may not get your money back, and automatic checks end for this stay.</p>
+          <label for="r-consent"><input type="checkbox" id="r-consent"><span>I understand this room has no free cancellation.</span></label>
+        </div>
+      </div>
+
+      <div class="card" id="r-askcard">
+        <h2>Unsure? Ask first.</h2>
+        <p style="margin:0 0 10px;font-size:14px;color:var(--muted)">Gemini sees only your booking, this room, both prices and the cancellation terms.</p>
+        <button class="btn ghost" type="button" id="r-ask">Ask Gemini</button>
+      </div>
+    </section>
+
+    <!-- DONE -->
+    <section id="view-done" hidden>
+      <div class="done-hero">
+        <h1>Room choice confirmed</h1>
+        <p id="done-copy"></p>
+      </div>
+      <button class="btn ghost wide" type="button" id="done-back">Back to your options</button>
+    </section>
+  </main>
+</div>
+
+<div class="bar" id="bar" hidden>
+  <div class="inner">
+    <div class="delta num"><b id="bar-drop"></b><span>Estimated drop · whole stay</span></div>
+    <button class="ask" type="button" id="bar-ask">Ask</button>
+    <button class="btn primary" type="button" id="bar-next">Continue</button>
+    <p class="msg" id="bar-msg" hidden></p>
+  </div>
+</div>
+
+<dialog class="sheet" id="sheet" aria-labelledby="sheet-title">
+  <div class="grip" aria-hidden="true"></div>
+  <div class="head">
+    <div><h2 id="sheet-title">Gemini</h2><p id="sheet-sub">Grounded on this comparison only</p></div>
+    <button class="close" type="button" id="sheet-close" aria-label="Close adviser">×</button>
+  </div>
+  <div class="log">
+    <p class="ctx">Gemini can see: your booking (AED 600, Superior Twin, Breakfast), three room options with prices and cancellation terms. It cannot book, cancel or change anything.</p>
+    <div class="chips">
+      <button type="button">Help me choose</button>
+      <button type="button">My plans may change</button>
+      <button type="button">Is breakfast worth it?</button>
+    </div>
+  </div>
+  <form class="composer" onsubmit="return false">
+    <input type="text" placeholder="What matters most for your stay?" aria-label="Your question">
+    <button class="btn primary" type="submit">Send</button>
+  </form>
+</dialog>
+
+<dialog class="table" id="compare" aria-labelledby="compare-title">
+  <div class="head"><h2 id="compare-title">All three options</h2><button class="close" type="button" id="compare-close" aria-label="Close comparison" style="min-width:44px;min-height:44px;font-size:20px;color:var(--muted)">×</button></div>
+  <table>
+    <thead><tr><th scope="col">Room</th><th scope="col">Meals</th><th scope="col">Cancellation</th><th scope="col" class="num">Price</th><th scope="col" class="num">You keep</th></tr></thead>
+    <tbody id="compare-body"></tbody>
+  </table>
+</dialog>
+
+<script>
+const OPTIONS = [
+  { id:'a', tab:'We would pick', room:'Superior Twin Plus', board:'Breakfast', refundable:false, price:380, pos:'20% 40%',
+    reasons:['Same hotel, same dates, bigger twin on a higher floor.','Breakfast kept exactly as you have it.','The largest drop of the three — AED 220 back after fees.'],
+    warns:['In exchange: no free cancellation on this rate.'] },
+  { id:'b', tab:'Keeps cancellation', room:'Superior Plus Twin', board:'Breakfast', refundable:true, price:570, pos:'55% 35%',
+    reasons:['The closest match to the room you already have.','The only option that keeps free cancellation.','A smaller drop, but your plans stay flexible.'],
+    warns:[] },
+  { id:'c', tab:'With city view', room:'Superior Plus Twin with City View and Best Available Rate', board:'Room only', refundable:false, price:410, pos:'80% 45%',
+    reasons:['Adds a city view over the skyline.','A middle drop of AED 190.','Widest availability of the three.'],
+    warns:['Loses breakfast and free cancellation.'] },
+];
+const PAID=600, save=o=>PAID-o.price, money=n=>'AED '+n;
+const state={view:'deals',tab:'a',step:1,selected:null,consent:{}};
+const $=id=>document.getElementById(id);
+
+function renderSeg(){
+  const seg=$('seg'); seg.replaceChildren();
+  OPTIONS.forEach(o=>{
+    const b=document.createElement('button'); b.type='button'; b.role='tab';
+    b.setAttribute('role','tab'); b.setAttribute('aria-selected',String(state.tab===o.id));
+    b.textContent=o.tab+' · save '+save(o);
+    b.addEventListener('click',()=>{state.tab=o.id; renderSeg(); renderHero(); renderPane();});
+    seg.append(b);
+  });
+}
+function renderHero(){
+  const o=OPTIONS.find(x=>x.id===state.tab);
+  $('hero').innerHTML=
+    '<div class="ph"><img src="../assets/illustrative-stays.jpg" alt="Illustrative photo of a hotel room" style="object-position:'+o.pos+'">'+
+    '<span class="tagp">Illustrative photo</span>'+
+    '<span class="save num"><b>Save '+money(save(o))+'</b><span>whole stay</span></span></div>'+
+    '<div class="body"><p class="room">'+o.room+'</p>'+
+    '<p class="meta num">'+o.board+' · '+money(PAID)+' → '+money(o.price)+' · '+
+      (o.refundable?'free cancellation':'non-refundable')+'</p>'+
+    '<ul class="reasons">'+o.reasons.map(r=>'<li>'+r+'</li>').join('')+o.warns.map(w=>'<li class="warn">'+w+'</li>').join('')+'</ul>'+
+    '<div class="cta"><button class="btn primary" type="button" id="hero-review">Review this room</button>'+
+    '<button class="btn ghost" type="button" id="hero-ask">Ask Gemini</button></div></div>';
+  $('hero-review').addEventListener('click',()=>openReview(o.id));
+  $('hero-ask').addEventListener('click',openSheet);
+}
+function renderPane(){
+  const p=$('pane-list'); p.innerHTML='<h2>Your options</h2>';
+  OPTIONS.forEach(o=>{
+    const b=document.createElement('button'); b.type='button';
+    b.setAttribute('aria-current',String(state.tab===o.id||state.selected?.id===o.id));
+    b.innerHTML='<span class="r">'+o.room+'</span><span class="v num">+'+save(o)+'</span><span class="s">'+o.board+' · '+(o.refundable?'free cancellation':'non-refundable')+'</span>';
+    b.addEventListener('click',()=>{ if(state.view==='review'){openReview(o.id);} else {state.tab=o.id;renderSeg();renderHero();renderPane();} });
+    p.append(b);
+  });
+}
+function openSheet(){ $('sheet-sub').textContent='Grounded on: '+ (state.selected?state.selected.room:'your three options'); $('sheet').showModal(); }
+$('sheet-close').addEventListener('click',()=>$('sheet').close());
+$('bar-ask').addEventListener('click',openSheet);
+$('r-ask').addEventListener('click',openSheet);
+$('compare-open').addEventListener('click',()=>$('compare').showModal());
+$('compare-close').addEventListener('click',()=>$('compare').close());
+(function(){ const tb=$('compare-body');
+  OPTIONS.forEach(o=>{ const tr=document.createElement('tr');
+    tr.innerHTML='<td>'+o.room+'</td><td>'+o.board+'</td><td>'+(o.refundable?'<span class="chip money">Free</span>':'<span class="chip risk">None</span>')+'</td><td class="num">'+money(o.price)+'</td><td class="num save">'+money(save(o))+'</td>';
+    tb.append(tr); }); })();
+
+const STEPS=['Price','Changes','Confirm'];
+function renderDots(){
+  const d=$('dots'); d.replaceChildren();
+  STEPS.forEach((s,i)=>{ const n=i+1; const el=document.createElement('span'); el.className='d'+(n<state.step?' done':'');
+    if(n===state.step) el.setAttribute('aria-current','step');
+    el.innerHTML='<i>'+(n<state.step?'✓':n)+'</i>'+s; d.append(el); });
+}
+function openReview(id){
+  const o=OPTIONS.find(x=>x.id===id); state.selected=o; state.view='review'; state.step=1;
+  $('view-deals').hidden=true; $('view-done').hidden=true; $('view-review').hidden=false; $('bar').hidden=false;
+  $('review-title').textContent=o.room;
+  $('r-new').textContent=money(o.price);
+  $('r-drop').textContent=money(save(o));
+  $('bar-drop').textContent='Save '+money(save(o));
+  $('r-risk').hidden=o.refundable; $('r-consent').checked=!!state.consent[id];
+  $('r-flexnote').textContent=o.refundable
+    ? 'This room keeps free cancellation. You can approve it as it is.'
+    : 'This room has no free cancellation. Read the panel below and tick the acknowledgement to approve.';
+  const f=$('r-facts'); f.replaceChildren();
+  [['Hotel','Same hotel · The Meridian Kuala Lumpur'],['Room',o.room],['Meals',o.board+(o.board==='Breakfast'?' · kept':' · dropped')],['Cancellation',o.refundable?'Free cancellation · kept':'Non-refundable · lost']]
+   .forEach(([k,v])=>{ const d=document.createElement('div'); d.className='fact'; d.innerHTML='<span class="k">'+k+'</span><span class="v">'+v+'</span>'; f.append(d); });
+  showStep(); renderDots(); renderPane(); window.scrollTo(0,0);
+}
+function showStep(){
+  $('step-1').hidden=state.step!==1; $('step-2').hidden=state.step!==2; $('step-3').hidden=state.step!==3;
+  $('bar-msg').hidden=true;
+  $('bar-next').textContent=state.step<3?'Continue':'Choose this room';
+  $('back').textContent=state.step===1?'‹ Your options':'‹ Previous step';
+}
+$('back').addEventListener('click',()=>{ if(state.step>1){state.step--;showStep();renderDots();} else toDeals(); });
+function toDeals(){ state.view='deals'; state.selected=null; $('view-review').hidden=true; $('view-done').hidden=true; $('view-deals').hidden=false; $('bar').hidden=true; renderPane(); window.scrollTo(0,0); }
+$('done-back').addEventListener('click',toDeals);
+$('r-consent').addEventListener('change',e=>{ state.consent[state.selected.id]=e.target.checked; if(e.target.checked)$('bar-msg').hidden=true; });
+$('bar-next').addEventListener('click',()=>{
+  if(state.step<3){ state.step++; showStep(); renderDots(); window.scrollTo(0,0); return; }
+  const o=state.selected;
+  if(!o.refundable && !state.consent[o.id]){
+    const m=$('bar-msg'); m.hidden=false; m.textContent='Tick the acknowledgement above to choose this room.';
+    $('r-risk').scrollIntoView({block:'center'}); $('r-consent').focus({preventScroll:true}); return;
+  }
+  state.view='done'; $('view-review').hidden=true; $('bar').hidden=true; $('view-done').hidden=false;
+  $('done-copy').textContent='You reviewed '+o.room+' and confirmed your choice. Your original booking is unchanged: no reservation, cancellation, payment or refund was made in this study.';
+  window.scrollTo(0,0);
+});
+renderSeg(); renderHero(); renderPane();
+</script>
+</body>
+</html>

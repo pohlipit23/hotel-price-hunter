@@ -1,5 +1,123 @@
 # Hotel Price Hunter: proposed starting plan
 
+## Public demo Firestore persistence — 18 October
+
+Current scope: the user agreed to an immutable Firestore copy of the sanitised
+EasyGDS starting quotation and captured comparison options, with each anonymous
+session referencing that exact snapshot. The approved design is recorded in
+`docs/public-demo-firestore-spec.md`. This section extends the existing project
+plan; earlier evidence and incomplete tasks below remain preserved.
+
+Status: implementation plan and task list prepared for human review. No app code,
+production import, deployment or IAM change is part of this planning step.
+
+### Architecture and dependencies
+
+1. Controlled import creates `roomdropDemoSnapshotsV1/{snapshotVersion}` from the
+   approved display projection. Identical retries are safe; conflicting content
+   cannot overwrite an existing version. Import is offline by default and makes
+   no EasyGDS/Gateway/model request. Production execution needs release approval.
+2. Sessions in `roomdropPublicSessionsV1/{sha256(cookieToken)}` reference that
+   immutable snapshot. Use the existing server Firestore dependency and attached
+   Cloud Run identity. Keep simulation/agency/watch collections separate.
+3. Session storage owns atomic receipt changes, expiry, counters and bounded
+   context merges. A private bounded capacity record coordinates the 64-live-session
+   limit across instances; expired entries release capacity without broad scans.
+   Only session documents receive TTL. Transaction callbacks have no external calls.
+4. Hosted startup requires an exact `ROOMDROP_SNAPSHOT_VERSION` pin and reads the
+   validated Firestore document before accepting requests. Production has neither
+   automatic seeding nor file/memory fallback. Test factories accept explicit
+   test storage; a local emulator launcher exercises the actual Firestore adapter.
+5. Preserve the UI and API projection. Gemini allowance is reserved in a storage
+   transaction, then the provider call runs outside it. A guarded merge appends
+   context without overwriting selections. Instance limits retain their existing
+   scope; this change does not create a global model-call budget.
+
+Build order: F1 import/read path → F2 durable session storage → F3 selection API →
+F4 advice integration → F5 hosted packaging → F6 acceptance/release preparation.
+Work is sequential because these steps share storage and server contracts.
+The detailed checklist and checkpoints live in `tasks/todo.md`.
+
+### Verification commands
+
+After confirming the intended emulator already exists, use only its loopback
+endpoint and the established `demo-roomdrop-iap-qa` namespace. Set
+`RUN_FIRESTORE_INTEGRATION=1`, `NODE_ENV=test`, and remove Cloud Run and live-model
+activation variables as documented in the spec. Never flush a shared emulator.
+
+```powershell
+node --test tests/quotation-snapshot-storage.test.mjs tests/quotation-snapshot-import.test.mjs
+node --test tests/quotation-session-storage.test.mjs
+node --test tests/quotation-demo-server.test.mjs tests/booking-live.test.mjs
+node --test tests/quotation-advice-server.test.mjs tests/booking-advice.test.mjs
+node --test tests/quotation-cloud.test.mjs tests/public-demo-release.test.mjs
+node --test tests/*.test.mjs
+git diff --check
+```
+
+New test names above are planned outputs. The new CLI defaults to validation only:
+`node scripts/import-demo-snapshot.mjs --snapshot=.local/quotation-demo/ACCEPTED-CAPTURE.json`.
+Actual emulator import adds `--execute --project=demo-roomdrop-iap-qa
+--database=(default) --emulator=127.0.0.1:8081`, with PowerShell quoting applied to
+the database argument. The accepted path is resolved from the existing capture;
+do not hard-code a private file into tracked source.
+
+Add `scripts/serve-booking-firestore-demo.mjs` with explicit snapshot-version,
+loopback emulator and port arguments for local review; it must use the imported
+record rather than reading the baseline from a local bundle. Add
+`tests/booking-firestore.browser.mjs` to own two temporary servers and exercise
+restart/cookie recovery and separate browser contexts with an injected provider.
+Keep `tests/booking-live.browser.mjs` as the existing UI-only regression.
+
+For the hosted artifact, extend `scripts/prepare-booking-release.mjs` to preserve
+exact-commit and dependency allowlists while pinning the snapshot version.
+Build its emitted context with `docker build --network=none --tag
+roomdrop-firestore-review CONTEXT_DIRECTORY` after satisfying the existing npm
+dependency layer; an uncached dependency-install build requires network and is
+not a network-disabled startup claim. Run the resulting container smoke with
+`docker run --rm --network=none roomdrop-firestore-review`: missing database
+access must fail safely. Separately verify successful startup and APIs against
+the emulator with the exact packaged app and an injected test configuration.
+Record executable commands, image/context hashes and cleanup in the verification
+document when the final implementation determines the precise harness arguments.
+
+### Risks and release boundaries
+
+| Risk | Required control |
+| --- | --- |
+| Old receipts shown against new options | Pin and validate snapshot versions; rotate stale sessions |
+| Concurrent writes erase selection or bypass limits | Transactional storage and real-emulator cross-client tests |
+| Transaction retries repeat paid inference | Provider calls outside callbacks; injected-provider count assertions |
+| Raw supplier or customer data imported | Existing display projection plus recursive validation and import tests |
+| Firestore failure appears as a successful confirmation | Commit before response; safe retries and no memory fallback |
+| Dirty checkout differs from release artifact | Preserve unrelated work; export exact reviewed commit and allowlist |
+| Older image rollback stops persistence | Retain snapshots; document reset/data compatibility before deployment |
+
+No unresolved product choice blocks local implementation once this plan is
+approved. Before live release, verify the actual database, runtime identity and
+permissions; prepare the exact create-only import, TTL command, env/image changes,
+before/after checks and rollback. Present that tested bundle for final approval.
+Do not infer permission for production writes, deployment, extra Gemini calls,
+Firebase Hosting, source publication or supplier refresh from design agreement.
+
+## Gemini restored and deployed, 18 October
+
+Model decision and execution: Gemini 3.8 Flash (`gemini-3.8-flash` / `global`) is
+deployed in the existing booking review on revision `hotel-price-hunter-00015-b8d`.
+The earlier three-request evaluation and three additional production acceptance
+checks passed. Both allowances are exhausted. See `docs/gemini-production-release.md`.
+
+The original hackathon plan explicitly requires live Gemini preference understanding
+and grounded comparisons. The published booking-backed demo now has a live model
+path. The restoration adds a Gemini stay adviser to selected-room
+review, with follow-up questions, a server-side Vertex AI adapter and deterministic
+financial/transaction boundaries. See `docs/quotation-gemini-contract.md`.
+The current room-selection UI remains; the historical opening questionnaire/chat
+modal is not reintroduced. The original five-call allowance stays exhausted and
+unchanged. The newly authorised 3.8 semantic tests and customer release have passed.
+Historical Gemini-disabled checkpoints below describe
+earlier releases and do not replace this restored AI requirement.
+
 Current cloud checkpoint, 15 October: RoomDrop customer revision
 `hotel-price-hunter-00007-lrm` is privately deployed behind its own operator-only IAP
 gate. Independent registry and **44+4** supported metadata/direct-access checks passed

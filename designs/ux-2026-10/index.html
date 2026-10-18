@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>RoomDrop UX review · two light directions · October 2026</title>
+<style>
+:root{color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:#f2f4f6;color:#1c2733;font:15px/1.55 'Segoe UI',system-ui,Arial,sans-serif}
+main{max-width:1040px;margin:auto;padding:32px 24px 48px}
+header{margin-bottom:24px}
+.eyebrow{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;font-weight:700;color:#5a6875}
+h1{font-size:28px;letter-spacing:-1px;margin:8px 0}
+header p{color:#53616d;max-width:640px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:36px}
+.meta{display:flex;align-items:center;justify-content:space-between;gap:12px}
+h2{font-size:19px;letter-spacing:-.5px;margin:0}
+.swatches{display:flex;gap:4px}
+.swatches i{width:16px;height:16px;border-radius:50%;border:1px solid #0002;background:var(--s)}
+.description{font-size:13px;color:#53616d;min-height:56px;margin:6px 0 0}
+iframe{display:block;width:100%;height:844px;border:1px solid #cdd4db;border-radius:20px;background:#fff;margin:14px 0 8px;box-shadow:0 8px 32px #182c3b0f}
+a{display:inline-flex;min-height:44px;align-items:center;color:#244e83;font-weight:650;font-size:13px}
+a:focus-visible,button:focus-visible{outline:3px solid #ad6810;outline-offset:4px}
+ul{margin:8px 0 0;padding-left:18px;font-size:13px;color:#41505d}
+li{margin:3px 0}
+footer{font-size:12px;color:#53616d;margin-top:28px;border-top:1px solid #d8dee4;padding-top:14px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 0}
+.controls button{min-height:40px;padding:8px 14px;border:1px solid #cdd4db;border-radius:999px;background:#fff;font-size:13px;font-weight:600;color:#33414e;cursor:pointer}
+.controls button[aria-pressed="true"]{background:#1c2733;border-color:#1c2733;color:#fff}
+@media(max-width:820px){main{padding:24px 16px}.grid{grid-template-columns:1fr;gap:30px;max-width:440px;margin:auto}h1{font-size:25px}.description{min-height:0}iframe{height:780px;border-radius:14px}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">RoomDrop / front-end UX review / October 2026</p>
+    <h1>Two light, mobile-first directions for the drop flow</h1>
+    <p>Companion previews to <a href="../../docs/ux-review-2026-10.md" style="display:inline;min-height:0">docs/ux-review-2026-10.md</a>. Both fix the review's P1 findings: positive verbal savings, no floating control over prices or buttons, consent feedback at the point of decision, and a desktop layout that uses the viewport. Fictional data only; no live integrations.</p>
+    <div class="controls" role="group" aria-label="Preview width">
+      <button type="button" data-w="390" aria-pressed="true">Phone · 390</button>
+      <button type="button" data-w="768" aria-pressed="false">Tablet · 768</button>
+      <button type="button" data-w="1280" aria-pressed="false">Desktop · 1280</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section>
+      <div class="meta">
+        <h2>A · The Statement</h2>
+        <span class="swatches" aria-label="Paper white, ink and money green"><i style="--s:#f6f8fa"></i><i style="--s:#152838"></i><i style="--s:#0b6b45"></i></span>
+      </div>
+      <p class="description">A calm financial statement. Slim sticky booking strip, three comparison rows that fit one phone fold, tabular positive savings, receipt-first review, risk panel welded to the action bar, adviser as an inline lane. Desktop adds a summary rail.</p>
+      <iframe id="fa" title="Direction A mobile preview" src="statement.html"></iframe>
+      <a href="statement.html">Open direction A full screen ↗</a>
+      <ul>
+        <li>All three options visible in one 844px fold.</li>
+        <li>Room name is the headline; hotel stated once in the strip.</li>
+        <li>Blocked approval explains itself inside the action bar.</li>
+      </ul>
+    </section>
+    <section>
+      <div class="meta">
+        <h2>B · The Concierge</h2>
+        <span class="swatches" aria-label="Ivory, ink and editorial indigo"><i style="--s:#fbf7ef"></i><i style="--s:#23201b"></i><i style="--s:#33418f"></i></span>
+      </div>
+      <p class="description">Guided, one option at a time. A reasoned hero recommendation, a segmented switcher for the alternatives, an on-demand compare-all table, and a three-step review where consent and the approve button share a step. Adviser is a docked half-sheet with its grounding shown.</p>
+      <iframe id="fb" title="Direction B mobile preview" src="concierge.html"></iframe>
+      <a href="concierge.html">Open direction B full screen ↗</a>
+      <ul>
+        <li>Shortest path to a confident first decision.</li>
+        <li>Consent lives in the same step as approval, so blocking cannot be missed.</li>
+        <li>Desktop becomes a master–detail two-pane.</li>
+      </ul>
+    </section>
+  </div>
+
+  <footer>Interactive design previews · light theme only · fictional RoomDrop data (AED 600 booked; AED 380 / 570 / 410 options) · no bookings, payments or monitoring. Imagery: shared illustrative JPEG from <code>designs/assets/</code>.</footer>
+</main>
+<script>
+const frames=[document.getElementById('fa'),document.getElementById('fb')];
+document.querySelectorAll('.controls button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.controls button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+  const w=Number(b.dataset.w);
+  frames.forEach(f=>{ f.style.maxWidth=w+'px'; f.style.margin='14px auto 8px'; });
+}));
+frames.forEach(f=>{f.style.maxWidth='390px';f.style.margin='14px auto 8px';});
+</script>
+</body>
+</html>

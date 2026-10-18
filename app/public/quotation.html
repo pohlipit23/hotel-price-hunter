@@ -30,6 +30,19 @@
         <section id="quote-review-screen" class="quote-panel" aria-labelledby="review-heading" hidden>
           <p class="eyebrow">Your selected option</p><h2 id="review-heading" tabindex="-1">Review this room</h2>
           <div id="quote-review-facts"></div>
+          <section class="quote-adviser" aria-labelledby="advice-heading">
+            <p class="eyebrow">Compare with confidence</p><h3 id="advice-heading">Gemini stay adviser</h3>
+            <p class="small muted">Ask about this room while you review. Advice leaves your room choice and acknowledgements with you.</p>
+            <form id="quote-advice-form">
+              <label for="quote-advice-question">What matters for your stay?</label>
+              <textarea id="quote-advice-question" rows="3" maxlength="1200" required aria-describedby="quote-advice-privacy" placeholder="My dates might change. Is this option worth it?"></textarea>
+              <p id="quote-advice-privacy" class="small muted">Your question and the displayed comparison are sent to Google Gemini. Leave out names, booking references and personal details.</p>
+              <div class="quote-advice-prompts"><button type="button" data-advice-question="My dates might change. How does this option affect flexibility?">My plans may change</button><button type="button" data-advice-question="What does the price difference mean, and what still needs checking?">Explain the price</button></div>
+              <button id="quote-ask-gemini" class="secondary" type="submit">Ask Gemini</button>
+            </form>
+            <p id="quote-advice-status" class="small muted" role="status" aria-live="polite"></p>
+            <div id="quote-advice-answer" class="quote-advice-answer" aria-live="polite" hidden></div>
+          </section>
           <p class="quote-note">This confirms a room choice for the demo. The price and full terms would be checked before an actual reservation.</p>
           <label class="quote-checkbox"><input id="quote-demo-consent" type="checkbox"><span>I understand this is a demo selection and no reservation, cancellation or payment will be made.</span></label>
           <label id="quote-flexibility-label" class="quote-checkbox quote-flexibility" hidden><input id="quote-flexibility-consent" type="checkbox"><span>I understand that free cancellation is not offered or has not been established for this option.</span></label>

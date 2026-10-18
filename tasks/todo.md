@@ -1,5 +1,121 @@
 # First milestone tasks
 
+## Public demo Firestore persistence — 18 October
+
+Design agreed in chat: import one sanitised immutable starting quotation/options
+snapshot into Firestore and link durable visitor sessions to it. Contract:
+`docs/public-demo-firestore-spec.md`; implementation plan: `tasks/plan.md`.
+Status: tasks prepared for review; all implementation and live acceptance below
+remain unverified. Existing open project tasks below are preserved.
+
+### F1: Import and read the immutable demo snapshot
+
+- [ ] Acceptance: default-offline importer validates the approved display
+  projection, creates only the designated snapshot, accepts identical replay and
+  rejects conflicting content/private fields. Separate clients read the same
+  validated version; no supplier request or production startup seeding occurs.
+- Verify: `node --test tests/quotation-snapshot-storage.test.mjs tests/quotation-snapshot-import.test.mjs`
+  with the real emulator enabled; include corrupted, missing and duplicate imports.
+- Depends on: approved implementation plan. Medium, four files:
+  `app/quotation-snapshot-storage.mjs`, `scripts/import-demo-snapshot.mjs`,
+  `tests/quotation-snapshot-storage.test.mjs`, `tests/quotation-snapshot-import.test.mjs`.
+
+### F2: Persist isolated anonymous sessions
+
+- [ ] Acceptance: hashed session identities retain one-hour expiry, snapshot
+  references, atomic receipts and bounded context; a private capacity record caps
+  live sessions across instances. No raw cookie is stored; no production fallback.
+- Verify: `node --test tests/quotation-session-storage.test.mjs` with real-emulator
+  two-client concurrency, expiry, capacity contention and failed-write coverage.
+- Depends on: F1. Small, two files: `app/quotation-session-storage.mjs`,
+  `tests/quotation-session-storage.test.mjs`.
+
+### Checkpoint F1–F2: Storage contract
+
+- [ ] Emulator tests prove immutable baseline and session isolation/retry behavior.
+- [ ] No existing simulation/agency/watch data or shared emulator state is erased.
+
+### F3: Restore and confirm selections through durable sessions
+
+- [ ] Acceptance: booking and quotation factories accept explicit storage;
+  bootstrap recovers current receipts, rotates expired/stale sessions and retains
+  existing origin/CSRF/consent guards. Same-choice retries return one committed
+  receipt; independent instances observe it with unchanged selection-only flags.
+- Verify: `node --test tests/quotation-demo-server.test.mjs tests/booking-live.test.mjs`
+  plus F2 tests. Inject test storage explicitly; prove restart via emulator adapters.
+- Depends on: F2. Medium, four files: `app/quotation-demo-server.mjs`,
+  `app/booking-demo-server.mjs`, `tests/quotation-demo-server.test.mjs`,
+  `tests/booking-live.test.mjs`.
+
+### F4: Preserve guarded Gemini context across instances
+
+- [ ] Acceptance: atomically reserve per-session allowance, invoke the provider
+  outside transactions, and merge bounded context only into a current live
+  session. Concurrent confirmation survives the merge; expired late responses
+  cannot resurrect sessions. Existing per-instance throttles remain bounded.
+- Verify: `node --test tests/quotation-advice-server.test.mjs tests/booking-advice.test.mjs`
+  with injected provider counters, concurrent writes and delayed-response cases;
+  no real model requests.
+- Depends on: F3. Medium, four files: `app/quotation-demo-server.mjs`,
+  `app/quotation-session-storage.mjs`, `tests/quotation-advice-server.test.mjs`,
+  `tests/booking-advice.test.mjs`.
+
+### Checkpoint F3–F4: Integrated API
+
+- [ ] Complete emulator-backed Node suite passes with explicit failure/skip counts.
+- [ ] Restart/isolation and model-call-count evidence matches the spec; all
+  transaction/consent boundaries remain enforced.
+
+### F5: Load the pinned Firestore snapshot in the hosted image
+
+- [ ] Acceptance: hosted booking/quotation startup requires the exact imported
+  snapshot version and closes storage cleanly. The booking release exporter
+  includes the dependency closure and pin, with no production snapshot-file or
+  memory fallback. Packaged missing/corrupt database states fail safely.
+- Verify: `node --test tests/quotation-cloud.test.mjs tests/public-demo-release.test.mjs`;
+  frozen-context build, network-disabled failure smoke and emulator-backed
+  successful packaged startup. Do not run the separate pitch deploy command.
+- Depends on: F4. Medium, five files: `app/booking-cloud.mjs`,
+  `app/quotation-cloud.mjs`, `scripts/prepare-booking-release.mjs`,
+  `tests/quotation-cloud.test.mjs`, `tests/public-demo-release.test.mjs`.
+  Keep the Dockerfile's existing app-copy pattern unless dependency evidence
+  demonstrates a necessary separately scoped packaging adjustment.
+
+### F6: Verify the durable browser journey and prepare release evidence
+
+- [ ] Acceptance: local launcher reads the imported emulator snapshot; a browser
+  harness proves mobile/desktop behavior, reload and process restart recovery,
+  second-visitor isolation and explicit consent. The final release document
+  names all live gates and exact import/configuration/TTL/rollback commands.
+- Verify: run `node tests/booking-firestore.browser.mjs` with the emulator-only
+  environment; run the current `tests/booking-live.browser.mjs` regression using
+  the accepted capture; complete `node --test tests/*.test.mjs` and
+  `git diff --check`. Capture counts/screenshots and review the final diff.
+- Depends on: F5. Medium, four files:
+  `scripts/serve-booking-firestore-demo.mjs`, `tests/booking-firestore.browser.mjs`,
+  `docs/public-demo-firestore-verification.md`, `docs/public-demo-firestore-release.md`.
+
+### Checkpoint F5–F6: Ready for release review
+
+- [ ] Test, browser, packaged-entrypoint and source/context evidence is complete;
+  existing unrelated dirty changes are preserved and excluded from the artifact.
+- [ ] Present the concrete production snapshot import, TTL and image/env change
+  bundle for approval. No production mutation is part of local acceptance.
+- [ ] After separately approved execution, verify real imported-snapshot reads,
+  anonymous persistence/isolation, preserved private services/data and rollback
+  readiness. Keep this live gate unchecked until proven.
+
+## Hackathon AI restoration, 17 October
+
+- [x] Revisit the agreed plan and restore its Gemini preference/comparison role to the current quotation flow.
+- [x] Implement a server-side Vertex AI adviser with grounded output, per-room conversation context and request guards.
+- [x] Add selected-room questions with loading, unavailable, failure and stale-navigation handling.
+- [x] Verify privacy, financial boundaries, unchanged selection authority, responsive UI and production SDK startup without generation.
+- [x] Pass newly authorised live Gemini 3.8 Flash semantic checks for price, uncertain plans and room/meal differences (3/3; allowance exhausted; `docs/gemini-38-evaluation.md`).
+- [x] Review and publish the customer image/configuration release, then verify the public AI journey (270/270 regressions; 3/3 production checks; `docs/gemini-production-release.md`).
+
+Contract and acceptance boundaries: `docs/quotation-gemini-contract.md`. Earlier completed milestone evidence below remains historical.
+
 Approved tasks; first milestone implementation is in progress. Checkboxes record verified completion only. Product requirements remain in the agreed prototype plan. Later simulation and submission milestones are ordered in `tasks/plan.md` and will be sliced when the first contract is established.
 
 ## Task 1: Establish the booking and decision contract

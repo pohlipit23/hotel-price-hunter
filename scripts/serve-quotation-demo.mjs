@@ -2,6 +2,7 @@ import { readFile, realpath } from 'node:fs/promises';
 import { resolve, relative, isAbsolute, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createQuotationDemoServer, validateLocalQuotationMode } from '../app/quotation-demo-server.mjs';
+import { createQuotationAdvisor } from '../app/quotation-advisor.mjs';
 
 try {
   validateLocalQuotationMode();
@@ -13,7 +14,8 @@ try {
   if (await realpath(local) !== local) throw Error();
   const path = await realpath(resolve(root, snapshot)); const part = relative(local, path);
   if (!part || part === '..' || part.startsWith('..' + sep) || isAbsolute(part)) throw Error();
-  const bundle = JSON.parse(await readFile(path, 'utf8')); const server = createQuotationDemoServer({ bundle });
+  const bundle = JSON.parse(await readFile(path, 'utf8')); const advisor = await createQuotationAdvisor();
+  const server = createQuotationDemoServer({ bundle, advisor });
   server.on('error', () => { console.error('Local quotation demo could not start. Check the selected port and snapshot.'); process.exitCode = 1; });
   server.listen(port, '127.0.0.1', () => console.log(`Quotation demo ready at http://127.0.0.1:${port}/ · selection only`));
   const stop = () => { server.close(); server.closeAllConnections(); };

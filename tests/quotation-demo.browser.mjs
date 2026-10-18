@@ -37,6 +37,10 @@ try {
     await page.locator('#quote-confirm').click(); await page.getByRole('alert').filter({ hasText: /acknowledgements/ }).waitFor();
     if (width === 320) {
       await page.locator('#review-heading').focus(); await page.keyboard.press('Tab');
+      assert.equal(await page.evaluate(() => document.activeElement.id), 'quote-advice-question');
+      assert.match(await page.locator('#quote-advice-status').textContent(), /Gemini advice is unavailable/);
+      assert.equal(await page.locator('#quote-ask-gemini').isEnabled(), false);
+      for (let tab = 0; tab < 3; tab++) await page.keyboard.press('Tab');
       assert.equal(await page.evaluate(() => document.activeElement.id), 'quote-demo-consent');
       await page.keyboard.press('Space'); await page.keyboard.press('Tab');
       assert.equal(await page.evaluate(() => document.activeElement.id), 'quote-confirm');

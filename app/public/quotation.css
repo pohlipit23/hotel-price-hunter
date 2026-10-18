@@ -41,6 +41,17 @@
 .quotation-demo button:disabled { cursor: wait; opacity: .6; }
 .quote-check { display: inline-grid; place-items: center; width: 54px; height: 54px; margin-bottom: 16px; border-radius: 50%; background: var(--green-bg); color: var(--green); font-size: 30px; }
 .quote-footer { margin-top: 28px; color: var(--muted); font-size: 12px; }
+.quote-adviser { margin: 24px 0; padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--blue-bg); }
+.quote-adviser h3 { font-size: 22px; margin: 0 0 10px; }
+.quote-adviser label { display: block; font-size: 14px; font-weight: 700; margin: 16px 0 8px; }
+.quote-adviser textarea { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 88px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 16px; }
+.quote-advice-prompts { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.quote-advice-prompts button { min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.quote-advice-answer { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 16px; overflow-wrap: anywhere; }
+.quote-advice-answer ul { margin: 12px 0; padding-left: 20px; font-size: 14px; }
+.quote-advice-answer li { margin-bottom: 8px; }
+.quote-advice-summary { font-weight: 700; }
+.quote-adviser :focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
 @media (max-width: 700px) {
   .quotation-shell { padding: 14px 16px 30px; }
   .quote-baseline { flex-direction: column; align-items: stretch; gap: 14px; padding: 20px; }
