@@ -1,7 +1,32 @@
 /** Judge flow screens: catalogue, booked Original Booking, Drop Watch setup and the replayed first check. Display only. */
-import { minorDigits, minimumSavingChoices, agencyMinimumSavingMinor } from './drop-watch.js';
+import { minorDigits, minimumSavingChoices, agencyMinimumSavingMinor, deliveryEmailValid } from './drop-watch.js';
 
-export const HONEST_NOTE = 'A real Altovo staging quotation standing in for a confirmed booking';
+// Altovo may be named as the staging booking engine that made the bookings; no Altovo or AirBorneo logo.
+export const HONEST_NOTE = 'Altovo staging quotation standing in for a confirmed booking';
+// The judge's three steps. Only steps 2 and 3 are RoomDrop; the booking itself was made on Altovo's engine.
+export const JOURNEY = Object.freeze([
+  { title: 'Pick a booking', tag: null, text: "Made on Altovo's booking engine, not part of this submission. RoomDrop starts at the confirmation." },
+  { title: 'Set up a drop', tag: 'RoomDrop', text: 'Invite on the confirmation page (or in the confirmation email).' },
+  { title: 'Get your drop', tag: 'RoomDrop app', text: 'Cheaper room found? It arrives by email.' },
+]);
+// Which journey step a visible screen belongs to: the start grid, the booking site, then the RoomDrop app.
+const STEP_OF = { 'catalogue-screen': 1, 'booked-screen': 2, 'setup-screen': 2, 'checking-screen': 2, 'booking-summary': 3, comparison: 3, 'simulated-switch': 3 };
+export function journeyStep(screenId) { return STEP_OF[screenId] ?? null; }
+const EMAIL_PROBLEM = 'Check the email address, or leave it empty.';
+// The optional delivery address as typed: empty means none (or keep a saved one), `remove` drops a saved one.
+export function deliveryEmailField(value, { remove = false } = {}) {
+  const email = String(value ?? '').trim();
+  if (!email) return { email: remove ? null : undefined, problem: null };
+  return deliveryEmailValid(email) ? { email, problem: null } : { email: undefined, problem: EMAIL_PROBLEM };
+}
+// The masked saved address from the committed receipt; the full address never reaches the page.
+export function savedDelivery(data) { return data?.watch?.delivery?.maskedEmail ?? null; }
+// The hand-off after the committed "Drop Watch armed" receipt: the judge leaves the booking site for the app.
+export function handoffCopy(data) {
+  if (!data?.watch) return null;
+  return { title: 'Drop Watch armed', lead: "You're leaving the booking site.",
+    text: 'In real life your drop arrives by email. For this demo we open the RoomDrop app now.', email: savedDelivery(data), action: 'Open RoomDrop' };
+}
 const blockers = {
   NON_REFUNDABLE: ['non-refundable', 'This booking is non-refundable', 'A cheaper room only helps if this booking can be cancelled for free. This one cannot, so there is nothing to watch.'],
   NO_FREE_CANCELLATION: ['no free cancellation', 'No free cancellation on this booking', 'Every cancellation here costs money, so a cheaper room would not save anything.'],
@@ -52,7 +77,7 @@ export function cardFacts(entry) {
 }
 export function capturedNote(data) {
   const readAt = data.baseline?.source?.readAt;
-  return HONEST_NOTE + (/^\d{4}-\d{2}-\d{2}$/.test(readAt ?? '') ? ' · captured ' + formatDay(readAt) : '');
+  return HONEST_NOTE + (/^\d{4}-\d{2}-\d{2}$/.test(readAt ?? '') ? ' - captured ' + formatDay(readAt) : '');
 }
 export function cannotStart(reason) { const [, title, text] = blockerFacts(reason); return { title, text }; }
 // The minimum choices, from the agency's 10.00 floor in the booking currency upwards.
@@ -65,9 +90,11 @@ export function minimumOptions(data, chosen) {
     caption: index === 0 ? formatMoney(value, currency) + ' or more' : currency + ' or more', checked: value === selected }));
 }
 // The arm request. It names the revision this tab last saw (0 before the first arm), so a stale tab
-// cannot replace a newer setup: the server answers 409 WATCH_REVISION_STALE instead.
-export function armRequestBody(data, minimumSavingMinor) {
-  return { snapshotVersion: data.snapshotVersion, consent: true, minimumSavingMinor, expectedRevision: data.watch?.revision ?? 0 };
+// cannot replace a newer setup: the server answers 409 WATCH_REVISION_STALE instead. `deliveryEmail` is
+// sent only when typed (a string) or removed (null); left out, the server keeps any saved address.
+export function armRequestBody(data, minimumSavingMinor, deliveryEmail) {
+  return { snapshotVersion: data.snapshotVersion, consent: true, minimumSavingMinor, expectedRevision: data.watch?.revision ?? 0,
+    ...(deliveryEmail !== undefined ? { deliveryEmail } : {}) };
 }
 // The armed line, from the committed receipt only; no receipt, no armed state.
 export function armedDetail(data) {
@@ -98,6 +125,38 @@ const fallbackArt = ['M14 70h92', 'M34 70V30h40v40', 'M30 30h48l-6-10H36l-6 10Z'
 export function createJudgeScreens(ui) {
   const { $, node, stayText, setActionContent } = ui;
   const cards = new Map();
+  // The 3-step journey strip: full on the start page, compact after it; the step follows the visible screen.
+  const strip = $('journey-strip');
+  strip.replaceChildren(...JOURNEY.map((step, index) => {
+    const item = node('li', undefined, 'journey-step'); item.dataset.step = String(index + 1);
+    const head = node('span', undefined, 'journey-head');
+    head.append(node('span', String(index + 1), 'journey-num'), node('strong', step.title, 'journey-title'));
+    if (step.tag) head.append(node('em', step.tag, 'journey-tag'));
+    item.append(head, node('span', step.text, 'journey-text')); return item;
+  }));
+  const syncStrip = () => {
+    const visible = Object.keys(STEP_OF).find(id => $(id) && !$(id).hidden);
+    const current = journeyStep(visible);
+    strip.hidden = !current; if (!current) return;
+    strip.classList.toggle('journey-compact', current !== 1);
+    strip.querySelectorAll('li').forEach((item, index) => {
+      if (index + 1 === current) item.setAttribute('aria-current', 'step'); else item.removeAttribute('aria-current');
+      item.classList.toggle('passed', index + 1 < current);
+    });
+  };
+  new MutationObserver(syncStrip).observe($('content'), { subtree: true, attributes: true, attributeFilter: ['hidden'] });
+  syncStrip();
+  // The optional delivery email: checked as typed, sent only through armRequestBody.
+  let removeSaved = false;
+  const emailProblem = () => {
+    const { problem } = deliveryEmailField($('delivery-email').value, { remove: removeSaved });
+    $('delivery-problem').textContent = problem ?? ''; $('delivery-problem').hidden = !problem;
+    if (problem) $('delivery-email').setAttribute('aria-invalid', 'true'); else $('delivery-email').removeAttribute('aria-invalid');
+    return problem;
+  };
+  $('delivery-email').addEventListener('change', emailProblem);
+  $('delivery-email').addEventListener('input', () => { if (!$('delivery-problem').hidden) emailProblem(); });
+  $('delivery-remove').addEventListener('click', () => { removeSaved = true; $('delivery-saved').hidden = true; $('delivery-email').focus(); });
   const tagNode = entry => {
     const tag = tagFor(entry); const chip = node('span', undefined, 'watch-tag tag-' + tag.kind);
     chip.append(svgIcon(tagIcons[tag.kind]), node('span', tag.text)); return chip;
@@ -185,26 +244,46 @@ export function createJudgeScreens(ui) {
         label.append(input, text); return label;
       }));
       $('judge-consent').checked = Boolean(data.watch);
+      // A saved address is shown masked only; leaving the field empty keeps it, Remove drops it.
+      removeSaved = false; $('delivery-email').value = ''; emailProblem();
+      const saved = savedDelivery(data); $('delivery-saved').hidden = !saved; $('delivery-saved-email').textContent = saved ?? '';
       $('setup-message').textContent = ''; $('setup-message').classList.remove('error');
       $('arm-watch').textContent = data.watch ? 'Update my Drop Watch' : 'Arm my Drop Watch'; $('arm-watch').disabled = false;
     },
     chosenMinimum() { return Number(document.querySelector('input[name="minimum-saving"]:checked')?.value); },
-    armRequestBody,
-    // Replays the captured check: a short playful beat, never a live search.
+    // The arm request with the delivery email field. An invalid address stops the arm with its own message.
+    armRequestBody(data, minimumSavingMinor) {
+      const problem = emailProblem();
+      if (problem) { $('delivery-email').focus(); throw Object.assign(new Error(problem), { userMessage: problem }); }
+      return armRequestBody(data, minimumSavingMinor, deliveryEmailField($('delivery-email').value, { remove: removeSaved }).email);
+    },
+    // Replays the captured check (a short beat, never a live search), then the hand-off: the watch is already
+    // committed; the judge leaves the booking site and opens the RoomDrop app. Resolves when they continue.
     async playCheck(data, isCurrent) {
       const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const found = data.watch.firstCheck.dropOptionIds.length;
+      const screen = $('checking-screen');
       $('checking-replay').textContent = 'Replayed check · captured ' + formatInstant(data.watch.firstCheck.checkedAt) + ' · not live';
       $('checking-title').textContent = 'Checking for drops';
       $('checking-status').textContent = 'Replaying the check from ' + formatInstant(data.watch.firstCheck.checkedAt) + '.';
-      $('checking-screen').classList.remove('checked');
+      screen.classList.remove('checked', 'handoff'); $('handoff').hidden = true;
       await new Promise(resolve => setTimeout(resolve, reduced ? 500 : 1500));
       if (!isCurrent()) return false;
-      $('checking-screen').classList.add('checked');
-      $('checking-title').textContent = 'Drop Watch armed';
-      $('checking-status').textContent = found ? 'Drop Watch armed. ' + found + (found === 1 ? ' drop' : ' drops') + ' above your minimum.' : 'Drop Watch armed. No drops above your minimum yet.';
-      await new Promise(resolve => setTimeout(resolve, reduced ? 200 : 700));
-      return isCurrent();
+      const copy = handoffCopy(data);
+      screen.classList.add('checked', 'handoff');
+      $('checking-title').textContent = copy.title;
+      $('checking-status').replaceChildren(node('span', copy.title + '. ', 'sr-only'), copy.lead);
+      $('handoff-text').textContent = copy.text;
+      $('handoff-email').hidden = !copy.email; $('handoff-email').textContent = copy.email ? 'Saved for ' + copy.email + ' · not sent yet' : '';
+      $('open-roomdrop-label').textContent = copy.action; $('handoff').hidden = false;
+      $('open-roomdrop').focus({ preventScroll: true });
+      const continued = await new Promise(resolve => {
+        const timer = setInterval(() => { if (!isCurrent() || screen.hidden) done(false); }, 150);
+        const click = () => done(true);
+        function done(value) { clearInterval(timer); $('open-roomdrop').removeEventListener('click', click); resolve(value); }
+        $('open-roomdrop').addEventListener('click', click);
+      });
+      screen.classList.remove('handoff'); $('handoff').hidden = true;
+      return continued && isCurrent();
     },
     armedDetail,
   };

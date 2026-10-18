@@ -1,5 +1,5 @@
 import { watchBlocker } from './altovo-quotation.mjs';
-import { agencyMinimumSavingMinor, qualifyingDrops } from '../public/drop-watch.js';
+import { agencyMinimumSavingMinor, deliveryEmailValid, qualifyingDrops } from '../public/drop-watch.js';
 import { codeScope } from '../quotation-session-storage.mjs';
 
 // Arming a Drop Watch and its immediate first check, as one pure session mutation.
@@ -14,8 +14,6 @@ export const DELIVERY_CONSENT_VERSION = 'roomdrop-drop-email-consent-2026-10-18'
 const REQUEST_KEYS = ['snapshotVersion', 'consent', 'minimumSavingMinor', 'expectedRevision', 'deliveryEmail'];
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 const DROP_ID = /^[a-zA-Z0-9-]{1,100}$/;
-// A basic address check only: one @, no spaces, a dotted domain, at most 254 characters.
-const EMAIL = /^[^\s@]{1,64}@[^\s@.]+(?:\.[^\s@.]+)+$/;
 const fail = (code, extra = {}) => { throw Object.assign(new Error('The Drop Watch could not be armed.'), { code, ...extra }); };
 const clone = value => JSON.parse(JSON.stringify(value));
 
@@ -42,7 +40,7 @@ export function armRequest(body, currency) {
   if (body.consent !== true) fail('WATCH_CONSENT_REQUIRED');
   if (!Number.isSafeInteger(body.minimumSavingMinor) || body.minimumSavingMinor < agencyMinimumSavingMinor(currency)) fail('MINIMUM_SAVING_INVALID');
   const email = body.deliveryEmail;
-  if (Object.hasOwn(body, 'deliveryEmail') && email !== null && (typeof email !== 'string' || email.length > 254 || !EMAIL.test(email))) fail('DELIVERY_EMAIL_INVALID');
+  if (Object.hasOwn(body, 'deliveryEmail') && email !== null && !deliveryEmailValid(email)) fail('DELIVERY_EMAIL_INVALID');
   return { snapshotVersion: body.snapshotVersion, minimumSavingMinor: body.minimumSavingMinor, expectedRevision: body.expectedRevision ?? null,
     ...(Object.hasOwn(body, 'deliveryEmail') ? { deliveryEmail: email } : {}) };
 }

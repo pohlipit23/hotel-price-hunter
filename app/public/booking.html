@@ -22,6 +22,7 @@
     <main id="main">
       <p id="page-status" role="status" class="page-status">Loading your demo booking…</p>
       <div id="content" hidden>
+        <ol id="journey-strip" class="journey-strip" aria-label="How this demo works" hidden></ol>
         <ol id="customer-steps" class="customer-steps" aria-label="Booking journey">
           <li aria-current="step"><span>1</span> Deals</li>
           <li><span>2</span> Review</li>
@@ -88,6 +89,13 @@
               <legend>Tell me about drops of at least</legend>
               <div id="minimum-options" class="chip-row"></div>
             </fieldset>
+            <div class="delivery-field">
+              <label for="delivery-email"><span class="delivery-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M3 6h18v12H3z"/><path d="m3 7 9 6 9-6"/></svg></span>Where should we send your drop? <span class="optional-tag">Optional</span></label>
+              <input id="delivery-email" type="email" inputmode="email" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@example.com" aria-describedby="delivery-problem delivery-consent">
+              <p id="delivery-saved" class="delivery-saved" hidden><span>Saved <strong id="delivery-saved-email"></strong></span><button id="delivery-remove" class="secondary" type="button">Remove</button></p>
+              <p id="delivery-problem" class="field-problem" hidden></p>
+              <p id="delivery-consent" class="delivery-consent">Use this email only to send my drop. Email delivery is not live yet; it is deleted when this demo session ends (1 hour).</p>
+            </div>
             <label class="watch-consent-box" for="judge-consent">
               <input id="judge-consent" type="checkbox">
               <span>RoomDrop may check this booking for cheaper equivalent rooms and show them to me. Nothing changes without my approval.</span>
@@ -100,8 +108,14 @@
         <section id="checking-screen" class="judge-screen" aria-labelledby="checking-title" hidden>
           <div class="checking-card">
             <div class="checking-drops" aria-hidden="true"><span></span><span></span><span></span></div>
+            <span class="handoff-stamp" aria-hidden="true"><span>Drop Watch</span><strong>Armed</strong></span>
             <h1 id="checking-title" tabindex="-1">Checking for drops</h1>
             <p id="checking-status" class="checking-status" role="status" aria-live="polite" aria-atomic="true"></p>
+            <div id="handoff" class="handoff-box" hidden>
+              <p id="handoff-text" class="handoff-text"></p>
+              <p id="handoff-email" class="handoff-email" hidden></p>
+              <button id="open-roomdrop" class="primary" type="button"><span id="open-roomdrop-label">Open RoomDrop</span> <span class="handoff-arrow" aria-hidden="true">→</span></button>
+            </div>
             <p id="checking-replay" class="replay-tag"></p>
           </div>
         </section>
