@@ -14,6 +14,9 @@ export function replayResult(snapshot) {
   const first = watch.firstCheck;
   const unavailable = { status: 'unavailable', options: [], capturedAt: [], replayedAt: null };
   if (!first || first.replayed !== true || (first.status !== undefined && first.status !== 'completed')
+    || (first.captureStatus !== undefined && (!['observed', 'observed-empty'].includes(first.captureStatus)
+      || (first.captureStatus === 'observed-empty' && snapshot.options.length > 0)
+      || (snapshot.capture?.status !== undefined && snapshot.capture.status !== first.captureStatus)))
     || (first.mode !== undefined && first.mode !== 'captured-replay') || !instant(first.checkedAt)
     || !instant(first.replayedAt ?? watch.armedAt) || !Number.isSafeInteger(watch.minimumSavingMinor) || watch.minimumSavingMinor < 0
     || (watch.code !== undefined && watch.code !== snapshot.code)

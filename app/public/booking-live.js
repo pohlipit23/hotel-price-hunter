@@ -243,10 +243,13 @@ export async function startBookingDemo(ui) {
     try {
       const response = await fetch(api('watch'), { method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': data.csrfToken },
-        body: JSON.stringify({ snapshotVersion: data.snapshotVersion, consent: true, minimumSavingMinor: minimum }) });
+        body: JSON.stringify({ snapshotVersion: data.snapshotVersion, consent: true, minimumSavingMinor: minimum,
+          expectedRevision: data.watch?.revision ?? 0 }) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
         if (result.error?.code === 'WATCH_CANNOT_START') { data.blocker = result.error.reason; busy = false; return go('booked', code, { push: false }); }
+        if (result.error?.code === 'WATCH_REVISION_STALE') throw Object.assign(Error(), { userMessage: 'Your Drop Watch changed. Reload to review its latest setup.' });
+        if (['CATALOGUE_UNAVAILABLE', 'DEMO_UNAVAILABLE'].includes(result.error?.code)) throw Object.assign(Error(), { userMessage: 'RoomDrop is unavailable right now. Please try again.' });
         throw Error();
       }
       data.watch = result.watch; data.confirmation = null; selected = null; applyData();
@@ -256,8 +259,8 @@ export async function startBookingDemo(ui) {
       steps('checking'); window.scrollTo({ top: 0, behavior: 'instant' }); focusHeading('checking-title');
       busy = false;
       if (await judge.playCheck(data, () => token === navigation)) { steps('options'); window.scrollTo({ top: 0, behavior: 'instant' }); focusHeading('armed-title'); }
-    } catch {
-      $('setup-message').textContent = 'Your Drop Watch could not be armed. Please try again.'; $('setup-message').classList.add('error');
+    } catch (error) {
+      $('setup-message').textContent = error.userMessage || 'Your Drop Watch could not be armed. Please try again.'; $('setup-message').classList.add('error');
     } finally { busy = false; $('arm-watch').disabled = false; $('arm-watch').removeAttribute('aria-busy'); }
   }
   const link = (id, handler) => $(id).addEventListener('click', event => { event.preventDefault(); handler(); });

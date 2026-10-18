@@ -37,6 +37,22 @@ test('confirmation must still belong to the current receipt and qualifying set',
  data.confirmation.watchRevision = 3; assert.equal(currentConfirmation(data), data.confirmation);
  data.confirmation.reservationCreated = true; assert.equal(currentConfirmation(data), null);
 });
+test('contract v3 captureStatus distinguishes observed-empty from unavailable and preserves legacy receipts', () => {
+ const data = replay(); data.dropSetVersion = 'drops-v3';
+ Object.assign(data.watch, { revision: 3, code: data.code, contentVersion: data.snapshotVersion, dropSetVersion: data.dropSetVersion });
+ data.capture = { status: 'observed', capturedAt: data.watch.firstCheck.checkedAt };
+ data.watch.firstCheck.captureStatus = 'observed';
+ assert.equal(replayResult(data).status, 'completed');
+ for (const captureStatus of ['not-searched', 'failed', 'observed-empty']) {
+  const bad = structuredClone(data); bad.watch.firstCheck.captureStatus = captureStatus;
+  assert.equal(replayResult(bad).status, 'unavailable', captureStatus);
+ }
+ const empty = structuredClone(data); empty.options = []; empty.watch.firstCheck.dropOptionIds = [];
+ empty.capture.status = 'observed-empty'; empty.watch.firstCheck.captureStatus = 'observed-empty';
+ assert.equal(replayResult(empty).status, 'empty');
+ const mismatch = structuredClone(empty); mismatch.capture.status = 'observed';
+ assert.equal(replayResult(mismatch).status, 'unavailable');
+});
 
 test('comparison badges compare the displayed room, meals and cancellation flag against the starting option',()=>{
  const baseline={room:{name:'Superior Twin',board:'Breakfast'},freeCancellation:true};
