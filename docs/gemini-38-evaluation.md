@@ -1,5 +1,7 @@
 # Gemini 3.8 Flash: integration and live evaluation
 
+**Production update, 18 October:** this evaluated adviser is now deployed in the existing booking review. [Production release](gemini-production-release.md) records the source/image/revision, three additional successful production checks and unchanged agency/watch/data boundaries. The remaining-release section below describes the earlier evaluation checkpoint.
+
 17 October 2026. The user approved evaluating Gemini 3.8 Flash with “Ok. Go ahead with it”, following the proposed three-case check and model recommendation. **All three real Vertex AI requests passed.** No deployment, IAM change, supplier call, booking, cancellation, payment or refund occurred.
 
 ## Application configuration
