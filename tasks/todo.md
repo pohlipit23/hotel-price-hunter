@@ -220,7 +220,7 @@ This is the Part 1/Part 2 seam.
 - [x] Acceptance: use the Ticket and Stamp design for curated photo/city/dates/
   price/scenario cards, then "Your agency booked this" and one "Set up a drop"
   action. Show staging quotation/capture-date note, cannot-start reason and honest
-  image fallbacks. No Altovo/AirBorneo branding, arbitrary code or share-link input.
+  image fallbacks. No Altovo/AirBorneo logo, arbitrary code or share-link input (Altovo\n  may be named as the staging booking engine, owner decision 18 Oct 2026).
 - Evidence: commits 8390e8e and 0694b94; verification doc, Part 1 F6 and F7a.
   Every real card has `photo: null` until S0.5, so judges see the drawn fallback.
   A reviewed photo also needs its exact `/assets/...` route in
@@ -249,6 +249,21 @@ This is the Part 1/Part 2 seam.
   desktop with keyboard; reload after arming shows the same committed receipt.
 - Depends on: F6. Small, three files: `app\public\booking-judge.js`,
   `app\public\booking.html` (setup/checking sections), `tests\booking-judge.browser.mjs`.
+
+### F7c: Journey strip, hand-off and delivery email (owner decisions, 18 Oct 2026)
+
+- [x] Acceptance: a 3-step strip (Pick a booking on Altovo's engine / Set up a drop,
+  RoomDrop / Get your drop, RoomDrop app) follows the visible screen; after the
+  committed receipt a stamp-style hand-off opens the Drops view (the owner explicitly
+  approved this extra step, superseding "no extra customer step or delay" for the
+  step 2 to 3 transition only; the arm transaction is unchanged); an optional delivery
+  email commits in the arm transaction and every response shows it masked (seam v7).
+- Evidence: commits 1f82761 and a32e350. Emulator suites 97/97; `npm test` 411 tests,
+  379 pass, 0 fail, 32 skipped; `tests\booking-judge.browser.mjs` and
+  `tests\booking-emulator.browser.mjs` passed (320, 768, 1440).
+- Open for Part 2: `booking-live.js` on this branch still builds the arm body inline,
+  so the email is sent only once Part 2's `judge.armRequestBody(data, minimum)` call
+  is merged. Part 2 must bind and confirm on `publicWatch(scope.watch)`.
 
 ### F9a: Minimum hosted Firestore wiring for setup (Part 1 of F9)
 

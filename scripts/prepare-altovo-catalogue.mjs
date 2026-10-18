@@ -6,6 +6,7 @@ import { authenticateGateway, createGateway } from '../app/gateway.mjs';
 import { normaliseGatewayRates } from '../app/domain/gateway-rates.mjs';
 import { buildQuotationDemo } from '../app/domain/quotation-demo.mjs';
 import { AGENCY_SEARCH_CONTEXT, altovoBaseline, watchBlocker } from '../app/domain/altovo-quotation.mjs';
+import { captureEngineDrops, ENGINE_PROFILES, ENGINE_SEARCH_DEFAULTS, loginEngine, parseEngineCredentials } from '../app/domain/engine-availability.mjs';
 
 // Builds the judge catalogue: one selection-only bundle per captured Altovo quotation.
 // Without --execute this is a dry run: it validates the local projections against the owner's
@@ -19,7 +20,11 @@ async function credentialText(path) {
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const blocked = code => Object.assign(Error(), { code });
 const CODE = /^[A-Z0-9]{4,20}$/;
-const PREFIXES = ['--gateway-credentials-file=', '--projections=', '--approved-codes='];
+const PREFIXES = ['--gateway-credentials-file=', '--projections=', '--approved-codes=', '--source=', '--engine-credentials-file=', '--engine-profile='];
+const sleepFor = ms => new Promise(done => setTimeout(done, ms));
+// Loose, display-only check that the engine returned the hotel the quotation names; null when the engine named none.
+const sameHotelName = (a, b) => { const words = value => String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return a && b ? words(a).includes(words(b)) || words(b).includes(words(a)) : null; };
 export const SEARCH_DEFAULTS = Object.freeze({ nationality: AGENCY_SEARCH_CONTEXT.nationality, countryResidence: AGENCY_SEARCH_CONTEXT.countryResidence,
   occupancy: AGENCY_SEARCH_CONTEXT.occupancy, source: AGENCY_SEARCH_CONTEXT.source });
 
@@ -76,12 +81,21 @@ async function approvedBaselines(projectionDir, approved) {
 }
 
 export async function main(args = process.argv.slice(2), { env = process.env, fetchImpl = fetch,
-  root = fileURLToPath(new URL('../', import.meta.url)), now = () => new Date() } = {}) {
+  root = fileURLToPath(new URL('../', import.meta.url)), now = () => new Date(), sleep = sleepFor } = {}) {
   const report = { mode: 'offline', status: 'not-attempted' };
+  let current = null;
   try {
     if (args.some(arg => arg !== '--execute' && !PREFIXES.some(prefix => arg.startsWith(prefix)))
       || new Set(args.map(arg => arg.split('=')[0])).size !== args.length) throw Error();
     const value = prefix => args.find(arg => arg.startsWith(prefix))?.slice(prefix.length);
+    // Drops of record come from the Gateway (default) or, by owner decision, the EasyGDS Core Engine.
+    const source = value(PREFIXES[3]) ?? 'gateway';
+    if (!['gateway', 'engine'].includes(source) || (source === 'engine' ? [0] : [4, 5]).some(index => value(PREFIXES[index]) !== undefined)) throw Error();
+    const engineSource = source === 'engine';
+    // The engine profile defaults to the user's choice, the air1 staging engine, whose host is pinned in code.
+    const engineProfile = engineSource ? value(PREFIXES[5]) ?? 'staging-air1' : null;
+    if (engineSource && !Object.hasOwn(ENGINE_PROFILES, engineProfile)) throw blocked('ENGINE_PROFILE_INVALID');
+    if (engineSource) Object.assign(report, { source: 'engine', engineProfile, ...(ENGINE_PROFILES[engineProfile].apiUrl ? { engineHost: new URL(ENGINE_PROFILES[engineProfile].apiUrl).hostname } : {}) });
     const approvedText = value(PREFIXES[2]);
     if (approvedText === undefined) {
       report.requirements = ['Owner-approved air1 code list (--approved-codes=CODE,CODE)', 'Allowlisted Altovo projections in .local/altovo-sample',
@@ -97,20 +111,39 @@ export async function main(args = process.argv.slice(2), { env = process.env, fe
     const checkedAt = now();
     const plan = (await approvedBaselines(projectionDir, approved)).map(baseline => ({ baseline, blocker: watchBlocker(baseline, checkedAt) }));
     if (!execute) {
-      Object.assign(report, { mode: 'dry-run', status: 'validated', searchDefaults: SEARCH_DEFAULTS,
-        entries: plan.map(({ baseline, blocker }) => ({ code: baseline.quotationCode, hotel: baseline.hotel.name, blocker, plannedSearch: !blocker })) });
+      Object.assign(report, { mode: 'dry-run', status: 'validated', searchDefaults: engineSource ? ENGINE_SEARCH_DEFAULTS : SEARCH_DEFAULTS,
+        entries: plan.map(({ baseline, blocker }) => ({ code: baseline.quotationCode, hotel: baseline.hotel.name, blocker, plannedSearch: !blocker,
+          ...(engineSource ? { engineHotelId: baseline.hotel.id } : {}) })) });
       return report;
     }
     const gatewayFile = value(PREFIXES[0]);
     let gateway = null;
+    let engine = null;
+    // Engine credentials are read and checked before any upstream call, even when no search is planned.
+    if (engineSource) {
+      const engineFile = value(PREFIXES[4]);
+      if (!engineFile) throw blocked('ENGINE_CREDENTIALS_REQUIRED');
+      let raw; try { raw = await credentialText(resolve(root, engineFile)); } catch { throw blocked('ENGINE_CREDENTIALS_REQUIRED'); }
+      engine = parseEngineCredentials(raw, engineProfile);
+      report.engineHost = new URL(engine.apiUrl).hostname;
+    }
     const entries = [];
+    const engineFacts = new Map();
     for (const { baseline, blocker } of plan) {
       let bundle; let capture; let imageSources = { kind: IMAGE_SOURCES_KIND, renderable: false, hotel: null, drops: [] };
+      current = baseline.quotationCode;
       if (blocker) {
         capture = { status: 'not-searched', reason: blocker };
         const view = { schemaVersion: 1, transactionMode: 'selection-only', baseline, options: [], checkedAt: checkedAt.toISOString(),
           completeness: 'no-search-watch-cannot-start', customerRefund: null, reservationCreated: false };
         bundle = { ...view, snapshotVersion: hash(view), privateReferences: {} };
+      } else if (engineSource) {
+        // One sign-in for the whole run; a rejected call is never retried or re-signed.
+        engine.token ??= await loginEngine({ credentials: engine.credentials, iamUrl: engine.iamUrl, fetchImpl });
+        const captured = await captureEngineDrops({ baseline, source: engine.source, apiUrl: engine.apiUrl, token: engine.token, fetchImpl, now, sleep });
+        ({ bundle, capture, imageSources } = captured);
+        engineFacts.set(baseline.quotationCode, { engineHotelId: baseline.hotel.id, engineHotelNameMatches: sameHotelName(captured.hotelName, baseline.hotel.name),
+          searchPosts: captured.searchPosts });
       } else {
         if (!gateway) {
           if (!gatewayFile) throw blocked('GATEWAY_CREDENTIALS_REQUIRED');
@@ -136,14 +169,18 @@ export async function main(args = process.argv.slice(2), { env = process.env, fe
       }
       entries.push({ code: baseline.quotationCode, blocker, capture, bundle, imageSources });
     }
+    current = null;
     const directory = resolve(local, 'altovo-catalogue'); await mkdir(directory, { recursive: true });
     if (await realpath(directory) !== directory) throw Error();
     const path = resolve(directory, `catalogue-${randomUUID()}.json`);
     await writeFile(path, JSON.stringify({ schemaVersion: 1, preparedAt: checkedAt.toISOString(), entries }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
     Object.assign(report, { mode: 'altovo-quotation-catalogue', status: 'prepared', privateCatalogue: path,
-      entries: entries.map(entry => ({ code: entry.code, hotel: entry.bundle.baseline.hotel.name, blocker: entry.blocker, capture: entry.capture.status, optionCount: entry.bundle.options.length, imageSources: imageSummary(entry.imageSources) })) });
+      entries: entries.map(entry => ({ code: entry.code, hotel: entry.bundle.baseline.hotel.name, blocker: entry.blocker, capture: entry.capture.status,
+        optionCount: entry.bundle.options.length, imageSources: imageSummary(entry.imageSources), ...engineFacts.get(entry.code) })) });
   } catch (error) {
     report.status = 'blocked'; report.reason = typeof error.code === 'string' && /^[A-Z_]+$/.test(error.code) ? error.code : 'ALTOVO_CATALOGUE_PREPARATION_FAILED';
+    // A failed capture is named by quotation code, so it is never mistaken for an empty one.
+    if (current) report.failedCode = current;
   }
   return report;
 }
