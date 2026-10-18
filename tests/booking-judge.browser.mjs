@@ -127,7 +127,7 @@ try {
     await page.keyboard.press('Space'); assert.equal(await page.locator('#judge-consent').isChecked(), true);
     // The optional delivery email, by keyboard: a malformed address is flagged in place, then corrected.
     assert.match(await page.locator('label[for="delivery-email"]').innerText(), /Where should we send your drop\?/);
-    assert.match(await page.locator('#delivery-consent').innerText(), /^Use this email only to send my drop\. Email delivery is not live yet; it is deleted when this demo session ends \(1 hour\)\.$/);
+    assert.match(await page.locator('#delivery-consent').innerText(), /^Use this email only to send my drop\. Email delivery is not live yet; it is kept only with this 1-hour demo session\.$/);
     await page.locator('#delivery-email').focus(); await page.keyboard.type('judge@example'); await page.keyboard.press('Tab');
     assert.equal(await page.locator('#delivery-problem').innerText(), 'Check the email address, or leave it empty.');
     assert.equal(await page.locator('#delivery-email').getAttribute('aria-invalid'), 'true');
