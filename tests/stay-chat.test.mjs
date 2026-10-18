@@ -10,7 +10,7 @@ const input = () => ({ baseline: { sourceType: 'quotation', quotationCode: 'PRIV
   checkedAt: '2026-10-18T00:00:00Z', snapshotVersion: 'a'.repeat(64), pageContext: 'drops-overview', optionId: null,
   intent: 'question', message: 'Which trade-offs should I consider?', history: [] });
 const approvedPhrase = 'The best choice depends on whether price or flexibility matters more to you.';
-const protocol = (patch = {}) => ({ replyKind: 'answer', segments: [{ kind: 'text', value: approvedPhrase }],
+const protocol = (patch = {}) => ({ replyKind: 'answer', segments: [{ id: 'support-1' }],
   referencedDropIds: [], recommendation: 'no-recommendation', reasonCodes: [], followUpQuestion: '', ...patch });
 const provider = value => async () => ({ text: JSON.stringify(value) });
 
@@ -28,6 +28,13 @@ test('support chat uses the fixed Gemini model and sends only allowlisted overvi
   assert.doesNotMatch(request.contents, /PRIVATE-|quotationCode|privateReferences|guestEmail|childAges|hotelId/);
   assert.equal(request.model, 'gemini-3.8-flash'); assert.equal(request.config.tools, undefined);
   assert.equal(request.config.responseMimeType, 'application/json'); assert.equal(request.config.responseJsonSchema.additionalProperties, false);
+  assert.equal(context.availableStatements['support-1'], approvedPhrase);
+  const segmentSchema = request.config.responseJsonSchema.properties.segments.items;
+  assert.deepEqual(segmentSchema.required, ['id']); assert.equal(segmentSchema.additionalProperties, false);
+  assert.deepEqual(Object.keys(segmentSchema.properties), ['id']);
+  assert.deepEqual(segmentSchema.properties.id.enum, Object.keys(context.availableStatements));
+  assert.deepEqual(request.config.responseJsonSchema.properties.referencedDropIds.items.enum, context.options.map(option => option.optionId));
+  assert.deepEqual(request.config.responseJsonSchema.properties.reasonCodes.items.enum, Object.keys(context.availableReasons));
 });
 test('detail generation receives only its selected drop and cannot recommend another drop', async () => {
   let request; const detail = input(); detail.pageContext = 'drop-detail'; detail.optionId = 'option-2'; detail.options = [detail.options[1]];
@@ -35,11 +42,14 @@ test('detail generation receives only its selected drop and cannot recommend ano
   const result = await advisor.chat(detail); assert.equal(result.recommendation, 'option-2');
   const context = JSON.parse(request.contents); assert.equal(context.pageContext, 'drop-detail');
   assert.deepEqual(context.options.map(value => value.optionId), ['option-2']); assert.doesNotMatch(request.contents, /option-1|option-3/);
+  assert.deepEqual(request.config.responseJsonSchema.properties.referencedDropIds.items.enum, ['option-2']);
+  assert.deepEqual(request.config.responseJsonSchema.properties.reasonCodes.items.enum, Object.keys(context.availableReasons));
+  assert.deepEqual(request.config.responseJsonSchema.properties.segments.items.properties.id.enum, Object.keys(context.availableStatements));
   const forged = await createQuotationAdvisor({ generateContent: provider(protocol({ recommendation: 'option-1', referencedDropIds: ['option-1'] })) });
   await assert.rejects(forged.chat(detail), { code: 'ADVICE_UNAVAILABLE' });
 });
 test('chat rejects unknown fact, drop and reason references and unsupported provider fields', async () => {
-  for (const value of [protocol({ segments: [{ kind: 'fact', value: 'invented-fact' }] }), protocol({ referencedDropIds: ['option-999'] }),
+  for (const value of [protocol({ segments: [{ id: 'invented-fact' }] }), protocol({ referencedDropIds: ['option-999'] }),
     protocol({ recommendation: 'option-999' }), protocol({ reasonCodes: ['verified-upgrade'] }), protocol({ replyKind: 'booked' }),
     protocol({ recommendation: 'option-1', referencedDropIds: ['option-1'] }),
     protocol({ referencedDropIds: ['option-1', 'option-1'] }), protocol({ reasonCodes: ['option-1:lower-estimate', 'option-1:lower-estimate'] }),
@@ -51,15 +61,14 @@ test('chat rejects unknown fact, drop and reason references and unsupported prov
 
 test('chat renders monetary comparisons only from supplied facts', async () => {
   const advisor = await createQuotationAdvisor({ generateContent: provider(protocol({ segments: [
-    { kind: 'text', value: approvedPhrase }, { kind: 'fact', value: 'starting-price' },
-    { kind: 'fact', value: 'option-2:estimate' }, { kind: 'fact', value: 'option-2:difference' },
+    { id: 'support-1' }, { id: 'starting-price' }, { id: 'option-2:estimate' }, { id: 'option-2:difference' },
   ], referencedDropIds: ['option-2'] })) });
   const result = await advisor.chat(input());
   assert.match(result.reply, /USD 600\.00/); assert.match(result.reply, /USD 420\.00/); assert.match(result.reply, /USD 180\.00 below/);
   assert.match(result.reply, /before final pricing and fees/); assert.match(result.reply, /not a verified saving or refund/);
   assert.ok(result.reply.split(/\s+/).length <= 100);
   const detail = input(); detail.pageContext = 'drop-detail'; detail.optionId = 'option-2'; detail.options = [detail.options[1]];
-  const crossScope = await createQuotationAdvisor({ generateContent: provider(protocol({ segments: [{ kind: 'fact', value: 'option-1:estimate' }] })) });
+  const crossScope = await createQuotationAdvisor({ generateContent: provider(protocol({ segments: [{ id: 'option-1:estimate' }] })) });
   await assert.rejects(crossScope.chat(detail), { code: 'ADVICE_UNAVAILABLE' });
 });
 test('chat history keeps at most four questions and excludes replies from another page, drop or snapshot', async () => {
@@ -80,18 +89,29 @@ test('opening uses the approved server template and overview also works with no 
   let request; const value = input(); value.intent = 'opening'; delete value.message; value.options = [];
   const advisor = await createQuotationAdvisor({ generateContent: async next => {
     request = next; const context = JSON.parse(next.contents);
-    return provider(protocol({ replyKind: 'clarification', segments: [{ kind: 'text', value: context.availablePhrases[0] }],
+    const phraseId = Object.entries(context.availableStatements).find(([, text]) => text === context.availablePhrases[0])[0];
+    return provider(protocol({ replyKind: 'clarification', segments: [{ id: phraseId }],
       followUpQuestion: context.availableQuestions[1] }))();
   } });
   const result = await advisor.chat(value); assert.equal(result.replyKind, 'clarification');
   const context = JSON.parse(request.contents); assert.deepEqual(context.options, []); assert.ok(context.travellerQuestion.trim());
   assert.ok(context.startingOption); assert.doesNotMatch(request.contents, /PRIVATE-/);
+  assert.equal(request.config.responseJsonSchema.properties.referencedDropIds.maxItems, 0);
+  assert.equal(request.config.responseJsonSchema.properties.reasonCodes.maxItems, 0);
+  const noEmptyEnums = value => {
+    if (!value || typeof value !== 'object') return;
+    if (Object.hasOwn(value, 'enum')) assert.ok(value.enum.length > 0);
+    Object.values(value).forEach(noEmptyEnums);
+  };
+  noEmptyEnums(request.config.responseJsonSchema);
 });
 test('chat does not display model-generated amounts, HTML, links or oversize prose', async () => {
   for (const text of ['Your final price is USD 500.00.', 'You save $50.', 'The refund is 25%.',
     '<img src=x onerror=alert(1)>', 'Read https://evil.invalid/payment', 'word '.repeat(101), 'x'.repeat(800)]) {
-    const advisor = await createQuotationAdvisor({ generateContent: provider(protocol({ segments: [{ kind: 'text', value: text }] })) });
-    await assert.rejects(advisor.chat(input()), { code: 'ADVICE_UNAVAILABLE' }, text);
+    for (const segment of [{ id: text }, { kind: 'text', value: text }]) {
+      const advisor = await createQuotationAdvisor({ generateContent: provider(protocol({ segments: [segment] })) });
+      await assert.rejects(advisor.chat(input()), { code: 'ADVICE_UNAVAILABLE' }, text);
+    }
   }
   const advisor = await createQuotationAdvisor({ generateContent: provider(protocol({ followUpQuestion: 'Can you pay USD 200?' })) });
   await assert.rejects(advisor.chat(input()), { code: 'ADVICE_UNAVAILABLE' });
@@ -101,12 +121,13 @@ test('supplied decision phrases and follow-up questions render unchanged', async
     let chosen; let question;
     const advisor = await createQuotationAdvisor({ generateContent: async request => {
       const context = JSON.parse(request.contents);
-      chosen = context.availablePhrases.find(phrase => phrase.startsWith('For firm dates,'));
+      const [chosenId, chosenText] = Object.entries(context.availableStatements).find(([, text]) => text.startsWith('For firm dates,'));
+      chosen = chosenText;
       question = context.availableQuestions[index];
       assert.ok(chosen); assert.equal(typeof question, 'string');
-      assert.ok(request.config.responseJsonSchema.properties.segments.items.properties.value.enum.includes(chosen));
+      assert.ok(request.config.responseJsonSchema.properties.segments.items.properties.id.enum.includes(chosenId));
       assert.deepEqual(request.config.responseJsonSchema.properties.followUpQuestion.enum, context.availableQuestions);
-      return provider(protocol({ segments: [{ kind: 'text', value: chosen }], followUpQuestion: question }))();
+      return provider(protocol({ segments: [{ id: chosenId }], followUpQuestion: question }))();
     } });
     const result = await advisor.chat(input());
     assert.equal(result.reply, [chosen, question].filter(Boolean).join(' '));
@@ -119,13 +140,18 @@ test('chat rejects unsupported confirmations and financial or cancellation promi
     'You can cancel without penalty and receive a full refund.', 'Your room choice is accepted.', 'Your booking is complete.',
     'You owe nothing.', 'booking is complete', 'room choice accepted', 'owe nothing',
     'Try checking the cancellation policy before choosing.', 'Compare all the options before choosing.']) {
-    const advisor = await createQuotationAdvisor({ generateContent: provider(protocol({ segments: [{ kind: 'text', value: text }] })) });
-    await assert.rejects(advisor.chat(input()), { code: 'ADVICE_UNAVAILABLE' }, text);
+    for (const segment of [{ id: text }, { kind: 'text', value: text }]) {
+      const advisor = await createQuotationAdvisor({ generateContent: provider(protocol({ segments: [segment] })) });
+      await assert.rejects(advisor.chat(input()), { code: 'ADVICE_UNAVAILABLE' }, text);
+    }
   }
 });
-test('text and question fields reject values outside their supplied choices', async () => {
+test('statement and question fields reject malformed segments and unsupported choices', async () => {
   for (const value of [protocol({ segments: [{ kind: 'text', value: 'selection-only' }] }),
     protocol({ segments: [{ kind: 'fact', value: approvedPhrase }] }),
+    protocol({ segments: [{ kind: 'fact', value: 'selection-only' }] }),
+    protocol({ segments: [{ id: approvedPhrase }] }), protocol({ segments: [{ id: 'support-1', value: approvedPhrase }] }),
+    protocol({ segments: [{}] }), protocol({ segments: [{ id: null }] }),
     protocol({ followUpQuestion: 'What matters most for your stay?' }), protocol({ followUpQuestion: 'Your booking is complete.' })]) {
     const advisor = await createQuotationAdvisor({ generateContent: provider(value) });
     await assert.rejects(advisor.chat(input()), { code: 'ADVICE_UNAVAILABLE' });
@@ -133,7 +159,7 @@ test('text and question fields reject values outside their supplied choices', as
 });
 test('chat renders cancellation advice from a grounded reason fact', async () => {
   const advisor = await createQuotationAdvisor({ generateContent: provider(protocol({
-    segments: [{ kind: 'fact', value: 'option-2:reduced-flexibility' }], referencedDropIds: ['option-2'], reasonCodes: ['option-2:reduced-flexibility'],
+    segments: [{ id: 'option-2:reduced-flexibility' }], referencedDropIds: ['option-2'], reasonCodes: ['option-2:reduced-flexibility'],
   })) });
   const result = await advisor.chat(input());
   assert.match(result.reply, /marked non-refundable/); assert.match(result.reply, /retaining flexibility is safer/);
