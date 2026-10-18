@@ -424,7 +424,7 @@ deploy, production import or live upstream call.
 
 ### F11b: Record final acceptance and prepare the release bundle (Part 2 of F11)
 
-- [ ] Acceptance: record full regression/browser/restart coverage and remaining
+- [x] Local acceptance: record full regression/browser/restart coverage and remaining
   content gaps, with exact build/start/import/rollback commands. Prepare session
   TTL and preservation checks for later release review.
 - Verify: `node .\tests\booking-firestore.browser.mjs`, `npm test`, packaged smoke
@@ -552,6 +552,27 @@ Current evidence and exact pins are in the Part 2 integration section of
 - [ ] Photo capture remains in progress with Claude, and final F11a/F11b release
   handoff remains open. No further merge, push, deploy, production import or live
   call is included in this approval.
+
+### Authorised 33bb55f / contract v5 merge - current local acceptance
+
+- [x] Merge pinned 33bb55f as 5eaf0ae; Part 1 storage, session, arm, helper and
+  setup HTML are preserved. F9a/F10a remain Codex-owned; F6/F7a/F11a are integrated.
+- [x] Source c7de6a4 uses reviewed local Drop photos with Hotel photo labels in
+  cards/Review/Confirmed; absent/failed images show an honest fallback. All eight
+  approved JPEGs are packaged and hash-checked through the served image.
+- [x] Hash-only and history routing use the URL's code and reload saved state;
+  real 182 -> 181 navigation and a hash change during arm pass. The arm request
+  continues to delegate to judge.armRequestBody(data, minimum).
+- [x] Browser geometry and screenshots pass 320/390/768/1024/1440 px. Gemini is
+  in heading flow, clear of Drop text and review consent/actions.
+- [x] Full Node: 419 tests, 388 pass, zero fail, 31 skips. Targeted actual emulator:
+  53/53. Real-capture, setup, arm-contract and historical booking browsers pass.
+- [x] F11b local acceptance/bundle: frozen source c7de6a4, both hosted entrypoints,
+  real emulator restart/isolation and network-disabled CLI guards pass. Evidence
+  and exact image/pins are in the current Part 2 verification and release docs.
+- [ ] Later release decision: forthcoming engine recapture/new Drop-set pins,
+  current cloud preservation/configuration, production importer support, TTL and
+  rollback review. No push, deploy, production import or live call ran.
 
 ## Hackathon AI restoration, 17 October
 

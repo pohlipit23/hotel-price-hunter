@@ -1,109 +1,92 @@
 # Curated RoomDrop Part 2 release preparation
 
-Status: the user-authorised setup merge through `8423825` is committed as
-`f47960e` and local integrated acceptance passes. The client uses the judge arm
-helper and the Gemini launcher no longer covers card prices or review controls.
-It is not a final release: Claude's photo capture and final F11a evidence remain
-pending. No push,
-deployment, production import, live call or access change is included.
+Status: local acceptance is complete after the authorised Part 1 merge through
+33bb55f (contract v5). Source c7de6a4 renders reviewed Drop photos, follows each
+hash route's saved watch, keeps Gemini clear of card text at 320/390 px, and uses
+the judge arm helper. F9a/F10a belong to Codex; Claude's F6/F7a/F11a are integrated.
+No push, deploy, production import or live call is included.
 
-The hosted booking and quotation entrypoints require server Firestore storage,
-the canonical customer deployment profile and a reviewed code/version manifest.
-They never seed/import or fall back to packaged booking facts or memory on storage
-failure. The actual Part 1 storage and arm modules are now integrated unchanged.
-Both hosted entrypoints serve the curated RoomDrop facade. Injected test factories
-are explicit programmatic dependencies; no production environment switch enables
-test storage. The exact image passed actual-emulator arm/confirm/restart and
-model-unavailable checks; both command-line entrypoints refused the prohibited
-production emulator profile in separate network-disabled tests.
+Both hosted entrypoints require Firestore, the canonical customer profile and an
+exact reviewed code/version manifest. They never import, seed or use a memory/file
+fallback at hosted startup. The production emulator guard remains mandatory.
+Part 1 storage/session/arm modules and setup HTML are unchanged from 33bb55f.
 
-F9a and F10a ownership transferred to Codex, alongside F9b/F10b. Claude retains
-F6/F7a/F11a; later Part 1 merges require another user go-ahead.
-
-| Frozen integration pin | Value |
+| Frozen local candidate | Value |
 | --- | --- |
-| Source commit | `f47960e9734bfe1933803ecb504cfee6d68b22fd` |
-| Context SHA-256 | `c50762a10fdb3df936fa16b5e42bf536ef0643543c8e02f0280a4d3e50ce951d` |
-| Catalogue manifest SHA-256 | `cb0a3fbe3146c8181844a574333389d769ed6780481849dd20fc6e5c86dc4dc5` |
-| Local image | `roomdrop-booking:f47960e9734b-c50762a10fdb` |
-| Local image ID | `sha256:132c1a1e2e4c5dc062944300868bb4ba886262d0d3cc69729a36134c4976c1fa` |
-| Local packet | `.local/integration/setup-merge-release-pin.json` and `.local/booking-release-d1c699b5-5641-4da1-b115-f94f6aff0637/manifest.json` |
+| Runtime source | c7de6a474254078481944d3fa7e20b6446cdd2b4 |
+| Context SHA-256 | 1efce687edc69efc6260702f6377627c5965a8690bdcf1f2b763d98530281224 |
+| Catalogue manifest SHA-256 | 6a8f104558ed6742544547e72f64abf7b9ffa53d9f25552b82161cd093ba62cb |
+| Local image | roomdrop-booking:c7de6a474254-1efce687edc6 |
+| Local image ID | sha256:a81f9b00ed4a09e25d6ae2f3300edfafe80ad112ef89f07b9c075a1616d1d0a6 |
+| Packet | .local/integration/v5-release-pin.json |
+| Context | .local/booking-release-03b3a359-64df-4d4c-b209-54357abf7f0b/context/ |
 
-This is a local image ID, not verified registry byte evidence. No image was
-pushed. The source and served assets are frozen; the real capture payload is
-absent from the image. The packet contains only reviewed code/version pins.
+This is a local image ID; no registry push or registry-byte verification occurred.
+The context contains code, eight approved public JPEGs and version pins. It
+contains no private captures, source URLs, credentials or visitor state.
+Missing runtime imports/assets fail preparation or the packaging regression.
 
-## Finish locally before requesting release approval
+Local proof: 419 Node tests (388 pass, zero fail, 31 reported skips); the selected
+actual-emulator core files pass 53/53. Five-width real-capture/browser tests prove
+arm/confirm/restart/context/isolation, 182 -> 181 hash navigation and stale-tab
+rejection. Photo fallback/load-failure, navigation during an arm request, Gemini
+geometry, keyboard and historical single-snapshot tests also pass. The image
+smoke verifies both hosted entrypoints and all eight photo hashes, then separate
+network-disabled CLI runs reject the production emulator profile with exit 1.
+All model responses were injected; the packaged model-unavailable path makes
+zero model calls. Full evidence: public-demo-firestore-verification.md, current
+Part 2 section.
 
-1. Wait for Claude's photo-capture/final F11a handoff, obtain authority for any later merge,
-   then retest the affected UI and exact combined image. Do not merge the moving
-   branch tip under the earlier permission for `8423825`.
-2. Preserve the current durable bootstrap projection and Part 1's arm transaction.
-   The client delegates to `judge.armRequestBody` to send `expectedRevision`;
-   startup uses `bookingStorage` as its sole
-   source, with loaded version bindings separately named `reviewedCatalogue`.
-3. Complete final content/photo/scenario review and production preservation checks.
-   The supplied real catalogue has now been validated and imported locally:
-   AIRB000180-183 arm with three captured Drops each; 179/184 refuse as
-   non-refundable. This proves captured local mechanics, not fresh availability.
-   The supplied cards remain draft metadata. Any extra capture needs separate
-   authorisation.
-4. Refreeze the exact combined source if code or reviewed pins change. The current
-   `.local\integration\reviewed-catalogue-manifest.json` already contains all six
-   actual imported code/version bindings, in this shape:
+## Reproduce the frozen local bundle
 
-```json
-{"schemaVersion":1,"entries":[{"code":"OWNER_APPROVED_CODE","contentVersion":"VERIFIED_CONTENT_HASH","dropSetVersion":"VERIFIED_DROP_SET_HASH"}]}
-```
-
-The example illustrates the shape; use the actual six-entry pin file above.
-Pins must match `loadHostedCatalogue` exactly. No hotel facts, raw captures,
-credentials, supplier references or judge state are packaged in that manifest.
+Run from the Part 2 worktree only. Preparation reads exact git bytes rather than
+uncommitted files. Test-injected bundles are explicitly marked and have no
+registry destination. Current manifest pins are stored only under ignored .local.
 
 ```powershell
 Set-Location 'C:\Users\pohli\Sites\hotel-price-hunter\.local\roomdrop-part2'
-$sourceCommit = 'f47960e9734bfe1933803ecb504cfee6d68b22fd'
-$prepared = node scripts\prepare-booking-release.mjs --prepare "--source=$sourceCommit" --manifest=.local\integration\reviewed-catalogue-manifest.json | ConvertFrom-Json
-$manifestPath = $prepared.manifestPath
-# Verify every hash before building.
-$bundle = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+$sourceCommit = 'c7de6a474254078481944d3fa7e20b6446cdd2b4'
+$prepared = node scripts\prepare-booking-release.mjs --prepare "--source=$sourceCommit" --manifest=.local\integration\v5-catalogue-manifest.json | ConvertFrom-Json
+$bundle = Get-Content -LiteralPath $prepared.manifestPath -Raw | ConvertFrom-Json
 if ($bundle.sourceMode -ne 'git-commit' -or -not $bundle.uncommittedFilesExcluded) { throw 'Test source cannot be released' }
 docker build --tag $bundle.localImageTag $bundle.contextDirectory
 docker image inspect $bundle.localImageTag --format '{{.Id}}'
 ```
 
-Preparation reads only the exact commit's files and recursively closes static
-module dependencies. Missing Part 1 source fails `SOURCE_DEPENDENCY_MISSING`.
-Explicit test-source injection yields `test-prepared-offline`, a
-`roomdrop-booking-test` tag, `sourceMode:test-injected` and no registry destination.
-Those artifacts cannot serve as release lineage.
+Compare every context file hash with the packet before accepting a rebuilt image.
+The normal CLI refuses emulator configuration in production. The local image
+smoke uses an explicit injected test storage factory and a read-only scratch
+script, Docker network namespace container:roomdrop-part2-firestore, no published
+host ports, and demo-roomdrop-part2 at 127.0.0.1:8281. It does not weaken the CLI.
+The scratch script is .local/integration/v5-image-smoke.mjs; results and guards are
+in v5-image-smoke.log and v5-image-guards.json in that directory.
 
-`Dockerfile.booking` copies only `booking-catalogue-manifest.json`; the old
-`--snapshot`/`--catalogue` release arguments are rejected. Preserve the legacy
-single-snapshot UI regression as separate historical evidence, not the hosted
-curated runtime. The older quotation release script/Docker context is not the
-curated release path; both new hosted entrypoints are included in this booking
-context's dependency closure.
+## Reviewed emulator catalogue and ports
 
-## Emulator import and local ports
-
-The existing Part 2 emulator is already running. Do not start Java/gcloud or use
-`npm run emulator`. The following guarded command imported the user-approved real
-catalogue combined with the supplied cards, all under ignored `.local\`.
-An identical retry is create-only/idempotent. Synthetic browser tests use their
-own namespace rather than overwriting these real-capture records.
+The existing Part 2 emulator remains roomdrop-part2-firestore on 127.0.0.1:8281,
+project demo-roomdrop-part2. No Java/gcloud startup or other emulator was used.
+The Part 1 reviewed s0.6 catalogue and s0.5 image manifest were copied read-only
+into .local/integration/v5-catalogue.json and v5-images.json. The guarded importer
+created six bookings/twelve Drops in the fresh namespace roomdropPart2PhotosV5.
+Earlier default roomdrop records are retained. The reproducible ignored helper
+v5-import.mjs calls the guarded importer with that explicit namespace; repeat
+imports are create-only. The public runtime does not import anything.
 
 ```powershell
 $env:GOOGLE_CLOUD_PROJECT='demo-roomdrop-part2'
 $env:FIRESTORE_EMULATOR_HOST='127.0.0.1:8281'
-node scripts\import-altovo-catalogue.mjs --catalogue=.local\integration\reviewed-real-catalogue.json
-node scripts\import-altovo-catalogue.mjs --catalogue=.local\integration\reviewed-real-catalogue.json --execute --project=demo-roomdrop-part2 '--database=(default)' --emulator=127.0.0.1:8281
-node tests\booking-firestore.browser.mjs --existing --catalogue=.local\integration\reviewed-real-catalogue.json
+node .local\integration\v5-import.mjs
+node tests\booking-firestore.browser.mjs --existing --prefix=roomdropPart2PhotosV5 --catalogue=.local/integration/v5-catalogue.json
 ```
 
-Use 8294 for a manual booking server, 8293 for quotation, and `PORT=8290` plus
-`APP_ORIGIN=http://127.0.0.1:8290` for the separate `app/server.mjs` simulation.
-Browser harnesses use port 0. Never operate the Part 1 or 8081 containers.
+The raw capture remains the first reviewed Gateway capture, not fresh availability.
+The planned EasyGDS engine recapture has not happened here. A new dropSetVersion
+requires a new manifest, watch/replay/browser checks and frozen bundle before
+release. Approved photo/card review does not replace that future data gate.
+
+Manual ports remain booking 8294, quotation 8293 and simulation 8290 with
+APP_ORIGIN=http://127.0.0.1:8290. Browser harnesses allocate port 0. Never touch
+Part 1/8181 or the legacy 8081 emulator. Tests clean only their own namespaces.
 
 ## Separate live approval packet still required
 

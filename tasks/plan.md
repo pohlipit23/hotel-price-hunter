@@ -151,6 +151,13 @@ Approved two-part delivery (18 October 2026). Mixed F tasks are split into `a`
   real-capture and placement browser gates pass four widths, including stale tabs.
   The refreshed local image is pinned to `f47960e`. Photo capture and final F11a
   evidence remain with Claude; no later merge or release action is authorised.
+  Final authorised integration: 33bb55f merged as 5eaf0ae, protected Part 1
+  modules unchanged. Source c7de6a4 renders reviewed photos, handles URL/hash
+  routing and packages all eight JPEGs. Node 388 pass/31 skips/zero fail; targeted
+  emulator 53/53; five-width real browser and both packaged entrypoints pass.
+  F11b local acceptance and offline bundle are complete. The later engine
+  recapture/new pins and live release prerequisites remain separate; no push,
+  deployment, production import or live call ran.
 - Both parts branch from `roomdrop/judge-flow-base`, a snapshot of pre-existing
   shared-checkout work authored by neither part. Part 2 may start against the
   current memory-backed `/watch` receipt and switches to the Firestore-backed

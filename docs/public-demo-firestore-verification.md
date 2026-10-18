@@ -885,7 +885,7 @@ node --test tests\quotation-session-storage.test.mjs tests\booking-drop-watch.te
 Remove-Item Env:RUN_FIRESTORE_INTEGRATION -ErrorAction SilentlyContinue
 ```
 
-## Part 2 - Authorised 8423825 setup integration (current)
+## Part 2 - Authorised 8423825 setup integration (previous candidate)
 
 The user authorised the next pinned merge through `8423825`; merge commit
 `f47960e9734bfe1933803ecb504cfee6d68b22fd` has that exact second parent.
@@ -933,3 +933,75 @@ injected, and external browser requests/page errors are zero. The image ID is
 local only; no registry push, deployment, production import, live call, access/TTL
 change or scheduler execution occurred. Photo capture and final release/F11a
 handoff remain pending with Claude and require a later authorised merge.
+
+## Part 2 - Authorised 33bb55f / contract v5 integration (current)
+
+Merge commit `5eaf0ae` has the exact authorised Part 1 parent
+`33bb55ffb23abe35c23a0c09a2091c25f7540aaa`. Runtime fix/source pin:
+`c7de6a474254078481944d3fa7e20b6446cdd2b4`. Storage/session core, arm,
+judge helper, drop-watch and setup HTML match Part 1 unchanged. The only booking
+CSS addition sizes reviewed photos in the Part 2 cards/review/receipt.
+F9a/F10a remain owned by Codex; Claude's F6/F7a/F11a and photo work are integrated.
+
+Drop cards, Review and Confirmed render the reviewed local Drop photo with a
+visible Hotel photo label. An absent or failed image shows No photo yet and
+removes the photo claim. Original Booking receipt photos use the catalogue's
+reviewed room/hotel photo. No remote source URL is rendered. The release context
+now includes all eight approved JPEGs; the rejected 184 room asset remains 404.
+
+Hash and history events resolve the code from the current URL and reload its
+saved setup. Older history state cannot select a different code; duplicate route
+events share the pending load. Navigation during an arm/confirm waits for that
+mutation and then follows the requested URL. The arm fetch continues to use
+`judge.armRequestBody(data, minimum)`. The existing heading placement for Gemini
+passes geometry checks at both reported phone widths, 320 and 390 px.
+
+| Local proof | Result | Evidence under ignored worktree .local/ |
+| --- | --- | --- |
+| Full Node suite | 419 tests, 388 passed, 0 failed, 31 skipped | integration/v5-node-tests-final.log |
+| Actual core emulator/session/arm/catalogue/launcher tests | 53 passed, 0 failed, 0 skipped | integration/v5-core-emulator.log |
+| Photo, fallback, hash-only/stale-state routing, mutation-in-flight, launcher and conversation browser | Pass: 320/390/768/1024/1440 px | integration/v5-browser-green.log; part2-browser/result.json |
+| Actual reviewed capture + photos + Firestore browser | Pass: five widths; exact 182 -> 181 hash transition, arm/confirm/retry/restart, context, two judges/codes, empty rearm and stale-tab rejection | integration/v5-real-browser.log; part2-firestore-real-browser/result.json |
+| Setup, arm-contract and historical single-snapshot browser | Pass, separately scoped fixture checks | integration/v5-judge-browser.log; v5-arm-browser.log; v5-single-browser.log |
+| Frozen source/context/image | Pass: all eight image bytes served and hashed, both hosted entrypoints, real arm/confirm/retry/restart/isolation and unavailable-model path | integration/v5-release-pin.json; v5-docker-build.log; v5-image-smoke.log |
+| Production emulator guards | Both entrypoints exit 1, network disabled | integration/v5-image-guards.json |
+| Review mutation | Inverting reviewed-photo fallback causes the browser regression to fail; original bytes restored and full browser passes | integration/v5-review-mutation.log; v5-browser-green.log |
+
+The two Node counts overlap. Inherited integration cases remain explicitly skipped
+in the full run; RUN_FIRESTORE_INTEGRATION was enabled only for the four selected
+core files, avoiding the unrelated tests that hardcode Part 1/8081 endpoints.
+Browser errors and external requests are zero. All model replies are injected;
+the packaged unavailable-model path makes zero model calls. Screenshots inspected
+include real 181 Drops at 390 px and Review at 320 px.
+
+Reviewed inputs were copied read-only from Part 1's ignored s0.6 catalogue and
+s0.5 image manifest to integration/v5-catalogue.json and v5-images.json. The
+reviewed image-manifest SHA-256 is
+`bc8aa163fc742f75e70811e5555eceaa94aab0ba34cd0e3b926c99b6879e8fd6`.
+The guarded importer created six bookings / twelve Drops in the new namespace
+`roomdropPart2PhotosV5` on 127.0.0.1:8281 / demo-roomdrop-part2 only. The earlier
+default roomdrop records were retained. Browser/image tests delete only their
+own private session namespaces; neither emulator nor existing records were reset.
+Import evidence: integration/v5-import.json; read-only version pins:
+integration/v5-catalogue-manifest.json.
+
+| Frozen local candidate | Value |
+| --- | --- |
+| Runtime source | `c7de6a474254078481944d3fa7e20b6446cdd2b4` |
+| Context SHA-256 | `1efce687edc69efc6260702f6377627c5965a8690bdcf1f2b763d98530281224` |
+| Catalogue manifest SHA-256 | `6a8f104558ed6742544547e72f64abf7b9ffa53d9f25552b82161cd093ba62cb` |
+| Local image | `roomdrop-booking:c7de6a474254-1efce687edc6` |
+| Local image ID | `sha256:a81f9b00ed4a09e25d6ae2f3300edfafe80ad112ef89f07b9c075a1616d1d0a6` |
+| Packet/context | integration/v5-release-pin.json; .local/booking-release-03b3a359-64df-4d4c-b209-54357abf7f0b/ |
+
+F11b local implementation/acceptance and the offline release bundle are complete.
+The reported future EasyGDS engine recapture is not in these facts: any new
+Drop set changes version pins and requires a fresh replay/browser/package gate.
+Live release approval still needs current cloud preservation/configuration,
+production-import support, session TTL and rollback review. There is no registry
+byte proof, live Gemini/upstream proof, public deployment or production import.
+No push, deploy, live call, IAM/TTL change, email or schedule ran.
+
+Reproduce the real browser gate in this worktree with the Part 2 emulator env:
+
+`node tests/booking-firestore.browser.mjs --existing --prefix=roomdropPart2PhotosV5 --catalogue=.local/integration/v5-catalogue.json`
