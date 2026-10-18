@@ -30,7 +30,6 @@ try {
   prefix = 'roomdropPart2Browser' + randomBytes(8).toString('hex');
   const now = () => new Date('2026-10-20T00:00:00Z');
   const bookingStorage = bookingModule.createBookingStorage({ firestore, prefix });
-  const sessionStorage = sessionModule.createFirestoreSessionStorage({ firestore, prefix, now });
   const otherCode = 'PART2002', extra = structuredClone(input.entries[0]);
   extra.code = otherCode; extra.bundle.baseline.quotationCode = otherCode;
   const { schemaVersion, transactionMode, baseline, options, checkedAt, completeness, customerRefund, reservationCreated } = extra.bundle;
@@ -38,10 +37,11 @@ try {
   input.entries.push(extra); input.cards.push({ ...input.cards[0], code: otherCode, order: 3 });
   await bookingStorage.importBundle(input, { execute: true, now });
   const loaded = await bookingModule.loadHostedCatalogue(bookingStorage);
+  const sessionStorage = sessionModule.createFirestoreSessionStorage({ firestore, prefix, now, catalogueCodes: loaded.entries.map(entry => entry.code) });
   const originals = JSON.stringify(await Promise.all(loaded.entries.map(entry => bookingStorage.getBooking(entry.code))));
   const advisor = { available: true, status: 'test-injected', chat: async () => ({ reply: 'Injected durable Gemini comparison.' }) };
   const start = async (port = 0) => {
-    server = createBookingDemoServer({ catalogue: { schemaVersion: 1, entries: loaded.entries }, bookingStorage, sessionStorage, now, advisor });
+    server = createBookingDemoServer({ reviewedCatalogue: loaded, bookingStorage, sessionStorage, now, advisor });
     await new Promise(resolve => server.listen(port, '127.0.0.1', resolve)); return server.address().port;
   };
   const port = await start(), origin = 'http://127.0.0.1:' + port;

@@ -25,7 +25,7 @@ async function app(t, { advisor, retry = false } = {}) {
   const record = { code, contentVersion: bundle.snapshotVersion, dropSetVersion: watch.dropSetVersion, bundle };
   const bookingStorage = { getBooking: async () => record,
     getDrops: async () => ({ dropSetVersion: record.dropSetVersion, captureStatus: 'observed', capturedAt: bundle.checkedAt, drops: bundle.options }) };
-  const server = createBookingDemoServer({ catalogue: { schemaVersion: 1, entries: [entry] }, sessionStorage, bookingStorage,
+  const server = createBookingDemoServer({ reviewedCatalogue: { entries: [{ ...entry, contentVersion: record.contentVersion, dropSetVersion: record.dropSetVersion }] }, sessionStorage, bookingStorage,
     advisor, now: () => new Date(at) });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
@@ -68,7 +68,8 @@ test('durable route rejects changed catalogue versions without touching sessions
 });
 test('contract v2 unavailable bookings and invalid session state return bounded errors without a commit', async t => {
   for (const [code, status, responseCode] of [['BOOKING_UNAVAILABLE', 404, 'BOOKING_UNAVAILABLE'],
-    ['SESSION_STATE_INVALID', 503, 'DEMO_UNAVAILABLE'], ['STORAGE_UNAVAILABLE', 503, 'DEMO_UNAVAILABLE']]) {
+    ['SESSION_STATE_INVALID', 503, 'DEMO_UNAVAILABLE'], ['STORAGE_UNAVAILABLE', 503, 'DEMO_UNAVAILABLE'],
+    ['CATALOGUE_UNAVAILABLE', 503, 'CATALOGUE_UNAVAILABLE'], ['DEMO_UNAVAILABLE', 503, 'DEMO_UNAVAILABLE']]) {
     const a = await app(t), failure = Object.assign(Error('PRIVATE-storage-detail'), { code });
     if (code === 'BOOKING_UNAVAILABLE') a.bookingStorage.getDrops = async () => { throw failure; };
     else a.sessionStorage.transact = async () => { throw failure; };
@@ -108,7 +109,7 @@ test('Firestore durable HTTP: independent instances recover receipts/context wit
       }) };
     const bookingStorage = { getBooking: async () => (await docs.doc('booking').get()).data(), getDrops: async () => (await docs.doc('drops').get()).data() };
     const advisor = { available: true, status: 'test-injected', chat: async input => { requests.push(input); return { reply: 'Injected durable comparison' }; } };
-    const server = createBookingDemoServer({ catalogue: { schemaVersion: 1, entries: [{ code, bundle }] }, sessionStorage, bookingStorage, advisor, now: () => new Date(at) });
+    const server = createBookingDemoServer({ reviewedCatalogue: { entries: [{ code, bundle, contentVersion: record.contentVersion, dropSetVersion: record.dropSetVersion }] }, sessionStorage, bookingStorage, advisor, now: () => new Date(at) });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); servers.push(server);
     const origin = 'http://127.0.0.1:' + server.address().port;
     return (action, body) => fetch(origin + '/api/booking-demo/q/' + code + '/' + action, { method: 'POST',

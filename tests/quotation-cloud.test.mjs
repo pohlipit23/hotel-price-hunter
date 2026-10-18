@@ -72,7 +72,8 @@ test('curated startup loads only storage, passes contract-v1 stores and closes o
     storesFactory: async () => { made++; return stores; }, catalogueLoader: async storage => { assert.equal(storage, stores.bookingStorage); return catalogue; },
     advisorFactory: async () => { modelCreated++; return { available: false }; },
     serverFactory: options => { received = options; return server; }, listen: async (value, port) => { assert.equal(value, server); assert.equal(port, 8294); }, log: () => {} });
-  assert.equal(made, 1); assert.equal(modelCreated, 1); assert.equal(received.catalogue, catalogue);
+  assert.equal(made, 1); assert.equal(modelCreated, 1); assert.equal(received.reviewedCatalogue, catalogue);
+  assert.equal(received.catalogue, undefined); assert.equal(received.bookingStorage, stores.bookingStorage);
   assert.equal(received.sessionStorage, stores.sessionStorage); assert.equal(received.snapshot, undefined);
   await Promise.all([app.stop(), app.stop()]); assert.equal(closed, 1); assert.equal(signals.listenerCount('SIGTERM'), 0);
 });

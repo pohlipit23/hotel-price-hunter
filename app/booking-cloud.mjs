@@ -66,7 +66,7 @@ export async function startHostedDemo({ environment = process.env, signals = pro
     const catalogue = await catalogueLoader(stores.bookingStorage);
     if (!Array.isArray(catalogue?.entries) || !catalogue.entries.length || catalogue.entries.length > 20) throw Error('CATALOGUE_UNAVAILABLE');
     const advisor = await advisorFactory({ environment });
-    server = serverFactory({ catalogue, sessionStorage: stores.sessionStorage, bookingStorage: stores.bookingStorage, environment, advisor });
+    server = serverFactory({ reviewedCatalogue: catalogue, sessionStorage: stores.sessionStorage, bookingStorage: stores.bookingStorage, environment, advisor });
     await listen(server, port);
     server.on('error', () => { log('RoomDrop runtime stopped: service unavailable.'); onSignal(); });
     signals.once('SIGTERM', onSignal); signals.once('SIGINT', onSignal);

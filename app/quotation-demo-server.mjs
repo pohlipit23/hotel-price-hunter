@@ -58,8 +58,10 @@ export function deploymentCatalogue(privateCatalogue) {
   validateDeploymentCatalogue(catalogue); return catalogue;
 }
 const selectionOnlyBundle = snapshot => ({ ...snapshot, privateReferences: Object.fromEntries(snapshot.options.map(option => [option.optionId, { selectionOnly: true }])) });
-export function createHostedQuotationDemoServer({ snapshot, catalogue, environment = process.env, now, advisor, sessionStorage, bookingStorage } = {}) {
+export function createHostedQuotationDemoServer({ snapshot, catalogue, reviewedCatalogue, environment = process.env, now, advisor, sessionStorage, bookingStorage } = {}) {
   validateCloudQuotationMode(environment);
+  // Keep Part 2's reviewed version bindings separate from Part 1's sole storage source.
+  if (catalogue == null && snapshot == null && bookingStorage && reviewedCatalogue) catalogue = reviewedCatalogue;
   if ((snapshot == null) === (catalogue == null)) throw new Error('Provide exactly one hosted snapshot or catalogue.');
   if (!Array.isArray(catalogue) && catalogue?.entries) {
     if (!sessionStorage || !bookingStorage || !Array.isArray(catalogue.entries) || !catalogue.entries.length || catalogue.entries.length > 20
@@ -87,7 +89,8 @@ const assets = new Map([
   ['/assets/illustrative-stays.jpg', ['assets/illustrative-stays.jpg', 'image/jpeg']],
 ]);
 // `catalogue` is the private catalogue file shape: { schemaVersion: 1, entries: [{ code, bundle }] }.
-export function createQuotationDemoServer({ bundle, catalogue, now = () => new Date(), advisor, sessionStorage, bookingStorage } = {}) {
+export function createQuotationDemoServer({ bundle, catalogue, reviewedCatalogue, now = () => new Date(), advisor, sessionStorage, bookingStorage } = {}) {
+  if (catalogue == null && bundle == null && bookingStorage && reviewedCatalogue) catalogue = { ...reviewedCatalogue, schemaVersion: 1 };
   if (catalogue == null) return createQuotationServer({ bundle, now, advisor });
   if (bundle != null || catalogue.schemaVersion !== 1 || !Array.isArray(catalogue.entries) || !catalogue.entries.length || catalogue.entries.length > 20
     || catalogue.entries.some(entry => !CATALOGUE_CODE.test(entry?.code ?? '') || entry.bundle?.baseline?.quotationCode !== entry.code)
