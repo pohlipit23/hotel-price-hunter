@@ -4,8 +4,12 @@ import { createHash } from 'node:crypto';
 import { planCatalogueImport } from '../app/booking-storage.mjs';
 import { altovoBaseline } from '../app/domain/altovo-quotation.mjs';
 import { engineDropBundle, ENGINE_SEARCH_DEFAULTS } from '../app/domain/engine-availability.mjs';
-import { siamKempinskiProjection } from './fixtures/altovo-catalogue.mjs';
-import { engineOffer, engineRates } from './fixtures/engine-rates.mjs';
+import { mkdtemp, mkdir, writeFile, readdir, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { main as prepareCatalogue } from '../scripts/prepare-altovo-catalogue.mjs';
+import { grandHyattProjection, siamKempinskiProjection } from './fixtures/altovo-catalogue.mjs';
+import { engineAvailability, engineHotel, engineOffer, engineRates } from './fixtures/engine-rates.mjs';
 
 // Siam Kempinski quotation: MYR 2335.52 retail for 17-18 Feb 2027.
 const siam = () => altovoBaseline(siamKempinskiProjection());
@@ -86,4 +90,123 @@ test('the importer refuses engine captures whose provenance, defaults or MYR amo
   assert.equal(reason(() => plan(rehash(wrongAmount))), 'BUNDLE_INVALID');
   const wrongBasis = engineEntry(); wrongBasis.bundle.options[0].estimate.basis = 'quotation-fx-before-final-pricing-and-fees';
   assert.equal(reason(() => plan(rehash(wrongBasis))), 'BUNDLE_INVALID');
+});
+
+// --- Owner-run preparation with --source=engine, against an injected engine only ---
+const ENGINE_ENV = ['# comment line', 'EASYGDS_API_URL=https://mh1.apps.easygds.com/api\r', 'EASYGDS_IAM_URL=https://iam.services.easygds.com/api',
+  'EASYGDS_EMAIL=owner@example.test', 'EASYGDS_PASSWORD=fixture-secret', 'EASYGDS_SCOPE_TYPE=System', 'EASYGDS_FLOW_TYPE=Basic', 'EASYGDS_TERRITORY=', 'OTHER_KEY=ignored', ''].join('\n');
+async function workspace(t, { env = ENGINE_ENV, projections = [grandHyattProjection(), siamKempinskiProjection()] } = {}) {
+  const root = await mkdtemp(join(tmpdir(), 'roomdrop-engine-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(join(root, '.local', 'altovo-sample'), { recursive: true });
+  for (const projection of projections) await writeFile(join(root, '.local', 'altovo-sample', `${projection.booking.code}.projection.json`), JSON.stringify(projection));
+  await writeFile(join(root, '.local', 'engine.env'), env);
+  return root;
+}
+const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+// Records every request; `answers` maps a path to a list of responses consumed in order.
+function fakeEngine(answers) {
+  const calls = []; const queues = Object.fromEntries(Object.entries(answers).map(([path, list]) => [path, [...list]]));
+  const fetchImpl = async (url, init) => {
+    const u = new URL(url); calls.push({ origin: u.origin, path: u.pathname, search: u.search, method: init.method, headers: init.headers, body: JSON.parse(init.body) });
+    const next = queues[u.pathname]?.shift(); if (!next) throw new Error(`unexpected call ${u.pathname}`);
+    return next;
+  };
+  return { calls, fetchImpl };
+}
+const AUTH = '/api/auth'; const SEARCH = '/api/v2/products/hotels/availabilities'; const RATES = '/api/v2/products/hotels/availabilities/rates';
+const authOk = () => json({ access_token: 'fixture-token', exp: 3600 });
+const ENGINE_EXECUTE = ['--approved-codes=AIRB000179,AIRB000180', '--source=engine', '--engine-credentials-file=.local/engine.env', '--execute'];
+const NOW = () => new Date(CHECKED_AT);
+const prepare = (root, engine, sleeps = [], args = ENGINE_EXECUTE) => prepareCatalogue(args, { root, fetchImpl: engine.fetchImpl, now: NOW, env: {}, sleep: async ms => { sleeps.push(ms); } });
+const catalogueFiles = async root => { try { return await readdir(join(root, '.local', 'altovo-catalogue')); } catch { return []; } };
+
+test('engine preparation signs in once, re-posts the same search until complete, then reads that hotel\'s rates', async t => {
+  const root = await workspace(t);
+  const engine = fakeEngine({ [AUTH]: [authOk()],
+    [SEARCH]: [json(engineAvailability({ total: 1 })), json(engineAvailability({ total: 1, hotels: [engineHotel('3135840', 'Siam Kempinski Hotel Bangkok')] }))],
+    [RATES]: [json(engineRates('3135840', [engineOffer({ total: 1998, tiers: FREE_THEN_CHARGED, images: [{ url: 'https://cdn.example.test/deluxe.jpg' }] })]))] });
+  const sleeps = [];
+  const report = await prepare(root, engine, sleeps);
+  assert.equal(report.status, 'prepared', report.reason);
+  assert.deepEqual(engine.calls.map(call => [call.origin, call.path, call.method, call.search]), [
+    ['https://iam.services.easygds.com', AUTH, 'POST', ''], ['https://mh1.apps.easygds.com', SEARCH, 'POST', ''],
+    ['https://mh1.apps.easygds.com', SEARCH, 'POST', ''], ['https://mh1.apps.easygds.com', RATES, 'POST', '']]);
+  assert.deepEqual(engine.calls[0].body, { email: 'owner@example.test', secret_key: 'fixture-secret', scope_type: 'System', flow_type: 'Basic' });
+  const search = { checkin_date: '2027-02-17', checkout_date: '2027-02-18', currency_code: 'MYR', language_code: 'en-US',
+    rooms: [{ idx: 1, adults: [30], children: [], infants: [] }], hotel_ids: ['3135840'], timeout: 20000 };
+  assert.deepEqual([engine.calls[1].body, engine.calls[2].body, engine.calls[3].body], [search, search, { search_id: 'search-fixture', hotel_id: '3135840' }]);
+  for (const call of engine.calls.slice(1)) assert.deepEqual(call.headers, { Authorization: 'Bearer fixture-token', 'Content-Type': 'application/json;charset=UTF-8', Accept: 'application/json', 'X-Territory': 'MY' });
+  assert.deepEqual(sleeps, [3000]);
+  assert.deepEqual([report.source, report.engineHost], ['engine', 'mh1.apps.easygds.com']);
+  assert.deepEqual(report.entries, [
+    { code: 'AIRB000179', hotel: 'Grand Hyatt Kuala Lumpur', blocker: 'NON_REFUNDABLE', capture: 'not-searched', optionCount: 0, imageSources: { hotel: false, drops: 0 } },
+    { code: 'AIRB000180', hotel: 'Siam Kempinski Hotel Bangkok', blocker: null, capture: 'observed', optionCount: 1, imageSources: { hotel: false, drops: 1 },
+      engineHotelId: '3135840', engineHotelNameMatches: true, searchPosts: 2 }]);
+  assert.doesNotMatch(JSON.stringify(report), /fixture-token|fixture-secret|owner@example/);
+  const written = JSON.parse(await readFile(report.privateCatalogue, 'utf8'));
+  assert.doesNotMatch(JSON.stringify(written), /fixture-token|fixture-secret|owner@example|search-fixture/);
+  const planned = planCatalogueImport({ schemaVersion: 1, entries: written.entries,
+    cards: [{ ...SIAM_CARD, order: 2 }, { code: 'AIRB000179', order: 1, cityName: 'Kuala Lumpur', scenarioLabel: 'Non-refundable', photo: null }] });
+  assert.deepEqual(planned.map(entry => entry.captureStatus), ['not-searched', 'observed']);
+  assert.deepEqual(planned[1].drops[0].provenance, { source: 'easygds-core-engine-production', host: 'mh1.apps.easygds.com', searchDefaults: ENGINE_SEARCH_DEFAULTS });
+});
+
+test('a confirmed 0 of 0 engine search is an empty capture with no rates call; offers with nothing cheaper still count as observed', async t => {
+  const empty = fakeEngine({ [AUTH]: [authOk()], [SEARCH]: [json(engineAvailability()), json(engineAvailability())] });
+  const root = await workspace(t);
+  const report = await prepare(root, empty);
+  assert.equal(report.status, 'prepared', report.reason);
+  assert.deepEqual(empty.calls.map(call => call.path), [AUTH, SEARCH, SEARCH]);
+  const entry = JSON.parse(await readFile(report.privateCatalogue, 'utf8')).entries.find(item => item.code === 'AIRB000180');
+  assert.deepEqual([entry.capture.status, entry.capture.offerCount, entry.bundle.options, entry.capture.provenance.source], ['observed-empty', 0, [], 'easygds-core-engine-production']);
+  const dearer = fakeEngine({ [AUTH]: [authOk()], [SEARCH]: [json(engineAvailability({ hotels: [engineHotel('3135840', 'Siam Kempinski Hotel Bangkok')] }))],
+    [RATES]: [json(engineRates('3135840', [engineOffer({ total: 2400 })]))] });
+  const second = await prepare(await workspace(t), dearer);
+  assert.deepEqual([second.entries[1].capture, second.entries[1].optionCount], ['observed', 0]);
+});
+
+test('a failed engine search publishes nothing: no retry, no second sign-in, and the failing code is named', async t => {
+  const hotel = engineHotel('3135840', 'Siam Kempinski Hotel Bangkok');
+  const cases = {
+    ENGINE_HTTP_FAILED: { [AUTH]: [authOk()], [SEARCH]: [json({ message: 'Unauthorized' }, 401)] },
+    ENGINE_AUTH_FAILED: { [AUTH]: [json({ message: 'locked' }, 403)] },
+    ENGINE_SEARCH_INCOMPLETE: { [AUTH]: [authOk()], [SEARCH]: Array.from({ length: 4 }, () => json(engineAvailability({ total: 1 }))) },
+    ENGINE_HOTEL_MAPPING_UNVERIFIED: { [AUTH]: [authOk()], [SEARCH]: [json(engineAvailability({ hotels: [engineHotel('999', 'Elsewhere')] }))] },
+    ENGINE_RATES_INVALID: { [AUTH]: [authOk()], [SEARCH]: [json(engineAvailability({ hotels: [hotel] }))], [RATES]: [json({ id: '3135840', rooms: [] })] },
+  };
+  for (const [reason, answers] of Object.entries(cases)) {
+    const root = await workspace(t); const engine = fakeEngine(answers); const sleeps = [];
+    const report = await prepare(root, engine, sleeps);
+    assert.deepEqual([report.status, report.reason, report.failedCode, report.privateCatalogue], ['blocked', reason, 'AIRB000180', undefined], reason);
+    assert.equal(engine.calls.filter(call => call.path === AUTH).length, 1, reason);
+    assert.deepEqual(await catalogueFiles(root), [], reason);
+    assert.doesNotMatch(JSON.stringify(report), /fixture-token|fixture-secret|Unauthorized|\blocked\b|message/, reason);
+    if (reason === 'ENGINE_SEARCH_INCOMPLETE') assert.deepEqual([engine.calls.filter(call => call.path === SEARCH).length, sleeps], [4, [3000, 3000, 3000]]);
+  }
+});
+
+test('engine credentials come only from the named file, with the fixed IAM URL and an apps.easygds.com host, checked before any call', async t => {
+  const refuse = { fetchImpl: async () => { throw new Error('No upstream call is allowed here.'); } };
+  const broken = {
+    ENGINE_CREDENTIALS_REQUIRED: [ENGINE_ENV.replace('EASYGDS_PASSWORD=fixture-secret', 'EASYGDS_PASSWORD='), ENGINE_ENV.replace(/EASYGDS_EMAIL=.*\n/, '')],
+    ENGINE_CREDENTIALS_INVALID: [ENGINE_ENV.replace('https://iam.services.easygds.com/api', 'https://iam.example.com/api'), `${ENGINE_ENV}EASYGDS_EMAIL=second@example.test\n`,
+      ENGINE_ENV.replace('EASYGDS_FLOW_TYPE=Basic', 'EASYGDS_FLOW_TYPE=Other')],
+    ENGINE_HOST_NOT_ALLOWED: [ENGINE_ENV.replace('https://mh1.apps.easygds.com/api', 'https://mh1.apps.easygds.com.example.com/api'),
+      ENGINE_ENV.replace('https://mh1.apps.easygds.com/api', 'http://mh1.apps.easygds.com/api')],
+  };
+  for (const [expected, files] of Object.entries(broken)) for (const [index, env] of files.entries()) {
+    const report = await prepare(await workspace(t, { env }), refuse);
+    assert.deepEqual([report.status, report.reason], ['blocked', expected], `${expected} #${index}`);
+  }
+  const root = await workspace(t);
+  const without = await prepare(root, refuse, [], ['--approved-codes=AIRB000179,AIRB000180', '--source=engine', '--execute']);
+  assert.equal(without.reason, 'ENGINE_CREDENTIALS_REQUIRED');
+  for (const args of [[...ENGINE_EXECUTE, '--gateway-credentials-file=.local/engine.env'], ['--approved-codes=AIRB000180', '--source=elsewhere'],
+    ['--approved-codes=AIRB000179,AIRB000180', '--engine-credentials-file=.local/engine.env', '--execute']]) {
+    assert.equal((await prepare(root, refuse, [], args)).status, 'blocked', args.join(' '));
+  }
+  const dry = await prepare(root, refuse, [], ['--approved-codes=AIRB000179,AIRB000180', '--source=engine']);
+  assert.deepEqual([dry.mode, dry.status, dry.source, dry.searchDefaults], ['dry-run', 'validated', 'engine', ENGINE_SEARCH_DEFAULTS]);
+  assert.deepEqual(dry.entries.map(entry => [entry.code, entry.plannedSearch, entry.engineHotelId]), [['AIRB000179', false, '5232813'], ['AIRB000180', true, '3135840']]);
 });

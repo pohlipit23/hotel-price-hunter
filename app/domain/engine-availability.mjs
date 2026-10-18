@@ -55,6 +55,80 @@ function cancellationFacts(offer, checkedAt) {
     ? { freeCancellation: true, cancellationDeadline: first.toUtc } : { freeCancellation: false, cancellationDeadline: null };
 }
 
+// Reads only the EASYGDS_* keys this capture needs from an owner-selected .env text. Missing values
+// are refused: no default account, scope or fallback credential is ever supplied.
+const CREDENTIAL_KEYS = ['EASYGDS_API_URL', 'EASYGDS_IAM_URL', 'EASYGDS_EMAIL', 'EASYGDS_PASSWORD', 'EASYGDS_SCOPE_TYPE', 'EASYGDS_FLOW_TYPE'];
+export function parseEngineCredentials(raw) {
+  const values = {};
+  for (const line of String(raw).split(/\r?\n/)) {
+    const match = line.trim().match(/^([A-Z0-9_]+)\s*=(.*)$/);
+    if (!match || !CREDENTIAL_KEYS.includes(match[1])) continue;
+    if (Object.hasOwn(values, match[1])) fail('ENGINE_CREDENTIALS_INVALID');
+    const value = match[2].trim(); values[match[1]] = /^(["']).*\1$/.test(value) ? value.slice(1, -1) : value;
+  }
+  if (CREDENTIAL_KEYS.some(key => !values[key])) fail('ENGINE_CREDENTIALS_REQUIRED');
+  if (!ENGINE_API_URL.test(values.EASYGDS_API_URL)) fail('ENGINE_HOST_NOT_ALLOWED');
+  if (values.EASYGDS_IAM_URL !== ENGINE_IAM_URL || !values.EASYGDS_EMAIL.includes('@') || !['System', 'Agent'].includes(values.EASYGDS_SCOPE_TYPE)
+    || values.EASYGDS_FLOW_TYPE !== 'Basic') fail('ENGINE_CREDENTIALS_INVALID');
+  return { apiUrl: values.EASYGDS_API_URL, credentials: { email: values.EASYGDS_EMAIL, secret_key: values.EASYGDS_PASSWORD,
+    scope_type: values.EASYGDS_SCOPE_TYPE, flow_type: values.EASYGDS_FLOW_TYPE } };
+}
+
+// One bounded JSON POST: no redirects, no retries, fixed failure codes and never a response body in errors.
+const RESPONSE_LIMIT = 32 * 1024 * 1024;
+async function postJson(fetchImpl, url, headers, body, httpCode) {
+  let response;
+  try {
+    response = await fetchImpl(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(60000), headers, body: JSON.stringify(body) });
+  } catch { fail('ENGINE_REQUEST_FAILED'); }
+  if (!response.ok) { await response.body?.cancel().catch(() => {}); fail(httpCode); }
+  if (!/^application\/(?:[a-z0-9.+-]+\+)?json(?:;|$)/i.test(response.headers.get('content-type') ?? '') || !response.body
+    || Number(response.headers.get('content-length')) > RESPONSE_LIMIT) { await response.body?.cancel().catch(() => {}); fail('ENGINE_INVALID_RESPONSE'); }
+  const reader = response.body.getReader(); const chunks = []; let length = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read(); if (done) break;
+      length += value.byteLength; if (length > RESPONSE_LIMIT) { await reader.cancel(); fail('ENGINE_INVALID_RESPONSE'); }
+      chunks.push(value);
+    }
+  } catch (error) { if (error?.code === 'ENGINE_INVALID_RESPONSE') throw error; fail('ENGINE_REQUEST_FAILED'); }
+  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return fail('ENGINE_INVALID_RESPONSE'); }
+}
+
+export async function loginEngine({ credentials, fetchImpl }) {
+  const data = await postJson(fetchImpl, `${ENGINE_IAM_URL}/auth`, { 'Content-Type': 'application/json', Accept: 'application/json' }, credentials, 'ENGINE_AUTH_FAILED');
+  if (typeof data?.access_token !== 'string' || !/^[\x21-\x7e]{1,16384}$/.test(data.access_token)) fail('ENGINE_AUTH_FAILED');
+  return data.access_token;
+}
+
+export const SEARCH_POSTS = 4;
+export const SEARCH_INTERVAL_MS = 3000;
+// The same search body is re-posted (idempotent, results accumulate) until this hotel is in and every
+// hotel the engine counted has arrived; 0 of 0 counts as empty only once confirmed by a second post.
+export async function captureEngineDrops({ baseline, apiUrl, token, fetchImpl, now = () => new Date(), sleep }) {
+  if (!ENGINE_API_URL.test(apiUrl ?? '')) fail('ENGINE_HOST_NOT_ALLOWED');
+  const hotelId = baseline.hotel.id; const host = new URL(apiUrl).hostname;
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json;charset=UTF-8', Accept: 'application/json', 'X-Territory': TERRITORY };
+  const body = { checkin_date: baseline.stay.checkin, checkout_date: baseline.stay.checkout, currency_code: CURRENCY, language_code: 'en-US',
+    rooms: [{ idx: 1, adults: Array(baseline.occupancy.adults).fill(ADULT_AGE), children: [], infants: [] }], hotel_ids: [hotelId], timeout: 20000 };
+  let found = null; let searchId = null; let posts = 0;
+  while (posts < SEARCH_POSTS) {
+    if (posts) await sleep(SEARCH_INTERVAL_MS);
+    posts += 1;
+    const data = await postJson(fetchImpl, `${apiUrl}/v2/products/hotels/availabilities`, headers, body, 'ENGINE_HTTP_FAILED');
+    if (!plain(data) || !text(data.search_id) || !Array.isArray(data.hotels) || !Number.isSafeInteger(data.total) || data.total < 0) fail('ENGINE_SEARCH_INVALID');
+    if (data.hotels.some(hotel => String(hotel?.id) !== hotelId)) fail('ENGINE_HOTEL_MAPPING_UNVERIFIED');
+    searchId = data.search_id;
+    if (data.hotels.length && data.hotels.length >= data.total) { found = data.hotels[0]; break; }
+    if (!data.hotels.length && data.total === 0 && posts >= 2) {
+      return { ...engineDropBundle(baseline, { id: hotelId, offers: [] }, { checkedAt: now().toISOString(), host }), searchPosts: posts, hotelName: null };
+    }
+  }
+  if (!found) fail('ENGINE_SEARCH_INCOMPLETE');
+  const rates = await postJson(fetchImpl, `${apiUrl}/v2/products/hotels/availabilities/rates`, headers, { search_id: searchId, hotel_id: hotelId }, 'ENGINE_HTTP_FAILED');
+  return { ...engineDropBundle(baseline, rates, { checkedAt: now().toISOString(), host }), searchPosts: posts, hotelName: text(found.name) };
+}
+
 // rates: the engine's `{ id, offers[] }` for this hotel. Returns the bundle, its photo source URLs
 // (kept beside the bundle, never renderable) and the capture record.
 export function engineDropBundle(baseline, rates, { checkedAt, host } = {}) {
