@@ -1,4 +1,4 @@
-import { bookingView, comparisonLabels } from './booking-live-data.js';
+import { bookingView, comparisonLabels, replayResult, currentConfirmation } from './booking-live-data.js';
 import { createStayAdviser } from './stay-advice.js';
 
 /** Use the existing booking screens and shared cards; confirmation is selection-only.
@@ -6,7 +6,7 @@ import { createStayAdviser } from './stay-advice.js';
 export async function startBookingDemo(ui) {
   const { $, node, money, savingLabel, addStamp, setActionContent, factTile, stayText, guestText, stayPhoto, offerPhotoIndex } = ui;
   const catalogueMode = document.body.dataset.bookingMode === 'catalogue';
-  let data, view, allOffers = [], selected, busy = false, lastTrigger, code = null, judge, entries = [], navigation = 0;
+  let data, view, selected, busy = false, lastTrigger, code = null, judge, entries = [], navigation = 0;
   const api = action => catalogueMode ? `/api/booking-demo/q/${code}${action ? '/' + action : ''}` : '/api/booking-demo' + (action ? '/' + action : '');
   const adviser = createStayAdviser({ parent: $('comparison'), before: $('price-details'), getData: () => data, chatUrl: () => api('chat') });
   const explanation = 'Estimated savings before final pricing and fees. Full cancellation terms and room matching still need verification.';
@@ -35,7 +35,7 @@ export async function startBookingDemo(ui) {
   const hashFor = screen => catalogueMode ? '#' + routes[screen] + (screen !== 'start' && code ? '-' + code : '')
     : screen === 'review' ? '#comparison' : screen === 'confirmed' ? '#confirmed' : '#booking-summary';
   const navigate = (screen, push = true) => {
-    const state = { bookingScreen: screen, optionId: selected?.offerId, code: screen === 'start' ? null : code };
+    const state = { bookingScreen: screen, optionId: screen === 'review' ? selected?.offerId : null, code: screen === 'start' ? null : code };
     if (push) history.pushState(state, '', hashFor(screen));
     steps(screen); window.scrollTo({ top: 0, behavior: 'instant' });
   };
@@ -82,7 +82,8 @@ export async function startBookingDemo(ui) {
     navigate('review', push); focusHeading('comparison-title');
   }
   function confirmed(receipt, push = true) {
-    selected = view.offers.find(offer => offer.offerId === receipt.optionId) ?? allOffers.find(offer => offer.offerId === receipt.optionId);
+    if (!currentConfirmation({ ...data, confirmation: receipt })) return false;
+    selected = view.offers.find(offer => offer.offerId === receipt.optionId);
     if (!selected) return false;
     $('switch-progress-label').textContent = 'Room choice confirmed'; $('switch-stage').textContent = 'Your new room choice is confirmed';
     $('switch-state').textContent = 'Demo complete';
@@ -93,7 +94,8 @@ export async function startBookingDemo(ui) {
     }
     $('switch-from-status').textContent = 'current booking'; $('switch-to-status').textContent = 'selected room';
     addStamp($('switch-stamp'), selected.displaySaving.minor, view.currency.code, 'Estimated drop', 'switch-stamp');
-    $('switch-trail').replaceChildren(node('li', 'You reviewed the room and confirmed your choice.'));
+    $('switch-trail').replaceChildren(node('li', 'You reviewed the room and confirmed your choice.'),
+      node('li', 'Selection receipt ' + receipt.selectionId + ' - ' + new Date(receipt.confirmedAt).toLocaleString()));
     $('switch-reassurance').textContent = 'Your original booking is unchanged. No reservation, cancellation, payment or refund was made.';
     $('switch-money').replaceChildren(node('dt', 'Estimated savings'), node('dd', savingLabel(selected.displaySaving.minor)));
     $('switch-message').textContent = explanation; $('switch-history-details').hidden = true;
@@ -110,16 +112,23 @@ export async function startBookingDemo(ui) {
   }
   // Renders the booking ticket and the Drops. In catalogue mode only the Drops the armed watch found are shown.
   function applyData() {
-    const found = data.watch?.firstCheck.dropOptionIds;
-    allOffers = bookingView(data).offers;
-    view = bookingView(catalogueMode ? { ...data, options: data.options.filter(option => found?.includes(option.optionId)) } : data);
+    const replay = catalogueMode ? replayResult(data) : null;
+    data.confirmation = currentConfirmation(data);
+    view = bookingView(catalogueMode ? { ...data, options: replay.options } : data);
     ui.setState(view); ui.setSelect(review); ui.renderBooking();
     $('booking-label').textContent = (catalogueMode ? 'Original Booking · ' : 'Your booking · ') + view.booking.reference;
     $('room').textContent = view.booking.room.name + ' · ' + data.baseline.room.board;
     $('offers').replaceChildren(...view.highlights.map(highlight => ui.offerCard(highlight.offer, highlight)));
-    $('offer-empty').hidden = view.highlights.length > 0; $('lower-minimum').hidden = !catalogueMode || view.highlights.length > 0;
-    $('offer-empty').textContent = catalogueMode ? 'No drops above your minimum yet. Your booking stays as it is.' : 'No lower rates in the latest check. Your current booking stays unchanged.';
-    if (catalogueMode && data.watch) $('armed-detail').textContent = judge.armedDetail(data);
+    $('offer-empty').hidden = view.highlights.length > 0;
+    $('lower-minimum').hidden = !catalogueMode || replay.status !== 'empty';
+    $('offer-empty').textContent = replay?.status === 'unavailable' ? 'The replayed check is unavailable. Reload to try again. Your Original Booking is unchanged.'
+      : catalogueMode ? 'No captured Drops meet your minimum. Your Original Booking is unchanged.' : 'No lower rates in the latest check. Your current booking stays unchanged.';
+    if (catalogueMode && data.watch) {
+      $('armed-title').textContent = replay.status === 'unavailable' ? 'Replayed check unavailable' : 'Drop Watch armed';
+      $('armed-detail').textContent = replay.status === 'unavailable' ? 'Captured data could not be verified. No live search was run.'
+        : judge.armedDetail(data) + ' - Replayed ' + new Date(replay.replayedAt).toLocaleString()
+          + ' - Captured ' + replay.capturedAt.map(at => new Date(at).toLocaleString()).join(', ') + ' - not live';
+    }
   }
   $('close-comparison').addEventListener('click', event => { event.preventDefault(); overview(); });
   $('keep-booking').addEventListener('click', () => overview()); $('done-button').addEventListener('click', () => overview());
@@ -137,6 +146,7 @@ export async function startBookingDemo(ui) {
       const response = await fetch(api('confirm'), { method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': data.csrfToken },
         body: JSON.stringify({ optionId: selected.offerId, snapshotVersion: data.snapshotVersion, acceptedDemoOnly: true,
+          ...(data.watch ? { watchBinding: JSON.stringify(data.watch) } : {}),
           ...(reduced ? { acceptReducedFlexibility: true } : {}) }) });
       if (!response.ok) throw Error();
       const result = await response.json(); data.confirmation = result.confirmation;
@@ -186,17 +196,22 @@ export async function startBookingDemo(ui) {
   judge = createJudgeScreens(ui);
   const status = (text, error = false) => { $('page-status').textContent = text; $('page-status').classList.toggle('error', error); };
   async function load(next) {
-    if (next === code && data) return true;
     const response = await fetch('/api/booking-demo/q/' + next, { credentials: 'same-origin' });
     if (!response.ok) return false;
-    const payload = await response.json(); code = next; data = payload; selected = null; lastTrigger = null; applyData();
-    $('booked-back').href = '#start'; $('setup-back').href = '#booked-' + code;
-    return true;
+    const payload = await response.json(); return payload;
   }
   async function go(screen, target, { push = true, optionId, trigger } = {}) {
     const token = ++navigation;
     if (screen !== 'start') {
-      try { if (!(await load(target))) { status('That booking is not in this demo. Pick one below.', true); screen = 'start'; } }
+      try {
+        const payload = await load(target);
+        if (token !== navigation) return;
+        if (!payload) { status('That booking is not in this demo. Pick one below.', true); screen = 'start'; }
+        else {
+          code = target; data = payload; selected = null; lastTrigger = trigger || null; applyData();
+          $('booked-back').href = '#start'; $('setup-back').href = '#booked-' + code;
+        }
+      }
       catch { status('That booking could not be loaded. Please try again.', true); screen = 'start'; }
       if (token !== navigation) return;
     }
@@ -228,7 +243,8 @@ export async function startBookingDemo(ui) {
         if (result.error?.code === 'WATCH_CANNOT_START') { data.blocker = result.error.reason; busy = false; return go('booked', code, { push: false }); }
         throw Error();
       }
-      data.watch = result.watch; selected = null; applyData();
+      data.watch = result.watch; data.confirmation = null; selected = null; applyData();
+      if (replayResult(data).status === 'unavailable') { busy = false; overview(); return; }
       const token = ++navigation;
       history.pushState({ bookingScreen: 'options', code }, '', hashFor('options'));
       steps('checking'); window.scrollTo({ top: 0, behavior: 'instant' }); focusHeading('checking-title');

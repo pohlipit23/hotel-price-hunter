@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { deploymentQuotationSnapshot, deploymentCatalogue } from '../app/quotation-demo-server.mjs';
 
 const sourceFiles = ['package.json','package-lock.json','app/quotation-advisor.mjs','app/stay-chat.mjs','app/gemini.mjs','app/prompts/quotation-advice.txt','app/prompts/stay-chat.txt','app/prompts/stay-chat-opening.txt',
-'app/public/stay-advice.js','app/public/stay-advice.css','app/booking-cloud.mjs','app/booking-demo-server.mjs','app/quotation-demo-server.mjs',
+'app/public/stay-advice.js','app/public/stay-advice.css','app/booking-cloud.mjs','app/booking-demo-server.mjs','app/quotation-demo-server.mjs','app/quotation-session-actions.mjs',
 'app/domain/quotation-demo.mjs','app/domain/altovo-quotation.mjs','app/domain/live-comparison.mjs','app/domain/decision.mjs','app/domain/money.mjs','app/live-engine.mjs',
 'app/public/booking.html','app/public/booking.css','app/public/booking.js','app/public/booking-live.js','app/public/booking-live-data.js','app/public/drop-eligibility.js',
 'app/public/booking-judge.js','app/public/drop-watch.js','app/public/pricing.js','app/public/watch.js','app/public/stay-photos.js',

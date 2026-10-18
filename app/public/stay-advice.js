@@ -1,3 +1,4 @@
+import { watchBinding } from './booking-live-data.js';
 /** One conversation shared by the compact adviser and the floating Gemini dialog. */
 export function createStayAdviser({ parent, before, getData, chatUrl = () => '/api/booking-demo/chat' }) {
   const el = (tag, text, className) => {
@@ -87,7 +88,7 @@ export function createStayAdviser({ parent, before, getData, chatUrl = () => '/a
     const currentReply = turns.filter(turn => turn.role === 'assistant' && turn.key === context?.key).at(-1);
     latest.textContent = currentReply?.text || (controller ? 'Gemini is weighing your options…'
       : !available ? 'Gemini is unavailable right now. You can still review the drops.' : noticeKey === context?.key && notice ? notice : 'Weigh the pros and cons with Gemini.');
-    const entries = turns.map(turn => {
+    const entries = turns.filter(turn => turn.scope === context?.scope).map(turn => {
       const entry = el('div', null, 'stay-chat-turn ' + turn.role);
       entry.append(el('span', (turn.role === 'user' ? 'You' : 'Gemini') + ' · ' + turn.label, 'stay-chat-speaker'), el('p', turn.text));
       return entry;
@@ -103,7 +104,7 @@ export function createStayAdviser({ parent, before, getData, chatUrl = () => '/a
     if (intent === 'opening' && (openings.has(context.key) || turns.some(turn => turn.key === context.key && turn.role === 'assistant'))) return;
     const current = context, data = getData(), version = ++generation;
     const requestController = new AbortController(); controller = requestController;
-    if (intent === 'question') { turns.push({ role: 'user', text: message, key: current.key, label: current.label }); updateDraft(''); }
+    if (intent === 'question') { turns.push({ role: 'user', text: message, key: current.key, scope: current.scope, label: current.label }); updateDraft(''); }
     notice = ''; noticeKey = current.key;
     refresh();
     const timeout = setTimeout(() => requestController.abort(), 25000);
@@ -111,6 +112,7 @@ export function createStayAdviser({ parent, before, getData, chatUrl = () => '/a
       const response = await fetch(chatUrl(), { method: 'POST', credentials: 'same-origin', signal: requestController.signal,
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': data.csrfToken },
         body: JSON.stringify({ snapshotVersion: data.snapshotVersion, pageContext: current.pageContext, intent,
+          ...(data.watch ? { watchBinding: watchBinding(data.watch) } : {}),
           ...(current.optionId ? { optionId: current.optionId } : {}), ...(intent === 'question' ? { message } : {}) }) });
       if (version !== generation || current.key !== context.key) return;
       if (!response.ok) {
@@ -125,7 +127,7 @@ export function createStayAdviser({ parent, before, getData, chatUrl = () => '/a
       if (result.snapshotVersion !== data.snapshotVersion || result.pageContext !== current.pageContext
         || result.optionId !== current.optionId || typeof result.advice?.reply !== 'string') throw Error('Comparison changed');
       if (intent === 'opening') openings.add(current.key);
-      turns.push({ role: 'assistant', text: result.advice.reply, key: current.key, label: current.label });
+      turns.push({ role: 'assistant', text: result.advice.reply, key: current.key, scope: current.scope, label: current.label });
       notice = result.source === 'test-injected' ? 'Test response · no live Gemini call' : 'Advice from Gemini';
       while (turns.length > 40) turns.shift();
     } catch {
@@ -156,9 +158,12 @@ export function createStayAdviser({ parent, before, getData, chatUrl = () => '/a
   });
   return {
     setContext(next) {
-      const key = [getData()?.snapshotVersion, next.pageContext, next.optionId || 'overview'].join(':');
+      const data = getData();
+      const scope = [data?.code ?? 'single', data?.snapshotVersion, watchBinding(data?.watch)].join(':');
+      const key = [scope, next.pageContext, next.optionId || 'overview'].join(':');
+      if (context?.scope !== scope) updateDraft('');
       if (context?.key !== key || !next.enabled) { generation++; controller?.abort(); controller = undefined; }
-      context = { ...next, optionId: next.optionId ?? null, key };
+      context = { ...next, optionId: next.optionId ?? null, key, scope };
       if (!next.enabled && dialog.open) dialog.close();
       refresh();
     },

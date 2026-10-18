@@ -1,5 +1,43 @@
 /** Display adapter only. Estimates never become execution or refund authority. */
 import { isDisplayedDrop } from './drop-eligibility.js';
+const instant = value => typeof value === 'string' && /(?:Z|[+-]\d\d:\d\d)$/.test(value) && Number.isFinite(Date.parse(value));
+export function watchBinding(watch) {
+  if (typeof watch === 'string') { try { watch = JSON.parse(watch); } catch { return null; } }
+  const ordered = value => Array.isArray(value) ? value.map(ordered) : value && typeof value === 'object'
+    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, ordered(value[key])])) : value;
+  return watch && typeof watch === 'object' ? JSON.stringify(ordered(watch)) : null;
+}
+// Consume the committed receipt. Never derive qualifying membership from all captured Drops.
+export function replayResult(snapshot) {
+  const watch = snapshot.watch;
+  if (!watch) return { status: 'not-armed', options: [], capturedAt: [], replayedAt: null };
+  const first = watch.firstCheck;
+  const unavailable = { status: 'unavailable', options: [], capturedAt: [], replayedAt: null };
+  if (!first || first.replayed !== true || (first.status !== undefined && first.status !== 'completed')
+    || (first.mode !== undefined && first.mode !== 'captured-replay') || !instant(first.checkedAt)
+    || !instant(first.replayedAt ?? watch.armedAt) || !Number.isSafeInteger(watch.minimumSavingMinor) || watch.minimumSavingMinor < 0
+    || (watch.code !== undefined && watch.code !== snapshot.code)
+    || (watch.contentVersion !== undefined && watch.contentVersion !== (snapshot.contentVersion ?? snapshot.snapshotVersion))
+    || (snapshot.dropSetVersion !== undefined && watch.dropSetVersion !== snapshot.dropSetVersion)
+    || (watch.currency !== undefined && watch.currency !== snapshot.baseline.quotedRetail.currency)
+    || (first.thresholdMinor !== undefined && first.thresholdMinor !== watch.minimumSavingMinor)
+    || !Array.isArray(first.dropOptionIds) || new Set(first.dropOptionIds).size !== first.dropOptionIds.length) return unavailable;
+  const capturedAt = first.capturedAt ?? [first.checkedAt];
+  if (!Array.isArray(capturedAt) || !capturedAt.length || capturedAt.some(value => !instant(value))) return unavailable;
+  const options = first.dropOptionIds.map(id => snapshot.options.find(option => option.optionId === id));
+  if (options.some(option => !option || !isDisplayedDrop(snapshot.baseline, option)
+    || option.estimate.currency !== snapshot.baseline.quotedRetail.currency)) return unavailable;
+  return { status: options.length ? 'completed' : 'empty', options, capturedAt, replayedAt: first.replayedAt ?? watch.armedAt };
+}
+export function currentConfirmation(snapshot) {
+  const receipt = snapshot.confirmation;
+  if (!receipt || receipt.snapshotVersion !== snapshot.snapshotVersion || receipt.reservationCreated !== false
+    || receipt.quoteModified !== false || receipt.customerRefund !== null) return null;
+  if (snapshot.code && (!replayResult(snapshot).options.some(option => option.optionId === receipt.optionId)
+    || (snapshot.watch?.revision !== undefined && receipt.watchRevision !== snapshot.watch.revision)
+    || (receipt.watchBinding !== undefined && receipt.watchBinding !== watchBinding(snapshot.watch)))) return null;
+  return receipt;
+}
 export function comparisonLabels(baseline, option) {
   const label = value => String(value ?? '').trim().toLowerCase();
   const flag = value => value === true ? true : value === false ? false : null;

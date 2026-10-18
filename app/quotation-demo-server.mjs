@@ -6,6 +6,7 @@ import { QUOTATION_MODEL } from './quotation-advisor.mjs';
 import { isDisplayedDrop } from './public/drop-eligibility.js';
 import { agencyMinimumSavingMinor, qualifyingDrops, watchTag } from './public/drop-watch.js';
 import { watchBlocker } from './domain/altovo-quotation.mjs';
+import { requireCurrentWatch, selectDrop, reserveAdvice, mergeAdvice } from './quotation-session-actions.mjs';
 
 export function validateLocalQuotationMode(env = process.env) {
   if (env.NODE_ENV === 'production' || env.K_SERVICE || env.CLOUD_RUN_JOB || (env.BIND_HOST && env.BIND_HOST !== '127.0.0.1')) {
@@ -164,19 +165,20 @@ function createQuotationServer({ bundle: single, bundles = null, now = () => new
           return json(res, 200, { watch: scope.watch, dropOptionIds });
         }
         // An armed Drop Watch narrows the Drops this booking may discuss or confirm to the ones it found.
-        const watched = route ? scope.watch?.firstCheck.dropOptionIds ?? null : null;
+        const current = route ? requireCurrentWatch({ scope, bundle, body, at: now() }) : null;
+        const watched = current?.options.map(option => option.optionId) ?? null;
         const shown = option => isDisplayedDrop(bundle.baseline, option) && (!watched || watched.includes(option.optionId));
         const chat = url.pathname.endsWith('/chat');
         if (chat || url.pathname.endsWith('/advice')) {
           if (chat) {
-            if (!body || Array.isArray(body) || Object.keys(body).some(key => !['optionId', 'snapshotVersion', 'message', 'pageContext', 'intent'].includes(key))
+            if (!body || Array.isArray(body) || Object.keys(body).some(key => !['optionId', 'snapshotVersion', 'message', 'pageContext', 'intent', ...(route ? ['watchBinding'] : [])].includes(key))
               || !['drops-overview', 'drop-detail'].includes(body.pageContext) || !['opening', 'question'].includes(body.intent)
               || (body.intent === 'question' && (typeof body.message !== 'string' || !body.message.trim() || body.message.length > 1200))
               || (body.intent === 'opening' && Object.hasOwn(body, 'message'))
               || (body.pageContext === 'drops-overview' && Object.hasOwn(body, 'optionId'))
               || (body.pageContext === 'drop-detail' && typeof body.optionId !== 'string')) return error(400, 'INVALID_ADVICE');
           } else {
-          if (!body || Array.isArray(body) || Object.keys(body).some(key => !['optionId', 'snapshotVersion', 'message'].includes(key))
+          if (!body || Array.isArray(body) || Object.keys(body).some(key => !['optionId', 'snapshotVersion', 'message', ...(route ? ['watchBinding'] : [])].includes(key))
             || typeof body.message !== 'string' || !body.message.trim() || body.message.length > 1200) return error(400, 'INVALID_ADVICE');
           }
           if (body.snapshotVersion !== bundle.snapshotVersion) return error(409, 'SNAPSHOT_CHANGED');
@@ -185,30 +187,41 @@ function createQuotationServer({ bundle: single, bundles = null, now = () => new
           if (option && (chat || route) && !shown(option)) return error(404, 'OPTION_UNAVAILABLE');
           if (!advisor.available || (chat && typeof advisor.chat !== 'function')) return error(503, 'ADVICE_UNAVAILABLE');
           const time = now().getTime();
-          if (time - session.adviceWindow >= 60000) { session.adviceWindow = time; session.adviceCount = 0; }
+          if (!route && time - session.adviceWindow >= 60000) { session.adviceWindow = time; session.adviceCount = 0; }
           if (time - adviceWindow >= 60000) { adviceWindow = time; adviceCount = 0; }
-          if (session.adviceCount >= 4 || adviceCount >= 20 || advicePending >= 2) return error(429, 'ADVICE_RATE_LIMIT');
-          session.adviceCount++; adviceCount++; advicePending++;
+          if ((!route && session.adviceCount >= 4) || adviceCount >= 20 || advicePending >= 2) return error(429, 'ADVICE_RATE_LIMIT');
+          const ticket = route ? reserveAdvice({ session, scope, bundle, body, at: now() }) : null;
+          if (!route) session.adviceCount++;
+          adviceCount++; advicePending++;
           try {
             if (chat) {
               const optionId = option?.optionId ?? null;
               const advice = await advisor.chat({ baseline: bundle.baseline, options: option ? [option] : bundle.options.filter(shown),
                 pageContext: body.pageContext, optionId, snapshotVersion: bundle.snapshotVersion, checkedAt: bundle.checkedAt,
-                intent: body.intent, message: body.message, history: scope.chatHistory });
+                intent: body.intent, message: body.message, history: ticket?.chatHistory ?? scope.chatHistory });
               if (sessions.get(cookie) !== session || session.expiresAt <= now().getTime()) return error(401, 'DEMO_SESSION_REQUIRED');
-              scope.chatHistory = [...scope.chatHistory, { pageContext: body.pageContext, optionId, snapshotVersion: bundle.snapshotVersion,
+              if (route) mergeAdvice({ scope, bundle, body, at: now(), ticket, advice, chat: true });
+              else scope.chatHistory = [...scope.chatHistory, { pageContext: body.pageContext, optionId, snapshotVersion: bundle.snapshotVersion,
                 question: body.intent === 'opening' ? 'Opening guidance' : body.message, reply: advice.reply }].slice(-4);
               return json(res, 200, { advice, optionId, pageContext: body.pageContext, snapshotVersion: bundle.snapshotVersion,
                 source: advisor.status === 'test-injected' ? 'test-injected' : 'vertex-gemini', selectionChanged: false });
             }
-            const history = scope.adviceHistory[option.optionId] || [];
+            const history = ticket?.adviceHistory ?? scope.adviceHistory[option.optionId] ?? [];
             const advice = await advisor.advise({ baseline: bundle.baseline, option, checkedAt: bundle.checkedAt, message: body.message, history });
             if (sessions.get(cookie) !== session || session.expiresAt <= now().getTime()) return error(401, 'DEMO_SESSION_REQUIRED');
             const { recommendation, priority, reasonCodes } = advice;
-            scope.adviceHistory[option.optionId] = [...history, { question: body.message, selection: { recommendation, priority, reasonCodes } }].slice(-2);
+            if (route) mergeAdvice({ scope, bundle, body, at: now(), ticket, advice, chat: false });
+            else scope.adviceHistory[option.optionId] = [...history, { question: body.message, selection: { recommendation, priority, reasonCodes } }].slice(-2);
             return json(res, 200, { advice, optionId: option.optionId, snapshotVersion: bundle.snapshotVersion,
               source: advisor.status === 'test-injected' ? 'test-injected' : 'vertex-gemini', selectionChanged: false });
-          } catch { return error(503, 'ADVICE_UNAVAILABLE'); } finally { advicePending--; }
+          } catch (failure) {
+            if (failure.status) return error(failure.status, failure.code, failure.reason ? { reason: failure.reason } : {});
+            return error(503, 'ADVICE_UNAVAILABLE');
+          } finally { advicePending--; }
+        }
+        if (route) {
+          const confirmation = selectDrop({ scope, bundle, body, at: now(), selectionId: `demo-${randomBytes(12).toString('hex')}` });
+          return json(res, 200, { confirmation });
         }
         const allowed = ['optionId', 'snapshotVersion', 'acceptedDemoOnly', 'acceptReducedFlexibility'];
         if (!body || Array.isArray(body) || Object.keys(body).some(key => !allowed.includes(key)) || body.acceptedDemoOnly !== true) return error(400, 'INVALID_SELECTION');
@@ -228,7 +241,10 @@ function createQuotationServer({ bundle: single, bundles = null, now = () => new
         res.writeHead(200, { 'Content-Type': `${type}${type.startsWith('text/') ? '; charset=utf-8' : ''}` }); return res.end(content);
       }
       return error(404, 'ROUTE_UNAVAILABLE');
-    } catch { if (!res.headersSent) return error(503, 'DEMO_UNAVAILABLE'); res.end(); }
+    } catch (failure) {
+      if (!res.headersSent) return error(failure.status ?? 503, failure.status ? failure.code : 'DEMO_UNAVAILABLE', failure.reason ? { reason: failure.reason } : {});
+      res.end();
+    }
   });
   server.requestTimeout = 15000; server.headersTimeout = 10000;
   return server;

@@ -1,8 +1,42 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bookingView, comparisonLabels } from '../app/public/booking-live-data.js';
+import { bookingView, comparisonLabels, replayResult, currentConfirmation } from '../app/public/booking-live-data.js';
 import { createBookingDemoServer } from '../app/booking-demo-server.mjs';
 const bundle=()=>({schemaVersion:1,transactionMode:'selection-only',snapshotVersion:'a'.repeat(64),baseline:{sourceType:'quotation',quotationCode:'DEMO-1',hotel:{id:'h',name:'Hotel'},stay:{checkin:'2027-01-21',checkout:'2027-01-22'},occupancy:{adults:2,childAges:[],infantAges:[]},room:{name:'Original room',board:'Breakfast'},quotedRetail:{totalMinor:50000,currency:'AED'},fx:{from:'USD',to:'AED',rate:'3.67'}},options:[{optionId:'option-1',roomName:'Twin',board:'Breakfast',freeCancellation:true,estimate:{totalMinor:45000,currency:'AED',isEstimate:true},indicativeDifferenceMinor:5000},{optionId:'option-2',roomName:'Twin 2',board:'Breakfast',freeCancellation:false,estimate:{totalMinor:30000,currency:'AED',isEstimate:true},indicativeDifferenceMinor:20000}],privateReferences:{'option-1':{rateDetail:'SECRET'},'option-2':{rateDetail:'SECRET'}}});
+
+function replay(ids = ['option-1']) {
+ const data = bundle(); data.code = 'DEMO1';
+ data.watch = { armedAt: '2026-10-18T12:00:00Z', minimumSavingMinor: 1000,
+  firstCheck: { replayed: true, checkedAt: '2026-10-17T12:00:00Z', dropOptionIds: ids } };
+ return data;
+}
+test('replay authority distinguishes legacy receipts, durable receipts, empty and unavailable', () => {
+ const data = replay(); const result = replayResult(data);
+ assert.equal(result.status, 'completed'); assert.deepEqual(result.options.map(x => x.optionId), ['option-1']);
+ assert.deepEqual(result.capturedAt, ['2026-10-17T12:00:00Z']); assert.equal(result.replayedAt, data.watch.armedAt);
+ assert.equal(replayResult(replay([])).status, 'empty');
+ assert.equal(replayResult({ ...data, watch: null }).status, 'not-armed');
+ for (const mutate of [x => { x.watch.firstCheck = null; }, x => { x.watch.firstCheck.dropOptionIds = ['missing']; },
+  x => { x.watch.firstCheck.status = 'unavailable'; }, x => { x.watch.firstCheck.checkedAt = 'bad'; },
+  x => { x.watch.firstCheck.dropOptionIds = ['option-1', 'option-1']; }, x => { x.watch.contentVersion = 'old'; },
+  x => { x.watch.currency = 'USD'; }, x => { x.watch.firstCheck.thresholdMinor = 2000; }]) {
+  const bad = replay(); mutate(bad); assert.equal(replayResult(bad).status, 'unavailable');
+ }
+ const durable = replay(); Object.assign(durable.watch, { revision: 2, contentVersion: durable.snapshotVersion, dropSetVersion: 'drops-v2', currency: 'AED' });
+ Object.assign(durable.watch.firstCheck, { mode: 'captured-replay', status: 'completed', replayedAt: durable.watch.armedAt,
+  capturedAt: ['2026-10-17T12:00:00Z'], thresholdMinor: 1000 });
+ assert.equal(replayResult(durable).status, 'completed');
+});
+test('confirmation must still belong to the current receipt and qualifying set', () => {
+ const data = replay(); data.confirmation = { optionId: 'option-1', snapshotVersion: data.snapshotVersion,
+  reservationCreated: false, quoteModified: false, customerRefund: null };
+ assert.equal(currentConfirmation(data), data.confirmation);
+ data.watch.firstCheck.dropOptionIds = []; assert.equal(currentConfirmation(data), null);
+ data.watch.firstCheck.dropOptionIds = ['option-1']; data.watch.revision = 3;
+ data.confirmation.watchRevision = 2; assert.equal(currentConfirmation(data), null);
+ data.confirmation.watchRevision = 3; assert.equal(currentConfirmation(data), data.confirmation);
+ data.confirmation.reservationCreated = true; assert.equal(currentConfirmation(data), null);
+});
 
 test('comparison badges compare the displayed room, meals and cancellation flag against the starting option',()=>{
  const baseline={room:{name:'Superior Twin',board:'Breakfast'},freeCancellation:true};
