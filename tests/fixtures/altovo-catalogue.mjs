@@ -8,7 +8,7 @@ export const FIXTURE_CHECKED_AT = '2026-10-18T12:10:00.000Z';
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 export function grandHyattProjection() {
-  return { source: 'altovo-staging', tenantHost: 'air1.app.altovostaging.com',
+  return { source: 'altovo-staging', tenantHost: 'air1.app.altovostaging.com', readAt: '2026-10-18',
     booking: { code: 'AIRB000179', status: 'quote', currency: 'MYR', retailTotal: 323.05, travelStart: '2026-11-18T00:00:00', travelEnd: '2026-11-19T00:00:00' },
     hotel: { name: 'Grand Hyatt Kuala Lumpur', star: 5, countryCode: 'MY', cityCode: 'KUL', checkin: '2026-11-18T00:00:00', checkout: '2026-11-19T00:00:00',
       roomCount: 1, paxCount: 1, nightCount: 1, gatewayHotelId: '5232813' },
@@ -18,7 +18,7 @@ export function grandHyattProjection() {
       schedule: [{ utcFrom: '2026-10-18T00:00:00+00:00', utcTo: '2026-11-18T23:59:59+00:00', penaltySupplier: 79.37, penaltyRetail: 323.05 }] } };
 }
 export function siamKempinskiProjection() {
-  return { source: 'altovo-staging', tenantHost: 'air1.app.altovostaging.com',
+  return { source: 'altovo-staging', tenantHost: 'air1.app.altovostaging.com', readAt: '2026-10-18',
     booking: { code: 'AIRB000180', status: 'quote', currency: 'MYR', retailTotal: 2335.52, travelStart: '2027-02-17T00:00:00', travelEnd: '2027-02-18T00:00:00' },
     hotel: { name: 'Siam Kempinski Hotel Bangkok', star: 5, countryCode: 'TH', cityCode: 'BKK', checkin: '2027-02-17T00:00:00', checkout: '2027-02-18T00:00:00',
       roomCount: 1, paxCount: 1, nightCount: 1, gatewayHotelId: '3135840' },

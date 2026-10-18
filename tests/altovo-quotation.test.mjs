@@ -39,7 +39,8 @@ test('watch blockers follow the injected time: open, ended window, stay started,
   assert.equal(watchBlocker(baseline, at('2027-03-01T00:00:00Z')), 'FREE_CANCELLATION_ENDED');
   const late = { ...baseline, cancellation: { ...baseline.cancellation, freeUntil: '2027-02-17T12:00:00.000Z' } };
   assert.equal(watchBlocker(late, at('2027-02-17T06:00:00Z')), 'STAY_STARTED');
-  const charged = siamKempinskiProjection(); charged.cancellation.schedule[0].penaltyRetail = 100;
+  // Every tier charged and no free-cancellation flag: refundable at a fee, so no free window to watch.
+  const charged = siamKempinskiProjection(); charged.cancellation.schedule[0].penaltyRetail = 100; charged.cancellation.offerFreeCancellation = false;
   assert.equal(watchBlocker(altovoBaseline(charged), at('2026-10-20T00:00:00Z')), 'NO_FREE_CANCELLATION');
   assert.equal(watchBlocker({ ...baseline, cancellation: undefined }), 'CANCELLATION_FACTS_UNKNOWN');
 });
