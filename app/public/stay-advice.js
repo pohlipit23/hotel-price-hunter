@@ -29,11 +29,13 @@ export function createStayAdviser({ parent, before, overviewParent, getData, cha
   const dialog = el('dialog', null, 'gemini-dialog'); dialog.id = 'gemini-dialog';
   dialog.setAttribute('aria-labelledby', 'gemini-title');
   const header = el('header', null, 'gemini-header');
-  const identity = el('div');
+  const identity = el('div', null, 'gemini-identity');
+  const avatar = el('span', '✦', 'gemini-avatar'); avatar.setAttribute('aria-hidden', 'true');
+  const identityText = el('div', null, 'gemini-identity-text');
   const dialogTitle = el('h2', 'Gemini'); dialogTitle.id = 'gemini-title';
   const contextLabel = el('p', 'RoomDrop support', 'gemini-context');
   const close = el('button', '×', 'gemini-close'); close.type = 'button'; close.setAttribute('aria-label', 'Close Gemini chat');
-  identity.append(dialogTitle, contextLabel); header.append(identity, close);
+  identityText.append(dialogTitle, contextLabel); identity.append(avatar, identityText); header.append(identity, close);
   const log = el('div', null, 'gemini-log'); log.setAttribute('role', 'log'); log.setAttribute('aria-label', 'Conversation with Gemini');
   const privacy = el('p', 'Your question and comparison go to Google Gemini. Leave out personal details.', 'stay-chat-privacy');
   dialog.append(header, log);
@@ -49,8 +51,10 @@ export function createStayAdviser({ parent, before, overviewParent, getData, cha
     const question = el('textarea');
     question.id = 'stay-question-' + suffix; question.rows = compact ? 1 : 2; question.maxLength = 1200; question.required = true;
     question.placeholder = 'What matters most for your stay?';
-    question.setAttribute('aria-describedby', 'stay-privacy-' + suffix);
-    const send = el('button', 'Send', 'stay-chat-send'); send.type = 'submit';
+    const hint = el('span', 'Press Enter to send, Shift and Enter for a new line.', 'sr-only'); hint.id = 'stay-hint-' + suffix;
+    question.setAttribute('aria-describedby', 'stay-privacy-' + suffix + ' stay-hint-' + suffix);
+    const send = el('button', null, 'stay-chat-send'); send.type = 'submit';
+    send.append(sendIcon(), el('span', 'Send', 'sr-only'));
     const privacyNote = compact ? privacy.cloneNode(true) : privacy;
     privacyNote.id = 'stay-privacy-' + suffix;
     const prompts = el('div', null, 'stay-advice-prompts');
@@ -59,9 +63,15 @@ export function createStayAdviser({ parent, before, overviewParent, getData, cha
       button.addEventListener('click', () => { updateDraft(text); question.focus(); });
       prompts.append(button);
     }
-    const input = el('div', null, 'stay-chat-input'); input.append(label, question, send);
+    const input = el('div', null, 'stay-chat-input'); input.append(label, question, send, hint);
     form.append(prompts, input, privacyNote); container.append(form);
     question.addEventListener('input', () => updateDraft(question.value));
+    // Enter sends, Shift+Enter keeps a newline; IME composition and a busy or unavailable chat never submit.
+    question.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+      event.preventDefault();
+      if (!send.disabled && question.value.trim()) form.requestSubmit(send);
+    });
     form.addEventListener('submit', event => { event.preventDefault(); question.focus(); request('question'); });
     composers.push({ question, send, prompts });
   }
@@ -70,6 +80,14 @@ export function createStayAdviser({ parent, before, overviewParent, getData, cha
   const status = el('p', null, 'stay-chat-status'); status.id = 'stay-advice-status'; status.setAttribute('role', 'status');
   dialog.append(status);
 
+  function sendIcon() {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    const path = document.createElementNS(ns, 'path'); path.setAttribute('d', 'M12 19V5M5.5 11.5 12 5l6.5 6.5');
+    svg.append(path);
+    return svg;
+  }
   function updateDraft(value) {
     draft = value;
     for (const composer of composers) composer.question.value = value;
@@ -77,9 +95,11 @@ export function createStayAdviser({ parent, before, overviewParent, getData, cha
   function refresh() {
     const active = Boolean(context?.enabled);
     if (overviewParent) {
-      const target = context?.pageContext === 'drop-detail' ? heading : overviewParent;
+      // Floats over the Drops overview; docks in the detail heading so it never covers the review actions.
+      const docked = context?.pageContext === 'drop-detail';
+      const target = docked ? heading : document.body;
       if (launcher.parentElement !== target) target.append(launcher);
-      launcher.classList.add('gemini-docked'); openInline.hidden = true;
+      launcher.classList.toggle('gemini-docked', docked); openInline.hidden = true;
     }
     launcher.hidden = !active; section.hidden = !active || context.pageContext !== 'drop-detail';
     launcher.setAttribute('aria-expanded', String(dialog.open));
@@ -100,7 +120,18 @@ export function createStayAdviser({ parent, before, overviewParent, getData, cha
       return entry;
     });
     log.replaceChildren(...entries);
-    if (!entries.length && !controller) log.append(el('p', available ? 'Compare the options and what matters to you.' : 'Gemini is unavailable right now.', 'stay-chat-empty'));
+    if (controller) {
+      // Decorative typing bubble; the status line announces the wait to assistive technology.
+      const typing = el('div', null, 'stay-chat-turn assistant stay-chat-typing'); typing.setAttribute('aria-hidden', 'true');
+      const dots = el('p'); dots.append(el('span'), el('span'), el('span'));
+      typing.append(dots); log.append(typing);
+    }
+    if (!entries.length && !controller) {
+      const empty = el('div', null, 'stay-chat-empty');
+      const mark = el('span', '✦', 'stay-chat-empty-mark'); mark.setAttribute('aria-hidden', 'true');
+      empty.append(mark, el('p', available ? 'Compare the options and what matters to you.' : 'Gemini is unavailable right now.'));
+      log.append(empty);
+    }
     if (dialog.open) log.scrollTop = log.scrollHeight;
   }
   async function request(intent) {

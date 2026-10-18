@@ -1,45 +1,82 @@
-.stay-adviser { margin: 6px 0 12px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+/* RoomDrop x Gemini support chat. Reuses booking.css tokens: ink, coral stamps, dashed ticket tears, 20px ticket radii. */
+.stay-adviser { margin: 6px 0 12px; padding: 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: 0 8px 18px rgba(32, 44, 59, .07); }
 .stay-advice-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.stay-adviser h2 { margin: 0; font-size: 18px; font-weight: 600; }
-.stay-advice-answer { margin: 10px 0; color: var(--muted); font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.stay-adviser h2 { margin: 0; font: 600 19px/1.2 var(--heading); }
+.stay-advice-answer { margin: 12px 0; padding: 12px 15px; border-radius: 20px 20px 20px 6px; background: var(--page); color: var(--ink); font-size: 16px; line-height: 1.55; overflow-wrap: anywhere; }
 .stay-adviser button, .gemini-dialog button, .gemini-launcher { cursor: pointer; }
-.stay-chat-link { min-height: 44px; padding: 4px 0; border: 0; background: transparent; color: var(--blue); font: 500 13px/1.4 var(--body); text-decoration: underline; text-underline-offset: 3px; }
+.stay-chat-link { min-height: 44px; padding: 4px 0; border: 0; background: transparent; color: var(--blue); font: 500 14px/1.4 var(--body); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Composer: a rounded pill with a coral stamp-style send button. */
 .stay-chat-form { margin: 0; }
-.stay-chat-input { display: flex; align-items: flex-end; gap: 8px; }
-.stay-chat-input textarea { min-width: 0; width: 100%; min-height: 46px; max-height: 140px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font: 400 16px/1.4 var(--body); resize: vertical; }
-.stay-chat-send { flex: 0 0 auto; min-height: 46px; padding: 10px 14px; border: 1px solid var(--ink); border-radius: 10px; background: var(--ink); color: white; font: 500 14px/1.4 var(--body); }
-.stay-chat-send:disabled { opacity: .55; cursor: default; }
-.stay-chat-privacy { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
-.stay-advice-prompts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-.stay-chat-prompt { min-height: 44px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--muted); font: 400 12px/1.4 var(--body); }
-.gemini-launcher { position: fixed; z-index: 6; right: 24px; bottom: 24px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: max-content; max-width: calc(100vw - 32px); min-height: 48px; padding: 12px 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); box-shadow: 0 4px 16px rgba(32, 44, 59, .12); font: 500 14px/1.4 var(--body); white-space: nowrap; }
+.stay-chat-input { position: relative; display: flex; align-items: flex-end; gap: 6px; padding: 4px; border: 1px solid var(--line); border-radius: 24px; background: var(--surface); box-shadow: 0 2px 8px rgba(32, 44, 59, .06); }
+.stay-chat-input:focus-within { border-color: var(--blue); }
+.stay-chat-input textarea { flex: 1 1 auto; min-width: 0; width: 100%; min-height: 44px; max-height: 140px; padding: 10px 6px 10px 14px; border: 0; border-radius: 20px; background: transparent; color: var(--ink); font: 400 16px/1.5 var(--body); resize: none; field-sizing: content; }
+.stay-chat-input textarea::placeholder { color: var(--muted); opacity: 1; }
+.stay-chat-send { display: grid; flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px; place-items: center; padding: 0; border: 0; border-radius: 50%; background: var(--coral); color: var(--surface); box-shadow: 0 3px 8px rgba(194, 64, 47, .28); }
+.stay-chat-send svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.stay-chat-send:hover:not(:disabled) { background: #a83324; }
+.stay-chat-send:disabled { background: #9aa9ba; box-shadow: none; opacity: 1; cursor: not-allowed; }
+.stay-chat-privacy { margin: 8px 4px 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.stay-advice-prompts { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 10px; }
+.stay-chat-prompt { min-height: 44px; padding: 8px 15px; border: 1px dashed #9aa9ba; border-radius: 999px; background: var(--surface); color: var(--ink); font: 500 14px/1.3 var(--body); }
+.stay-chat-prompt:hover { border-style: solid; border-color: var(--coral); background: #fdf1ef; color: #a83324; }
+
+/* Launcher: placement is set by booking-live; only its look lives here. */
+.gemini-launcher { position: fixed; z-index: 6; right: 24px; bottom: 24px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: max-content; max-width: calc(100vw - 32px); min-height: 48px; padding: 12px 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); box-shadow: 0 6px 18px rgba(32, 44, 59, .14); font: 600 15px/1.4 var(--body); white-space: nowrap; }
 .gemini-overview-heading { flex-wrap: wrap; align-items: center; }
 .gemini-overview-heading > div { flex: 1 1 240px; }
 .gemini-launcher.gemini-docked { position: static; z-index: auto; max-width: 100%; box-shadow: none; }
-.gemini-star { display: block; flex: 0 0 24px; width: 24px; color: var(--blue); font-size: 24px; line-height: 1; }
+.gemini-star { display: block; flex: 0 0 24px; width: 24px; color: var(--coral); font-size: 22px; line-height: 1; }
 .gemini-label { display: block; flex: 0 0 auto; white-space: nowrap; line-height: 1.4; }
-.gemini-launcher:hover, .stay-chat-prompt:hover { background: #f5f8fc; }
-.gemini-dialog { position: fixed; inset: auto 24px 24px auto; width: 420px; height: min(680px, calc(100dvh - 48px)); max-width: calc(100vw - 48px); max-height: calc(100dvh - 48px); margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--ink); box-shadow: 0 12px 48px rgba(32, 44, 59, .18); }
+.gemini-launcher:hover { border-color: var(--coral); background: #fdf1ef; }
+
+/* Dialog: ticket header, tear line, chat bubbles on the page tint. */
+.gemini-dialog { position: fixed; inset: auto 24px 24px auto; width: 420px; height: min(680px, calc(100dvh - 48px)); max-width: calc(100vw - 48px); max-height: calc(100dvh - 48px); margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: var(--page); color: var(--ink); box-shadow: 0 18px 50px rgba(32, 44, 59, .22); }
 .gemini-dialog[open] { display: flex; flex-direction: column; }
 html:has(.gemini-dialog[open]), body:has(.gemini-dialog[open]) { overflow: hidden; }
-.gemini-dialog::backdrop { background: rgba(32, 44, 59, .16); }
-.gemini-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
-.gemini-header h2 { margin: 0; font: 600 20px/1.3 var(--heading); }
-.gemini-context { margin: 3px 0 0; max-width: 310px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-.gemini-close { flex: 0 0 44px; width: 44px; min-height: 44px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 28px; }
+.gemini-dialog::backdrop { background: rgba(32, 44, 59, .2); }
+.gemini-header { position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 12px 14px 16px; border-bottom: 2px dashed var(--line); background: var(--surface); }
+.gemini-header::before, .gemini-header::after { position: absolute; bottom: -11px; width: 20px; height: 20px; border-radius: 50%; background: var(--page); content: ''; }
+.gemini-header::before { left: -10px; }
+.gemini-header::after { right: -10px; }
+.gemini-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.gemini-identity-text { min-width: 0; }
+.gemini-avatar { display: grid; flex: 0 0 46px; width: 46px; height: 46px; place-items: center; border: 2px solid var(--coral); border-radius: 50%; box-shadow: inset 0 0 0 2px var(--surface), inset 0 0 0 4px var(--coral); background: var(--surface); color: var(--coral); font-size: 20px; line-height: 1; transform: rotate(-8deg); }
+.gemini-header h2 { margin: 0; font: 800 22px/1.1 var(--heading); letter-spacing: -.03em; }
+.gemini-context { display: inline-block; max-width: 100%; margin: 5px 0 0; padding: 2px 10px; border-radius: 999px; background: var(--blue-bg); color: #23466e; font-size: 12px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
+.gemini-close { flex: 0 0 44px; width: 44px; min-height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--ink); font-size: 28px; line-height: 1; }
 .gemini-close:hover { background: var(--page); }
-.gemini-log { flex: 1 1 auto; min-height: 0; padding: 16px 18px; overflow-y: auto; overscroll-behavior: contain; }
-.stay-chat-turn { padding: 12px 0; }
-.stay-chat-turn + .stay-chat-turn { border-top: 1px solid var(--line); }
-.stay-chat-turn.user { margin-left: 24px; }
-.stay-chat-turn p { margin: 5px 0 0; font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
-.stay-chat-speaker { color: var(--muted); font-size: 11px; line-height: 1.5; }
-.stay-chat-turn.user .stay-chat-speaker { color: var(--blue); }
-.stay-chat-empty { color: var(--muted); font-size: 14px; }
-.gemini-dialog .stay-chat-form { flex: 0 0 auto; padding: 0 18px 8px; border-top: 1px solid var(--line); background: var(--surface); }
-.stay-chat-status { flex: 0 0 auto; margin: 0; padding: 0 18px max(12px, env(safe-area-inset-bottom)); color: var(--muted); font-size: 11px; }
+.gemini-log { flex: 1 1 auto; display: flex; flex-direction: column; gap: 14px; min-height: 0; padding: 22px 16px 16px; overflow-y: auto; overscroll-behavior: contain; }
+.stay-chat-turn { display: flex; flex-direction: column; align-items: flex-start; max-width: 88%; }
+.stay-chat-turn.assistant { align-self: flex-start; }
+.stay-chat-turn.user { align-self: flex-end; align-items: flex-end; }
+.stay-chat-turn p { margin: 4px 0 0; padding: 11px 15px; border-radius: 20px 20px 20px 6px; background: var(--surface); box-shadow: 0 2px 8px rgba(32, 44, 59, .07); color: var(--ink); font-size: 16px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.stay-chat-turn.user p { border-radius: 20px 20px 6px 20px; background: var(--ink); box-shadow: none; color: var(--surface); }
+.stay-chat-speaker { padding: 0 8px; color: var(--muted); font-size: 12px; font-weight: 500; line-height: 1.5; }
+.stay-chat-typing p { display: flex; align-items: center; gap: 5px; min-height: 46px; }
+.stay-chat-typing p span { width: 8px; height: 8px; border-radius: 50%; background: var(--coral); opacity: .35; animation: stay-chat-bounce 1.1s ease-in-out infinite; }
+.stay-chat-typing p span:nth-child(2) { animation-delay: .15s; }
+.stay-chat-typing p span:nth-child(3) { animation-delay: .3s; }
+@keyframes stay-chat-bounce { 0%, 80%, 100% { opacity: .35; translate: 0 0; } 40% { opacity: 1; translate: 0 -4px; } }
+.stay-chat-empty { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: auto 0; padding: 20px 12px; color: var(--muted); text-align: center; }
+.stay-chat-empty p { max-width: 260px; margin: 0; font-size: 16px; line-height: 1.5; }
+.stay-chat-empty-mark { display: grid; width: 64px; height: 64px; place-items: center; border: 2px dashed var(--coral); border-radius: 50%; color: var(--coral); font-size: 26px; line-height: 1; transform: rotate(-8deg); }
+.gemini-dialog .stay-chat-form { flex: 0 0 auto; padding: 2px 14px 6px; border-top: 1px solid var(--line); background: var(--surface); }
+.gemini-dialog .stay-advice-prompts { margin: 10px 0; }
+.stay-chat-status { flex: 0 0 auto; margin: 0; padding: 0 18px max(12px, env(safe-area-inset-bottom)); color: var(--muted); font-size: 12px; }
+.gemini-dialog > .stay-chat-status { background: var(--surface); }
 .stay-chat-status:empty { padding-bottom: 8px; }
+.stay-adviser .stay-chat-status { padding: 6px 4px 0; }
+.stay-adviser .stay-chat-status:empty { padding: 0; }
 .stay-adviser :focus-visible, .gemini-dialog :focus-visible, .gemini-launcher:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+@supports selector(:has(*)) {
+  /* The whole composer pill carries the focus ring while typing. */
+  .stay-chat-input:has(textarea:focus-visible) { outline: 3px solid var(--blue); outline-offset: 2px; }
+  .stay-chat-input textarea:focus-visible { outline: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stay-chat-typing p span { animation: none; opacity: .6; }
+}
 body[data-live-booking] .postcard { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
 body[data-live-booking] .has-review { padding-bottom: 0; }
 body[data-live-booking] .review-actions { position: static; inset: auto; z-index: auto; border: 0; padding: 16px 0 0; background: transparent; box-shadow: none; }
@@ -48,6 +85,8 @@ body[data-live-booking] .review-actions { position: static; inset: auto; z-index
   .gemini-launcher { right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); }
   .gemini-dialog { inset: 0; width: 100%; max-width: 100%; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; }
   .gemini-header { padding-top: max(12px, env(safe-area-inset-top)); }
-  .gemini-dialog .stay-chat-form { padding-bottom: 8px; }
+  .gemini-header::before, .gemini-header::after { display: none; }
+  .gemini-dialog .stay-chat-form { padding-bottom: 6px; }
+  .stay-chat-turn { max-width: 92%; }
   .stay-adviser { padding: 14px; }
 }

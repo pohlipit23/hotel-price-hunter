@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createQuotationAdvisor } from '../app/quotation-advisor.mjs';
+import { MAX_REPLY_WORDS, MAX_SEGMENTS, joinStatements } from '../app/stay-chat.mjs';
 
 const input = () => ({ baseline: { sourceType: 'quotation', quotationCode: 'PRIVATE-QUOTE', hotel: { id: 'PRIVATE-HOTEL', name: 'Demo Hotel' },
   stay: { checkin: '2026-11-10', checkout: '2026-11-12' }, occupancy: { adults: 2, childAges: [8], infantAges: [] },
@@ -9,7 +10,7 @@ const input = () => ({ baseline: { sourceType: 'quotation', quotationCode: 'PRIV
     estimate: { totalMinor: 40000 + id * 1000, currency: 'USD', isEstimate: true }, privateReferences: `PRIVATE-TOKEN-${id}` })),
   checkedAt: '2026-10-18T00:00:00Z', snapshotVersion: 'a'.repeat(64), pageContext: 'drops-overview', optionId: null,
   intent: 'question', message: 'Which trade-offs should I consider?', history: [] });
-const approvedPhrase = 'The best choice depends on whether price or flexibility matters more to you.';
+const approvedPhrase = 'It mostly comes down to whether price or flexibility matters more to you.';
 const protocol = (patch = {}) => ({ replyKind: 'answer', segments: [{ id: 'support-1' }],
   referencedDropIds: [], recommendation: 'no-recommendation', reasonCodes: [], followUpQuestion: '', ...patch });
 const provider = value => async () => ({ text: JSON.stringify(value) });
@@ -19,7 +20,7 @@ test('support chat uses the fixed Gemini model and sends only allowlisted overvi
   const advisor = await createQuotationAdvisor({ environment: {}, generateContent: async value => { request = value; return provider(protocol())(); } });
   const result = await advisor.chat(input());
   assert.equal(result.replyKind, 'answer'); assert.equal(result.model, 'gemini-3.8-flash'); assert.equal(result.reply, approvedPhrase);
-  assert.ok(result.reply.trim().split(/\s+/).length <= 100);
+  assert.ok(result.reply.trim().split(/\s+/).length <= MAX_REPLY_WORDS);
   const context = JSON.parse(request.contents);
   assert.equal(context.pageContext, 'drops-overview'); assert.equal(context.options.length, 3);
   assert.deepEqual(context.options.map(value => value.optionId), ['option-1', 'option-2', 'option-3']);
@@ -61,12 +62,17 @@ test('chat rejects unknown fact, drop and reason references and unsupported prov
 
 test('chat renders monetary comparisons only from supplied facts', async () => {
   const advisor = await createQuotationAdvisor({ generateContent: provider(protocol({ segments: [
-    { id: 'support-1' }, { id: 'starting-price' }, { id: 'option-2:estimate' }, { id: 'option-2:difference' },
+    { id: 'starting-price' }, { id: 'option-2:estimate' }, { id: 'option-2:difference' },
   ], referencedDropIds: ['option-2'] })) });
   const result = await advisor.chat(input());
-  assert.match(result.reply, /USD 600\.00/); assert.match(result.reply, /USD 420\.00/); assert.match(result.reply, /USD 180\.00 below/);
-  assert.match(result.reply, /before final pricing and fees/); assert.match(result.reply, /not a verified saving or refund/);
-  assert.ok(result.reply.split(/\s+/).length <= 100);
+  // Flowing sentences: the fees caveat is said once and the difference refers back to the estimate.
+  assert.equal(result.reply, 'Your starting option is USD 600.00 for the whole stay. Room 2 is estimated at USD 420.00, before final pricing and fees. '
+    + "That's USD 180.00 below your starting option, so treat it as an estimate, not a verified saving or refund.");
+  assert.equal(result.reply.match(/before final pricing and fees/g).length, 1);
+  assert.ok(result.reply.split(/\s+/).length <= MAX_REPLY_WORDS);
+  const alone = await createQuotationAdvisor({ generateContent: provider(protocol({ segments: [{ id: 'option-2:difference' }], referencedDropIds: ['option-2'] })) });
+  assert.equal((await alone.chat(input())).reply,
+    'Room 2 is USD 180.00 below your starting option before final pricing and fees, so treat it as an estimate, not a verified saving or refund.');
   const detail = input(); detail.pageContext = 'drop-detail'; detail.optionId = 'option-2'; detail.options = [detail.options[1]];
   const crossScope = await createQuotationAdvisor({ generateContent: provider(protocol({ segments: [{ id: 'option-1:estimate' }] })) });
   await assert.rejects(crossScope.chat(detail), { code: 'ADVICE_UNAVAILABLE' });
@@ -121,7 +127,7 @@ test('supplied decision phrases and follow-up questions render unchanged', async
     let chosen; let question;
     const advisor = await createQuotationAdvisor({ generateContent: async request => {
       const context = JSON.parse(request.contents);
-      const [chosenId, chosenText] = Object.entries(context.availableStatements).find(([, text]) => text.startsWith('For firm dates,'));
+      const [chosenId, chosenText] = Object.entries(context.availableStatements).find(([, text]) => text.startsWith('If your dates are firm,'));
       chosen = chosenText;
       question = context.availableQuestions[index];
       assert.ok(chosen); assert.equal(typeof question, 'string');
@@ -132,7 +138,7 @@ test('supplied decision phrases and follow-up questions render unchanged', async
     const result = await advisor.chat(input());
     assert.equal(result.reply, [chosen, question].filter(Boolean).join(' '));
     assert.equal(result.followUpQuestion, question);
-    if (index === 2) assert.equal(question, 'Are lower costs or cancellation flexibility more important to you?');
+    if (index === 2) assert.equal(question, 'Is a lower price or cancellation flexibility more important to you?');
   }
 });
 test('chat rejects unsupported confirmations and financial or cancellation promises without numeric amounts', async () => {
@@ -162,8 +168,32 @@ test('chat renders cancellation advice from a grounded reason fact', async () =>
     segments: [{ id: 'option-2:reduced-flexibility' }], referencedDropIds: ['option-2'], reasonCodes: ['option-2:reduced-flexibility'],
   })) });
   const result = await advisor.chat(input());
-  assert.match(result.reply, /marked non-refundable/); assert.match(result.reply, /retaining flexibility is safer/);
+  assert.equal(result.reply, 'Room 2 is marked non-refundable, so a flexible option is safer if your plans might change.');
   assert.deepEqual(result.reasonCodes, ['option-2:reduced-flexibility']);
+});
+test('chat replies stay short: at most three statements, no repeats and a word cap', async () => {
+  let request;
+  const four = await createQuotationAdvisor({ generateContent: async value => { request = value; return provider(protocol({ segments: [
+    { id: 'support-1' }, { id: 'starting-price' }, { id: 'option-2:estimate' }, { id: 'option-2:difference' }] }))(); } });
+  await assert.rejects(four.chat(input()), { code: 'ADVICE_UNAVAILABLE' });
+  assert.equal(MAX_SEGMENTS, 3); assert.equal(MAX_REPLY_WORDS, 70);
+  assert.equal(request.config.responseJsonSchema.properties.segments.maxItems, MAX_SEGMENTS);
+  assert.match(request.config.responseJsonSchema.properties.segments.description, /at most 70 words/);
+  assert.match(request.config.systemInstruction, /at most 70 words/);
+  const repeated = await createQuotationAdvisor({ generateContent: provider(protocol({ segments: [{ id: 'support-1' }, { id: 'support-1' }] })) });
+  assert.equal((await repeated.chat(input())).reply, approvedPhrase);
+  const long = input(); long.options = long.options.map(option => ({ ...option, roomName: 'Grand '.repeat(13).trim() }));
+  const wordy = await createQuotationAdvisor({ generateContent: provider(protocol({ segments: [
+    { id: 'option-1:cancellation-flag' }, { id: 'option-2:reduced-flexibility' }, { id: 'option-3:different-room-label' }],
+    followUpQuestion: 'Which room features matter most to you?' })) });
+  await assert.rejects(wordy.chat(long), { code: 'ADVICE_UNAVAILABLE' });
+});
+test('statement joining keeps every fact and only shortens repeated caveats', () => {
+  const statements = { a: 'A is USD 1.00, before final pricing and fees.', b: 'B is USD 2.00, before final pricing and fees.', c: 'Plain.' };
+  const variants = { b: { brief: 'B is USD 2.00.' }, c: { chained: { after: 'a', text: 'Chained.' } } };
+  assert.equal(joinStatements(['a', 'b', 'c'], statements, variants), 'A is USD 1.00, before final pricing and fees. B is USD 2.00. Plain.');
+  assert.equal(joinStatements(['b', 'a'], statements, variants), 'B is USD 2.00, before final pricing and fees. A is USD 1.00, before final pricing and fees.');
+  assert.equal(joinStatements(['a', 'c', 'a'], statements, variants), 'A is USD 1.00, before final pricing and fees. Chained.');
 });
 test('chat validates money and selected context before calling the provider', async () => {
   let calls = 0; const advisor = await createQuotationAdvisor({ generateContent: async () => { calls++; return provider(protocol())(); } });
