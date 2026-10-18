@@ -3,15 +3,16 @@
 ## Part 2 - 18 October 2026
 
 Worktree: `.local\roomdrop-part2`, branch `codex/roomdrop-part2-app`.
-Base: `3c07af3`. Binding storage interface: v1 supplied by Claude through the user.
+Base: `3c07af3`. Binding storage interface: v2 supplied by Claude through the user.
 All runtime tests and evidence below are local. No live capture, model call,
 production import, source push, deployment, IAM/TTL change or Scheduler execution.
 
 | Boundary | Result | Evidence |
 | --- | --- | --- |
-| Node regressions, including Part 2 emulator cases | Pass: 331 tests, 325 passed, 0 failed, 6 skipped | `.local\part2-node-tests-final.log` |
+| Node regressions, including actual v2 session and Part 2 emulator cases | Pass: 335 tests, 329 passed, 0 failed, 6 skipped | `.local\part2-node-tests-v2.log` |
 | Part 2 transactions on real Firestore | Pass: independent clients, hashed test cookie ids, concurrent confirmations, allowance contention, context restart | `quotation-session-actions.test.mjs` with `RUN_ROOMDROP_PART2_FIRESTORE=1` |
 | Durable confirm/chat HTTP on real Firestore | Pass: separate servers/clients, restart recovery, stored follow-up context, unchanged watch/shared records | `quotation-durable-actions.test.mjs`, contract-v1 adapters over test-owned emulator documents |
+| Actual Part 1 v2 session adapter compatibility | Pass: memory and real Firestore, invariant/catalogue rejection, preserved watch, receipt/context persistence, `ttlAt` Timestamp | `part1-session-v2.test.mjs`; pinned `5535935` source read via `git show` and evaluated only in memory |
 | Full existing judge UI | Pass: 320/768/1440 px | `.local\judge-flow\browser\result.json`, 27 screenshots; memory arm |
 | Part 2 UI | Pass: 320/768/1024/1440 px, keyboard, refresh, isolation, rearm, empty/unavailable, no external requests | `.local\part2-browser\result.json`, 24 screenshots; memory arm and injected model |
 | Historical single-snapshot booking UI | Pass: 320/768/1440 px | `.local\restore-booking-ui\browser\result.json`; synthetic two-Drop snapshot, no live rates |
@@ -49,6 +50,9 @@ copied into this worktree and no research branch was merged. The durable routes
 use contract-v1 `get`/`transact`, `getBooking`/`getDrops` and the hosted loader.
 The current GET/watch branches remain the base snapshot's memory implementation.
 They must be reconciled with Part 1 after the user's integration go-ahead.
+The v2 follow-up reads the committed storage code without copying it into this
+checkout: actual session adapters are compatible, but that does not integrate
+the missing runtime files or prove the Part 1 arm/GET journey.
 
 Part 1's per-code bootstrap must spread
 `publicPostWatchState({ scope, bundle })` from `quotation-session-actions.mjs`.
@@ -60,6 +64,9 @@ two judges, two codes, context, rearm and immutable shared facts.
 All original Part 2 acceptance checkboxes remain open pending that proof. The
 six-curated-quotation content matrix and production importer/TTL approval are
 separate Part 1/release prerequisites; synthetic rate fixtures cannot close them.
+Claude reports all six codes AIRB000179-184 captured, with 180-183 armable and
+three Drops each, and 179/184 non-refundable. That is an owner report; Part 2
+has not read the real capture payloads or imported them.
 
 ### Reproduction
 

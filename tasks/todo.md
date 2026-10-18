@@ -380,6 +380,20 @@ No original acceptance checkbox above is closed by these component proofs.
 Evidence and commands: `docs\public-demo-firestore-verification.md` (Part 2) and
 `docs\public-demo-firestore-release.md`.
 
+Contract v2 follow-up (Part 2 only):
+
+- [x] Map `getDrops` booking-unavailable to 404; keep invalid session/storage
+  diagnostics bounded and verify no confirmation is committed on refusal.
+- [x] Delegate hosted client creation to `createRoomdropFirestore`; pass the
+  reviewed `catalogueCodes` to the session factory.
+- [x] `part1-session-v2.test.mjs` reads pinned Part 1 source through `git show`
+  and verifies actual memory/Firestore compatibility, catalogue rejection,
+  unchanged guards/watch, receipt/context persistence and the `ttlAt` Timestamp.
+  No Part 1 source is copied or edited and no branch is merged/rebased.
+- [ ] Whole-journey acceptance and combined release remain open. Claude reports
+  AIRB000179-184 captured (180-183 armable with three Drops each, 179/184
+  non-refundable); Part 2 has not inspected or imported those real captures.
+
 - [ ] Plan approval (given 18 October 2026) precedes coding; local checks and raw
   acceptance evidence are complete. The full catalogue content matrix (S0) remains
   unchecked until supplied and captured; storage mechanics alone do not complete it.

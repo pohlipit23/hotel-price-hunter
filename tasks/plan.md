@@ -124,6 +124,10 @@ Approved two-part delivery (18 October 2026). Mixed F tasks are split into `a`
   bounded durable handler; F7b has a separate `booking-after-watch.browser.mjs`
   for memory-receipt evidence. F11b's `booking-firestore.browser.mjs` refuses to
   substitute those doubles for the actual Part 1 dependencies.
+  Contract v2 follow-up: use Part 1's guarded Firestore client factory, constrain
+  session storage to manifest codes and handle `getDrops` booking-unavailable
+  errors. `part1-session-v2.test.mjs` evaluates the committed session module
+  read-only from `git show` to prove actual adapter compatibility without merging.
 - Both parts branch from `roomdrop/judge-flow-base`, a snapshot of pre-existing
   shared-checkout work authored by neither part. Part 2 may start against the
   current memory-backed `/watch` receipt and switches to the Firestore-backed

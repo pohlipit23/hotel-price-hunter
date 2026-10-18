@@ -293,6 +293,23 @@ there is no snapshot-file fallback or startup import. Source doubles are availab
 only through explicit release-test injection, marked `test-injected`, assigned a
 `roomdrop-booking-test` image name and no registry destination.
 
+#### Part 2 contract v2 follow-up
+
+Contract v2 is additive. Part 2's hosted store factory now delegates Firestore
+creation to `createRoomdropFirestore(environment)` and passes the reviewed
+manifest's code list as `catalogueCodes` to the session factory. The durable
+handler returns 404 for `BOOKING_UNAVAILABLE` from `getDrops`; invalid session
+state and storage failures remain bounded 503 responses without internal details.
+The importer input is `{ schemaVersion, entries, cards }` and remains admin-only.
+Bundles bind `snapshotVersion` to `contentVersion` and need no private references.
+
+Compatibility tests read the actual session module from pinned Part 1 commit
+`553593537b0e8741bfe877c2cf7ad911deff2dec` via `git show` and evaluate those bytes
+in memory. They verify Part 2 actions against both its memory and real Firestore
+adapters, including catalogue bounds, invariant rejection, unchanged watches,
+receipt/context persistence and `ttlAt`. This is storage compatibility proof,
+not a branch merge or acceptance of the unfinished GET/watch integration.
+
 ### The seam: the atomic arm operation and its receipt
 
 "Starts the watcher" means: valid consent and minimum saved, armed state

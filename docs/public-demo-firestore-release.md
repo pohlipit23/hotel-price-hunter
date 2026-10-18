@@ -1,6 +1,6 @@
 # Curated RoomDrop Part 2 release preparation
 
-Status: implementation against storage contract v1 is committed locally;
+Status: implementation against storage contract v2 is committed locally;
 integrated acceptance and a production release candidate are blocked on Part 1
 integration. No deployment/import/publication approval is requested yet. The
 reviewed catalogue content and exact production image are not ready to approve.
@@ -20,8 +20,11 @@ test storage. GET/watch integration still requires Part 1's implementation.
 2. Wire Part 1's durable GET/watch and bootstrap projection
    `publicPostWatchState({ scope, bundle })`. Keep its atomic arm receipt unchanged.
 3. Run all Node and browser/emulator gates in the Part 2 verification document.
-4. Complete the owner-created six-scenario matrix with separately authorised
-   captures. Synthetic fixtures prove mechanics only.
+4. Verify the six-scenario matrix, metadata, capture provenance and guarded import.
+   Claude now reports AIRB000179-184 captured: 180-183 armable with three Drops
+   each, 179/184 non-refundable. Part 2 has not inspected or imported those real
+   captures. Synthetic fixtures prove mechanics only; any extra capture still
+   needs separate authorisation.
 5. From actual reviewed Firestore/import dry-run output, save only this shape in
    ignored `.local\reviewed-catalogue-manifest.json`:
 
@@ -85,9 +88,12 @@ rollback. Historical deployment notes are not a current cloud preflight.
 The Part 1 importer currently rejects production activation. There is no executable
 production import command approved or claimed here. Its owner must supply and
 verify the guarded production import path before that approval packet is complete.
-Likewise, inspect the actual session TTL timestamp field/type after integration.
-Propose TTL for the public session collection alone; keep application expiry
-checks independent. No TTL activation or broad IAM grant is authorised.
+The committed v2 session module stores `ttlAt` as a Firestore Timestamp, verified
+against the actual adapter on the Part 2 emulator. It keeps numeric `expiresAt`
+for application expiry and omits `ttlAt` from returned sessions. Propose TTL on
+`roomdropPublicSessionsV1.ttlAt` alone, after integration and a refreshed database
+preflight; keep application expiry checks independent. No TTL activation or broad
+IAM grant is authorised.
 
 Only after the exact candidate image, preservation checks and all approvals exist
 may the release owner fill and execute these image/rollback commands:
