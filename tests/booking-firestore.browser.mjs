@@ -72,6 +72,9 @@ try {
       : (report.external.push(new URL(route.request().url()).origin), route.abort()));
     const page = await judge.newPage(); page.on('pageerror', failure => report.errors.push(failure.message));
     const visible = id => page.locator('#' + id).waitFor({ state: 'visible' });
+    // The Drops list (the armed strip is always hidden now). #deal-list is in the static markup, so after a reload
+    // also wait for the loaded booking label before reading its content.
+    const drops = async () => { await visible('deal-list'); await page.locator('#booking-label').filter({ hasText: /^Original Booking/ }).waitFor(); };
     const shot = async stage => {
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${stage} overflow at ${width}`);
       const path = join(output, `${stage}-${width}.png`); await page.screenshot({ path, fullPage: true }); report.screenshots.push(path);
@@ -82,7 +85,8 @@ try {
       await page.locator('#delivery-email').fill('judge-private@example.test');
       await page.locator('#arm-watch').click(); await visible('handoff');
       assert.match(await page.locator('#handoff-email').innerText(), /j\*\*\*@example.test/);
-      await page.locator('#open-roomdrop').click(); await visible('armed-strip');
+      await page.locator('#open-roomdrop').click(); await drops();
+      assert.equal(await page.locator('#armed-strip').isVisible(), false);
       assert.equal(await page.locator('#customer-steps').isVisible(), false);
     };
     if (existing && width === 320) {
@@ -102,12 +106,13 @@ try {
     await arm(code, minimum); await shot('drops');
     assert.match(await page.locator('#armed-detail').innerText(), /Replayed .*Captured .*not live/);
     assert.equal(await page.locator('#gemini-launcher').evaluate(button => {
-      const box = button.getBoundingClientRect();
-      return getComputedStyle(button).position === 'static' && [...document.querySelectorAll('#offers .offer-ticket')].every(card => {
-        const bounds = card.getBoundingClientRect();
-        return box.bottom <= bounds.top || box.top >= bounds.bottom || box.right <= bounds.left || box.left >= bounds.right;
-      });
-    }), true, 'Gemini must not overlap Drop content');
+      // Floating on the overview; scrolled to the end, the last Drop card must sit clear of it.
+      scrollTo(0, document.documentElement.scrollHeight);
+      const box = button.getBoundingClientRect(), last = [...document.querySelectorAll('#offers .offer-ticket')].at(-1).getBoundingClientRect();
+      const clear = box.bottom <= last.top || box.top >= last.bottom || box.right <= last.left || box.left >= last.right;
+      scrollTo(0, 0);
+      return getComputedStyle(button).position === 'fixed' && clear;
+    }), true, 'Gemini must float and leave the last Drop reachable');
     const withPhotos = loaded.entries.find(entry => entry.code === code).bundle.options.every(option => option.photo);
     if (withPhotos) {
       await page.waitForFunction(() => [...document.querySelectorAll('#offers img')].every(image => image.complete && image.naturalWidth > 0));
@@ -118,7 +123,9 @@ try {
     if (await page.locator('#flexibility-warning').isVisible()) await page.locator('#accept-reduced-flexibility').check();
     await page.locator('#gemini-launcher').click(); await visible('gemini-dialog');
     await page.locator('#gemini-dialog').getByText('Injected durable Gemini comparison.', { exact: true }).waitFor();
-    await page.keyboard.press('Escape'); await page.locator('#approve-offer').click(); await visible('simulated-switch'); await shot('confirmed');
+    await page.keyboard.press('Escape'); await page.locator('#approve-offer').click(); await visible('simulated-switch'); await visible('switch-next');
+    assert.deepEqual([await page.locator('#done-button').isVisible(), await page.locator('#switch-reassurance').isVisible()], [false, false]);
+    await shot('confirmed');
     const mine = await (await judge.request.get(origin + '/api/booking-demo/q/' + code)).json();
     assert.ok(mine.confirmation?.selectionId, 'Committed confirmation missing from bootstrap');
     assert.equal(mine.confirmation.reservationCreated, false); assert.equal(mine.confirmation.quoteModified, false); assert.equal(mine.confirmation.customerRefund, null);
@@ -158,7 +165,7 @@ try {
       data: { snapshotVersion: beforeRearm.snapshotVersion, consent: true, minimumSavingMinor: emptyMinimum, expectedRevision: beforeRearm.watch.revision } });
     assert.equal(armed.status(), 200);
     assert.deepEqual((await armed.json()).dropOptionIds, []);
-    await page.goto(origin + '/#drops-' + code); await page.reload(); await visible('armed-strip');
+    await page.goto(origin + '/#drops-' + code); await page.reload(); await drops();
     assert.equal(await page.locator('#offers .offer-ticket').count(), 0);
     const rearmed = await (await judge.request.get(origin + '/api/booking-demo/q/' + code)).json();
     assert.equal(rearmed.confirmation, null); await shot('empty');

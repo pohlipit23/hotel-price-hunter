@@ -37,6 +37,9 @@ try {
     page.on('pageerror', e => report.errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error' && !/status of 503/.test(m.text())) report.errors.push(m.text()); });
     const visible = id => page.locator('#' + id).waitFor({ state: 'visible' });
+    // The Drops list (the armed strip is always hidden now). #deal-list is in the static markup, so after a reload
+    // also wait for the loaded booking label before reading its content.
+    const drops = async () => { await visible('deal-list'); await page.locator('#booking-label').filter({ hasText: /^Original Booking/ }).waitFor(); };
     const active = () => page.evaluate(() => document.activeElement?.id || document.activeElement?.getAttribute('name') || document.activeElement?.className);
     const focused = async id => assert.equal(await page.evaluate(() => document.activeElement?.id), id, width + ' focus ' + id);
     // Presses Tab until the element matching `selector` has focus: the judge's own keyboard path.
@@ -56,9 +59,14 @@ try {
     };
     // The journey strip: which of the three steps is current, from the visible screen.
     const step = async expected => assert.equal(await page.locator('#journey-strip [aria-current="step"]').getAttribute('data-step'), String(expected), width + ' journey step');
+    // Which site header the screen shows: none on the start grid, the plain agency mark on booking pages, the RoomDrop
+    // logo in the RoomDrop app. The old demo tag is hidden; the judge bar carries the 'Judge demo' badge.
+    const site = async expected => assert.deepEqual(
+      [await page.locator('.site-header').isVisible(), await page.locator('#agency-brand').isVisible(), await page.locator('.brand').isVisible(), await page.locator('.demo-tag').isVisible()],
+      { none: [false, false, false, false], agency: [true, true, false, false], roomdrop: [true, false, true, false] }[expected], width + ' site header ' + expected);
     // The hand-off after the committed arm: leave the booking site, then open the RoomDrop app by keyboard.
     const handoff = async (email = null) => {
-      await visible('handoff'); await focused('open-roomdrop'); await step(2);
+      await visible('handoff'); await focused('open-roomdrop'); await step(2); await site('agency');
       assert.equal(await page.locator('#checking-title').innerText(), 'Drop Watch armed');
       assert.match(await page.locator('#checking-status').innerText(), /You're leaving the booking site\./);
       assert.equal(await page.locator('#handoff-text').innerText(), 'In real life your drop arrives by email. For this demo we open the RoomDrop app now.');
@@ -73,7 +81,7 @@ try {
       assert.match(await page.locator('#checking-replay').innerText(), /Replayed check · captured 18 Oct 2026, 12:10 UTC · not live/);
       // Re-arms happen after the saved address exists, which they keep.
       await handoff('j***@example.test');
-      await visible('armed-strip'); await focused('armed-title');
+      await drops(); await focused('changes-title');
       assert.equal(await page.locator('#offer-empty').isVisible(), expectEmpty);
     };
 
@@ -94,7 +102,10 @@ try {
     assert.equal(await hyattCard.locator('.scenario-label').count(), 0);
     assert.equal(await hyattCard.locator('.photo-fallback').getAttribute('aria-label'), 'No photo yet · Kuala Lumpur');
     assert.equal(await hyattCard.locator('.photo-tag').count(), 0);
-    assert.equal(await page.locator('#journey-strip li').count(), 3); await step(1);
+    assert.equal(await page.locator('#journey-strip li').count(), 3); await step(1); await site('none');
+    // The journey strip lives in the judge-only bar, outside the product frame.
+    assert.deepEqual([await page.locator('#judge-bar').isVisible(), await page.locator('#judge-bar #journey-strip').count(),
+      await page.locator('#app-frame #journey-strip').count(), await page.locator('#judge-bar .judge-bar-badge').textContent()], [true, 1, 0, 'Judge demo']);
     assert.match(await page.locator('#journey-strip').innerText(), /Pick a booking[\s\S]*Made on Altovo's booking engine, not part of this submission\. RoomDrop starts at the confirmation\.[\s\S]*Set up a drop[\s\S]*RoomDrop[\s\S]*Invite on the confirmation page \(or in the confirmation email\)\.[\s\S]*Get your drop[\s\S]*RoomDrop app[\s\S]*Cheaper room found\? It arrives by email\./);
     await shot('start');
 
@@ -104,7 +115,8 @@ try {
     assert.equal(new URL(page.url()).hash, '#booked-' + SIAM);
     const booked = await page.locator('#booked-screen').innerText();
     assert.match(booked, /Your agency booked this/i);
-    assert.match(booked, /Altovo staging quotation standing in for a confirmed booking - captured 18 Oct 2026/); await step(2);
+    assert.match(booked, /Altovo staging quotation standing in for a confirmed booking - captured 18 Oct 2026/); await step(2); await site('agency');
+    assert.equal(await page.locator('#agency-brand').innerText(), 'Travel Agency');
     assert.match(booked, /Free cancellation until 14 Feb 2027, 16:58 UTC/); assert.match(booked, /MYR 2,335\.52/); assert.match(booked, /1 guest/);
     assert.equal(await page.locator('#booked-screen button.primary:visible').count(), 1, 'one primary action');
     assert.equal(await page.locator('#setup-drop').innerText(), 'Set up a drop');
@@ -133,14 +145,14 @@ try {
     assert.equal(await page.locator('#delivery-email').getAttribute('aria-invalid'), 'true');
     await page.locator('#delivery-email').focus(); await page.keyboard.type('.test');
     assert.equal(await page.locator('#delivery-problem').isVisible(), false);
-    await step(2);
+    await step(2); await site('agency');
     await shot('setup');
     let failed = 0;
     await page.route(`**/api/booking-demo/q/${SIAM}/watch`, route => (failed += 1, route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":{"code":"DEMO_UNAVAILABLE"}}' })));
     await tabTo('#arm-watch'); await page.keyboard.press('Enter');
     await page.getByText('RoomDrop is unavailable right now. Please try again.').waitFor();
     assert.equal(failed, 1);
-    assert.deepEqual([await page.locator('#setup-screen').isVisible(), await page.locator('#armed-strip').isVisible(), await page.locator('#checking-screen').isVisible()], [true, false, false]);
+    assert.deepEqual([await page.locator('#setup-screen').isVisible(), await page.locator('#deal-list').isVisible(), await page.locator('#checking-screen').isVisible()], [true, false, false]);
     assert.equal(new URL(page.url()).hash, '#setup-' + SIAM); assert.equal(await page.locator('#arm-watch').isDisabled(), false);
     await shot('arm-failed');
     await page.unroute(`**/api/booking-demo/q/${SIAM}/watch`);
@@ -152,7 +164,9 @@ try {
     await shot('checking', false);
     await visible('handoff'); await shot('handoff');
     await handoff('j***@example.test');
-    await visible('armed-strip'); await focused('armed-title'); await step(3);
+    await drops(); await focused('changes-title'); await step(3); await site('roomdrop');
+    assert.equal(await page.locator('#changes-title').innerText(), 'Find your next drop');
+    assert.deepEqual([await page.locator('#armed-strip').isVisible(), await page.locator('footer').isVisible()], [false, false], 'no armed strip or footer on Drops');
     assert.deepEqual([receipt.watch.revision, receipt.watch.minimumSavingMinor, receipt.dropOptionIds.length], [1, 5000, 2]);
     assert.equal(new URL(page.url()).hash, '#drops-' + SIAM);
     const detail = await page.locator('#armed-detail').innerText();
@@ -163,7 +177,7 @@ try {
     await shot('armed');
 
     // Reload after arming shows the same committed receipt.
-    await page.reload(); await visible('armed-strip');
+    await page.reload(); await drops();
     assert.equal(await page.locator('#armed-detail').innerText(), detail);
     assert.deepEqual(await page.evaluate(async code => (await (await fetch('/api/booking-demo/q/' + code)).json()).watch, SIAM), receipt.watch);
 
@@ -177,18 +191,18 @@ try {
     }, { code: SIAM, revision: receipt.watch.revision });
     assert.doesNotMatch(emailed, /judge@/); assert.equal(JSON.parse(emailed).watch.delivery.maskedEmail, 'j***@example.test');
     assert.equal(JSON.parse(emailed).watch.revision, receipt.watch.revision, 'same email and minimum is an identical retry');
-    await page.reload(); await visible('armed-strip');
+    await page.reload(); await drops();
     // Re-arm with new minima (existing Drops screens consume the receipt); the saved address shows masked and is kept.
-    await page.goBack(); await page.goForward(); await visible('armed-strip');
-    await page.locator('#change-minimum').click(); await visible('setup-screen');
+    await page.goBack(); await page.goForward(); await drops();
+    await page.evaluate(code => { location.hash = '#setup-' + code; }, SIAM); await visible('setup-screen');
     assert.equal(await page.locator('#delivery-saved-email').innerText(), 'j***@example.test');
     assert.equal(await page.locator('input[name="minimum-saving"][value="5000"]').isChecked(), true);
     assert.equal(await page.locator('#arm-watch').innerText(), 'Update my Drop Watch');
     await page.locator('input[name="minimum-saving"][value="25000"]').check(); await page.locator('#arm-watch').click();
     await visible('checking-screen'); await shot('handoff-email', false); await handoff('j***@example.test');
-    await visible('armed-strip'); assert.equal(await page.locator('#offer-empty').isVisible(), true);
+    await drops(); assert.equal(await page.locator('#offer-empty').isVisible(), true);
     assert.doesNotMatch(await page.locator('body').innerText(), /judge@/);
-    assert.match(await page.locator('#offer-empty').innerText(), /No drops above your minimum yet/);
+    assert.equal(await page.locator('#offer-empty').innerText(), 'No drops above your minimum yet. Your original booking stays active.');
     await shot('empty');
     await page.locator('#lower-minimum').click(); await visible('setup-screen'); await arm(1000);
     assert.equal(await page.locator('#offers .offer-ticket').count(), 3);
@@ -197,13 +211,37 @@ try {
     const first = page.locator('#offers .offer-action').first(); await first.focus(); await page.keyboard.press('Enter');
     await visible('comparison'); assert.match(new URL(page.url()).hash, /^#review-AIRB000180$/);
     if (await page.locator('#flexibility-warning').isVisible()) await page.locator('#accept-reduced-flexibility').check();
-    await shot('review');
+    await site('roomdrop'); await shot('review');
     await page.locator('#approve-offer').click(); await visible('simulated-switch'); await focused('switch-stage');
     assert.equal(new URL(page.url()).hash, '#confirmed-AIRB000180');
-    assert.match(await page.locator('#switch-reassurance').innerText(), /No reservation, cancellation, payment or refund was made/);
+    // The RoomDrop app ends at the confirmation: only the next-step choice shows. Hidden parts keep their text.
+    assert.equal(await page.locator('#switch-reassurance').innerText(), 'Your original booking stays active.');
+    for (const id of ['switch-state', 'switch-trail', 'switch-reassurance', 'switch-money', 'switch-message', 'done-button'])
+      assert.equal(await page.locator('#' + id).isVisible(), false, width + ' confirmed hides ' + id);
+    assert.equal(await page.locator('footer').isVisible(), false, 'no page footer on Confirmed'); await site('roomdrop');
+    assert.equal(await page.locator('#switch-next-title').innerText(), 'What next?');
+    const pressed = async () => [await page.locator('#keep-watching').getAttribute('aria-pressed'), await page.locator('#keep-for-good').getAttribute('aria-pressed')];
+    assert.deepEqual(await pressed(), ['false', 'false']); assert.equal(await page.locator('#switch-next-message').innerText(), '');
+    // Neither choice is stored: picking one sends nothing to the server.
+    const sent = []; const onRequest = request => sent.push(request.method() + ' ' + request.url()); page.on('request', onRequest);
+    await page.locator('#keep-watching').click();
+    assert.deepEqual(await pressed(), ['true', 'false']);
+    assert.equal(await page.locator('#switch-next-message').innerText(), 'Got it. Fresh drops will show up here.');
+    await page.locator('#keep-for-good').focus(); await page.keyboard.press('Enter');
+    assert.deepEqual(await pressed(), ['false', 'true']);
+    assert.equal(await page.locator('#switch-next-message').innerText(), 'Got it. This booking is yours to keep.');
+    page.off('request', onRequest); assert.deepEqual(sent, [], 'next-step choice sent a request');
     await shot('confirmed');
-    await page.reload(); await visible('simulated-switch');
-    await page.goBack(); await visible('comparison'); await page.goBack(); await visible('armed-strip');
+    await page.reload(); await visible('simulated-switch'); assert.deepEqual(await pressed(), ['false', 'false'], 'choice is not kept');
+    // Once confirmed, the review and Drops routes land on the confirmation. A pressed choice is reset each time
+    // the confirmation renders, which proves the route ran (the screen was already showing).
+    const landsConfirmed = async (route, hidden) => {
+      await page.locator('#keep-watching').click(); await page.goBack();
+      await page.locator('#keep-watching[aria-pressed="false"]').waitFor();
+      assert.equal(new URL(page.url()).hash, '#' + route + '-' + SIAM);
+      assert.deepEqual([await page.locator('#simulated-switch').isVisible(), await page.locator('#' + hidden).isVisible()], [true, false], route + ' lands on Confirmed');
+    };
+    await landsConfirmed('review', 'comparison'); await landsConfirmed('drops', 'deal-list');
 
     // Cannot start: the reason, with the setup action shown but disabled; direct setup links fall back.
     await page.locator('.brand').click(); await visible('catalogue-screen'); await focused('catalogue-title');

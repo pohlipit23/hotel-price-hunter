@@ -15,14 +15,20 @@
 <body>
   <a class="skip" href="#main">Skip to your booking</a>
   <div class="postcard">
+    <!-- Judge-only navigation; everything in .app-frame is what the product would show. -->
+    <nav id="judge-bar" class="judge-bar" aria-label="Judge demo" hidden>
+      <p class="judge-bar-label"><span class="judge-bar-badge">Judge demo</span> How this demo works</p>
+      <ol id="journey-strip" class="journey-strip" aria-label="How this demo works" hidden></ol>
+    </nav>
+    <div id="app-frame" class="app-frame">
     <header class="site-header">
       <a class="brand" href="/" aria-label="RoomDrop home"><img src="/assets/roomdrop-logo.png" alt="RoomDrop"></a>
+      <span id="agency-brand" class="agency-brand" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9.5"/><path d="M7.5 13.5 17 9l-2 6-3-1.5-1.5 2-.5-3Z"/></svg>Travel Agency</span>
       <span class="demo-tag">Fictional demo</span>
     </header>
     <main id="main">
       <p id="page-status" role="status" class="page-status">Loading your demo booking…</p>
       <div id="content" hidden>
-        <ol id="journey-strip" class="journey-strip" aria-label="How this demo works" hidden></ol>
         <ol id="customer-steps" class="customer-steps" aria-label="Booking journey">
           <li aria-current="step"><span>1</span> Deals</li>
           <li><span>2</span> Review</li>
@@ -172,6 +178,14 @@
               </article>
             </div>
             <div id="switch-stamp" class="switch-stamp" hidden></div>
+            <div id="switch-next" class="switch-next" aria-labelledby="switch-next-title" role="group" hidden>
+              <h2 id="switch-next-title">What next?</h2>
+              <div class="switch-next-actions">
+                <button id="keep-watching" class="primary" type="button" aria-pressed="false">Keep watching for drops</button>
+                <button id="keep-for-good" class="secondary" type="button" aria-pressed="false">Keep this booking for good</button>
+              </div>
+              <p id="switch-next-message" class="switch-next-message" role="status"></p>
+            </div>
             <ol id="switch-trail" class="switch-trail" aria-label="Switch progress"></ol>
             <p id="switch-reassurance" class="reassurance"></p>
             <dl id="switch-money" class="switch-money"></dl>
@@ -201,7 +215,7 @@
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Fresh options</p>
-                <h2 id="changes-title"></h2>
+                <h2 id="changes-title" tabindex="-1"></h2>
                 <p class="savings-explanation">Potential refund after fees · for the whole stay</p>
               </div>
             </div>
@@ -322,6 +336,7 @@
         <footer><p>Fictional demo · no real bookings or payments</p></footer>
       </div>
     </main>
+    </div>
   </div>
 </body>
 </html>

@@ -23,7 +23,16 @@ export async function startBookingDemo(ui) {
     $('booking-summary').hidden = !existing || screen === 'review'; $('comparison').hidden = screen !== 'review';
     $('simulated-switch').hidden = screen !== 'confirmed'; $('current-ticket').hidden = screen === 'confirmed';
     $('deal-list').hidden = screen === 'confirmed'; $('price-watch').hidden = catalogueMode || screen === 'confirmed';
-    $('armed-strip').hidden = !catalogueMode || screen !== 'options';
+    // From the Drops page on, the RoomDrop app has no demo strip or footer; only the judge header stays.
+    $('armed-strip').hidden = true;
+    document.querySelector('footer').hidden = catalogueMode && existing;
+    // Inside the app frame: the agency's site for the booking pages, RoomDrop from the Drops page on.
+    if (catalogueMode) {
+      const site = screen === 'start' ? null : existing ? 'roomdrop' : 'agency';
+      $('app-frame').dataset.site = site ?? 'none';
+      document.querySelector('.site-header').hidden = !site;
+      document.querySelector('.brand').hidden = site !== 'roomdrop'; $('agency-brand').hidden = site !== 'agency';
+    }
     $('customer-steps').hidden = catalogueMode || screen === 'start';
     $('content').classList.toggle('has-review', screen === 'review'); $('content').classList.toggle('has-switch', screen === 'confirmed');
     const current = stepIndex[screen] ?? -1;
@@ -99,8 +108,8 @@ export async function startBookingDemo(ui) {
       ['Exchange rate', data.baseline.fx ? `1 ${data.baseline.fx.from} = ${data.baseline.fx.rate} ${data.baseline.fx.to}` : 'Not supplied'],
       ['Pricing', explanation], ['Cancellation', termText(offer)]];
     $('differences').replaceChildren(...details.flatMap(([label, value]) => [node('dt', label), node('dd', value)]));
-    $('selected-checked').textContent = 'Rates captured ' + (catalogueMode ? replayResult(data).capturedAt : [data.checkedAt]).map(instantLabel).join(', ')
-      + '. Availability can change. No live search was run.';
+    $('selected-checked').textContent = 'Price checked ' + (catalogueMode ? replayResult(data).capturedAt : [data.checkedAt]).map(instantLabel).join(', ')
+      + '. Availability can change.';
     $('review-message').textContent = ''; $('review-message').classList.remove('error'); $('approve-help').hidden = true;
     $('review-consent-link').hidden = true; $('content').classList.remove('needs-review-consent');
     setActionContent($('approve-offer'), 'Choose this drop');
@@ -112,8 +121,8 @@ export async function startBookingDemo(ui) {
     selected = view.offers.find(offer => offer.offerId === receipt.optionId);
     if (!selected) return false;
     $('switch-progress-label').textContent = 'Room choice confirmed'; $('switch-stage').textContent = 'Your new room choice is confirmed';
-    $('switch-state').textContent = 'Demo complete';
-    $('switch-explanation').textContent = 'Your selected room is shown below. The demo stops here before rebooking.';
+    $('switch-state').hidden = catalogueMode; $('switch-state').textContent = 'Demo complete';
+    $('switch-explanation').textContent = catalogueMode ? 'Your selected room is shown below.' : 'Your selected room is shown below. The demo stops here before rebooking.';
     const card = entries.find(entry => entry.code === code)?.card;
     for (const [prefix, record] of [['switch-from', view.booking], ['switch-to', selected]]) {
       $(prefix + '-hotel').textContent = record.hotel.name; $(prefix + '-room').textContent = record.room.name;
@@ -124,18 +133,22 @@ export async function startBookingDemo(ui) {
     addStamp($('switch-stamp'), selected.displaySaving.minor, view.currency.code, 'Estimated drop', 'switch-stamp');
     $('switch-trail').replaceChildren(node('li', 'You reviewed the room and confirmed your choice.'),
       node('li', 'Selection receipt ' + receipt.selectionId + ' - ' + instantLabel(receipt.confirmedAt)));
-    $('switch-reassurance').textContent = 'Your original booking is unchanged. No reservation, cancellation, payment or refund was made.';
+    $('switch-reassurance').textContent = catalogueMode ? 'Your original booking stays active.'
+      : 'Your original booking is unchanged. No reservation, cancellation, payment or refund was made.';
     $('switch-money').replaceChildren(node('dt', 'Estimated savings'), node('dd', savingLabel(selected.displaySaving.minor)));
     $('switch-message').textContent = explanation; $('switch-history-details').hidden = true;
     $('advance-demo').closest('details').hidden = true;
-    $('done-button').hidden = false; $('done-button').textContent = 'Review other drops';
+    $('done-button').hidden = catalogueMode; $('done-button').textContent = 'Review other drops';
+    // The RoomDrop app ends here: only the next-step choice shows, and neither choice is built yet.
+    for (const id of ['switch-trail', 'switch-reassurance', 'switch-money', 'switch-message']) $(id).hidden = catalogueMode;
+    $('switch-next').hidden = !catalogueMode; nextChoice(null);
     navigate('confirmed', push); focusHeading('switch-stage');
     return true;
   }
   function overview(push = true) {
     if (busy) return;
     navigate('options', push);
-    const target = lastTrigger?.isConnected && !lastTrigger.closest('[hidden]') ? lastTrigger : catalogueMode ? $('armed-title') : $('hotel');
+    const target = lastTrigger?.isConnected && !lastTrigger.closest('[hidden]') ? lastTrigger : catalogueMode ? $('changes-title') : $('hotel');
     target.focus({ preventScroll: true }); target.scrollIntoView({ block: 'center', behavior: 'instant' });
   }
   // Renders the booking ticket and the Drops. In catalogue mode only the Drops the armed watch found are shown.
@@ -154,8 +167,8 @@ export async function startBookingDemo(ui) {
     }
     $('offer-empty').hidden = view.highlights.length > 0;
     $('lower-minimum').hidden = !catalogueMode || replay.status !== 'empty';
-    $('offer-empty').textContent = replay?.status === 'unavailable' ? 'The replayed check is unavailable. Reload to try again. Your Original Booking is unchanged.'
-      : catalogueMode ? 'No drops above your minimum yet. This is a captured check; no live search was run. Your Original Booking is unchanged.' : 'No lower rates in the latest check. Your current booking stays unchanged.';
+    $('offer-empty').textContent = replay?.status === 'unavailable' ? 'Drops are unavailable right now. Reload to try again.'
+      : catalogueMode ? 'No drops above your minimum yet. Your original booking stays active.' :'No lower rates in the latest check. Your current booking stays unchanged.';
     if (catalogueMode && data.watch) {
       $('armed-title').textContent = replay.status === 'unavailable' ? 'Replayed check unavailable' : 'Drop Watch armed';
       $('armed-detail').textContent = replay.status === 'unavailable' ? 'Captured data could not be verified. No live search was run.'
@@ -191,6 +204,8 @@ export async function startBookingDemo(ui) {
     $('changes-title').textContent = 'Find your next drop';
     document.querySelector('.savings-explanation').textContent = 'Estimated savings for the whole stay · before final pricing and fees';
     document.querySelector('.demo-tag').textContent = catalogueMode ? 'Judge demo' : 'Booking demo';
+    // The judge bar carries the demo label in catalogue mode, outside the app frame.
+    document.querySelector('.demo-tag').hidden = catalogueMode; $('judge-bar').hidden = !catalogueMode;
     document.querySelector('footer p').textContent = 'Demo ends at room confirmation · no rebooking or payment';
     if (catalogueMode) {
       $('customer-steps').classList.add('five-steps');
@@ -254,6 +269,8 @@ export async function startBookingDemo(ui) {
     if (['options', 'review', 'confirmed'].includes(screen) && !data.watch) screen = data.blocker ? 'booked' : 'setup';
     if (screen === 'booked') { judge.renderBooked(data); navigate('booked', push); focusHeading('booked-title'); return; }
     if (screen === 'setup') { judge.renderSetup(data); navigate('setup', push); focusHeading('setup-title'); return; }
+    // Once a drop is chosen the app is finished: Drops and review routes land on the confirmation.
+    if (catalogueMode && data.confirmation && ['options', 'review'].includes(screen)) screen = 'confirmed';
     if (screen === 'confirmed' && data.confirmation && confirmed(data.confirmation, push)) return;
     const offer = view.offers.find(item => item.offerId === optionId);
     if (screen === 'review' && offer) return review(offer, trigger, push);
@@ -285,7 +302,7 @@ export async function startBookingDemo(ui) {
       history.pushState({ bookingScreen: 'options', code }, '', hashFor('options'));
       steps('checking'); window.scrollTo({ top: 0, behavior: 'instant' }); focusHeading('checking-title');
       busy = false;
-      if (await judge.playCheck(data, () => token === navigation)) { steps('options'); window.scrollTo({ top: 0, behavior: 'instant' }); focusHeading('armed-title'); }
+      if (await judge.playCheck(data, () => token === navigation)) { steps('options'); window.scrollTo({ top: 0, behavior: 'instant' }); focusHeading('changes-title'); }
     } catch (error) {
       $('setup-message').textContent = error.userMessage || 'Your Drop Watch could not be armed. Please try again.'; $('setup-message').classList.add('error');
     } finally { busy = false; $('arm-watch').disabled = false; $('arm-watch').removeAttribute('aria-busy'); if (pendingRoute) followLocation(); }
@@ -297,6 +314,15 @@ export async function startBookingDemo(ui) {
   $('arm-watch').addEventListener('click', arm);
   $('judge-consent').addEventListener('change', () => { $('setup-message').textContent = ''; $('setup-message').classList.remove('error'); });
   $('change-minimum').addEventListener('click', () => go('setup', code)); $('lower-minimum').addEventListener('click', () => go('setup', code));
+  // Neither choice is stored yet; the buttons only acknowledge the judge's pick on this page.
+  function nextChoice(choice) {
+    $('keep-watching').setAttribute('aria-pressed', String(choice === 'watch'));
+    $('keep-for-good').setAttribute('aria-pressed', String(choice === 'keep'));
+    $('switch-next-message').textContent = choice === 'watch' ? 'Got it. Fresh drops will show up here.'
+      : choice === 'keep' ? 'Got it. This booking is yours to keep.' : '';
+  }
+  $('keep-watching').addEventListener('click', () => nextChoice('watch'));
+  $('keep-for-good').addEventListener('click', () => nextChoice('keep'));
   document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); go('start'); });
   function followLocation() {
     if (busy) { pendingRoute = true; return; }

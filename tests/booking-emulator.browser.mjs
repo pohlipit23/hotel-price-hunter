@@ -58,6 +58,9 @@ async function judgePage(width) {
   return { context, page };
 }
 const visible = (page, id) => page.locator('#' + id).waitFor({ state: 'visible' });
+// The Drops list (the armed strip is always hidden now). #deal-list is in the static markup, so after a reload
+// also wait for the loaded booking label before reading its content.
+const drops = async page => { await visible(page, 'deal-list'); await page.locator('#booking-label').filter({ hasText: /^Original Booking/ }).waitFor(); };
 const loaded = (page, selector) => page.waitForFunction(s => [...document.querySelectorAll(s)].every(image => image.complete && image.naturalWidth > 0), selector);
 async function shot(page, stage, width) {
   assert.doesNotMatch(await page.locator('body').innerText(), /fictional|AirBorneo|[\u2013\u2014]/i, stage);
@@ -77,7 +80,7 @@ async function armFromGrid(page, code, minimum) {
   const receipt = await (await response).json();
   // The hand-off after the committed arm: leave the booking site, open the RoomDrop app.
   await visible(page, 'handoff'); await page.locator('#open-roomdrop').click();
-  await visible(page, 'armed-strip');
+  await drops(page);
   assert.equal(new URL(page.url()).hash, '#drops-' + code);
   return { receipt, detail: await page.locator('#armed-detail').innerText() };
 }
@@ -138,12 +141,12 @@ try {
   await startLauncher(false);
   restarting = false;
   // A full load of the armed code's link (the tab was last on the other code).
-  await a.page.goto(`${origin}/#drops-${PAN}`); await a.page.reload(); await visible(a.page, 'armed-strip');
+  await a.page.goto(`${origin}/#drops-${PAN}`); await a.page.reload(); await drops(a.page);
   assert.equal(await a.page.locator('#armed-detail').innerText(), panA.detail);
   assert.deepEqual(await watchOf(a.page, PAN), panA.receipt.watch);
   assert.deepEqual(await watchOf(a.page, PARK), parkA.receipt.watch);
   await shot(a.page, 'restarted-armed-' + PAN.toLowerCase(), 768);
-  await b.page.reload(); await visible(b.page, 'armed-strip');
+  await b.page.reload(); await drops(b.page);
   assert.equal(await b.page.locator('#armed-detail').innerText(), panB.detail);
   assert.deepEqual(await watchOf(b.page, PAN), panB.receipt.watch);
   await shot(b.page, 'restarted-armed-' + PAN.toLowerCase(), 390);

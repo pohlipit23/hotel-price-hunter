@@ -43,18 +43,21 @@ try {
     });
     const page = await context.newPage(); page.on('pageerror', error => report.errors.push(error.message));
     const visible = id => page.locator('#' + id).waitFor({ state: 'visible' });
+    // After the committed arm: the hand-off, then the Drops list (the armed strip is always hidden now).
+    const drops = async () => { await visible('handoff'); await page.locator('#open-roomdrop').click(); await visible('deal-list'); };
+    const changeMinimum = async () => { await page.evaluate(code => { location.hash = '#setup-' + code; }, code); await visible('setup-screen'); };
     await page.goto(origin + '/#setup-' + code); await visible('setup-screen'); await page.locator('#judge-consent').check();
     await Promise.all([page.waitForResponse(response => response.url().endsWith('/watch')), page.locator('#arm-watch').click()]);
-    assert.equal(bodies[0].expectedRevision, 0); await visible('armed-strip'); assert.equal(watch.revision, 1);
-    await page.locator('#change-minimum').click(); await visible('setup-screen');
+    assert.equal(bodies[0].expectedRevision, 0); await drops(); assert.equal(watch.revision, 1);
+    await changeMinimum();
     await page.locator('input[name="minimum-saving"][value="5000"]').check(); await page.locator('#arm-watch').click();
-    await visible('armed-strip'); assert.equal(bodies[1].expectedRevision, 1); assert.equal(watch.revision, 2);
-    await page.locator('#change-minimum').click(); await visible('setup-screen');
+    await drops(); assert.equal(bodies[1].expectedRevision, 1); assert.equal(watch.revision, 2);
+    await changeMinimum();
     watch = { ...watch, revision: 3 }; const committed = JSON.stringify(watch);
     await page.locator('input[name="minimum-saving"][value="10000"]').check(); await page.locator('#arm-watch').click();
     await page.locator('#setup-message').filter({ hasText: /changed.*Reload/ }).waitFor();
     assert.equal(bodies[2].expectedRevision, 2); assert.equal(JSON.stringify(watch), committed);
-    assert.equal(await page.locator('#armed-strip').isVisible(), false);
+    assert.equal(await page.locator('#deal-list').isVisible(), false);
     await page.reload(); await visible('setup-screen');
     for (const errorCode of ['CATALOGUE_UNAVAILABLE', 'DEMO_UNAVAILABLE']) {
       unavailable = errorCode;
