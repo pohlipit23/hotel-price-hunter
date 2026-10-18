@@ -29,8 +29,9 @@ The approved journey is:
    acknowledgement and explicit cancellation-flexibility consent.
 
 Use RoomDrop's Ticket and Stamp style, short copy and existing brand assets.
-Show no Altovo or AirBorneo logo or co-branding; the factual staging-source note
-remains visible. A judge never supplies a share link or an arbitrary booking code.
+Altovo may be named as the booking engine (staging) that made the bookings (owner
+decision, 18 October 2026). Show no Altovo or AirBorneo logo; AirBorneo is not shown.
+The factual staging-source note remains visible. A judge never supplies a share link or an arbitrary booking code.
 
 ## Scope and existing work
 
@@ -341,6 +342,31 @@ change the arm request, transaction, error codes or receipt fields without
 coordinating with Part 1 and recording the change here; it may add its own fields
 outside `watch` (for example confirmation and context under `byCode[code]`).
 
+#### Seam v7: optional delivery email and the hand-off (owner decisions, 18 October 2026)
+
+- Additive arm request key `deliveryEmail`: absent keeps any saved address, `null`
+  removes it, a string sets it (basic format, at most 254 characters, else
+  `400 DELIVERY_EMAIL_INVALID`, no commit). It commits in the same arm transaction at
+  `session.byCode[code].watch.delivery = { channel: 'email', email, consentVersion:
+  'roomdrop-drop-email-consent-2026-10-18', status: 'pending-service' }`. No email is sent.
+- Every response (arm receipt, bootstrap `watch`, `committedWatch`) shows only
+  `publicWatch(watch)`: `watch.delivery = { channel, maskedEmail: 'j***@example.test',
+  consentVersion, status }`. Without an address the receipt has no `delivery` key.
+  An identical retry compares the effective address as well as the minimum.
+- The stored watch now holds the address. Part 2 must build bindings, confirmations,
+  logs and model context from `publicWatch(scope.watch)` (exported from
+  `app\domain\booking-drop-watch.mjs`), never from the raw stored watch.
+- The address is never logged or put in URLs or evidence; tests use `example.test`.
+  Expired sessions are unreadable at once; the document itself is removed by the next
+  session creation's capacity cleanup (the TTL policy still needs separate approval).
+- Transition step 2 to 3: the owner explicitly approved one extra step after the
+  committed "Drop Watch armed" receipt, superseding "no extra customer step or delay"
+  for this transition only: a stamp-style hand-off ("You're leaving the booking
+  site.") with "Open RoomDrop" into the existing Drops view. The arm and its immediate
+  replay transaction are unchanged; the hand-off only follows the commit. Its URL is
+  already `#drops-CODE`, so a reload goes straight to the receipt-backed Drops view and
+  the hand-off is not repeated.
+
 #### Storage seam (F2 and F3a, implemented 18 October 2026)
 
 These signatures implement the orchestrator contract
@@ -614,7 +640,7 @@ and is not evidence that this Cloud Run entrypoint works.
    selection receipts are idempotent and retain all selection-only flags.
 5. Start/card grid, Original Booking confirmation, cannot-start, setup, replay,
    Deals, Review and Confirmed work on mobile and desktop with keyboard access.
-   Source and replay labels are visible; agency/provider branding is absent.
+   Source and replay labels are visible; no agency/provider logo (Altovo named only as the booking engine).
 6. Expiry, capacity, stale bindings, database failure and late model responses fail
    safely. Unit/HTTP/emulator tests use injected model and upstream responses.
    Report full-suite pass/failure/skip counts; relevant emulator tests must run.
