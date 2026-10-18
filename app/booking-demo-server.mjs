@@ -15,9 +15,9 @@ const assets = new Map([
 ]);
 // Booking API paths map one to one onto the quotation API; query strings never match and stay unavailable.
 const bookingApi = /^\/api\/booking-demo(\/(?:confirm|advice|chat|catalogue|q\/[A-Z0-9]{4,20}(?:\/(?:watch|confirm|advice|chat))?))?$/;
-export function createBookingDemoServer({ bundle, snapshot, catalogue, environment, now, advisor } = {}) {
-  const server = environment ? createHostedQuotationDemoServer({ snapshot, catalogue, environment, now, advisor })
-    : createQuotationDemoServer({ bundle, catalogue, now, advisor });
+export function createBookingDemoServer({ bundle, snapshot, catalogue, environment, now, advisor, sessionStorage, bookingStorage } = {}) {
+  const server = environment ? createHostedQuotationDemoServer({ snapshot, catalogue, environment, now, advisor, sessionStorage, bookingStorage })
+    : createQuotationDemoServer({ bundle, catalogue, now, advisor, sessionStorage, bookingStorage });
   const mode = catalogue ? 'catalogue' : 'single';
   const delegate = server.listeners('request')[0];
   server.removeListener('request', delegate);

@@ -7,6 +7,7 @@ import { isDisplayedDrop } from './public/drop-eligibility.js';
 import { agencyMinimumSavingMinor, qualifyingDrops, watchTag } from './public/drop-watch.js';
 import { watchBlocker } from './domain/altovo-quotation.mjs';
 import { requireCurrentWatch, selectDrop, reserveAdvice, mergeAdvice } from './quotation-session-actions.mjs';
+import { createPostWatchHandler } from './quotation-post-watch.mjs';
 
 export function validateLocalQuotationMode(env = process.env) {
   if (env.NODE_ENV === 'production' || env.K_SERVICE || env.CLOUD_RUN_JOB || (env.BIND_HOST && env.BIND_HOST !== '127.0.0.1')) {
@@ -57,9 +58,20 @@ export function deploymentCatalogue(privateCatalogue) {
   validateDeploymentCatalogue(catalogue); return catalogue;
 }
 const selectionOnlyBundle = snapshot => ({ ...snapshot, privateReferences: Object.fromEntries(snapshot.options.map(option => [option.optionId, { selectionOnly: true }])) });
-export function createHostedQuotationDemoServer({ snapshot, catalogue, environment = process.env, now, advisor } = {}) {
+export function createHostedQuotationDemoServer({ snapshot, catalogue, environment = process.env, now, advisor, sessionStorage, bookingStorage } = {}) {
   validateCloudQuotationMode(environment);
   if ((snapshot == null) === (catalogue == null)) throw new Error('Provide exactly one hosted snapshot or catalogue.');
+  if (!Array.isArray(catalogue) && catalogue?.entries) {
+    if (!sessionStorage || !bookingStorage || !Array.isArray(catalogue.entries) || !catalogue.entries.length || catalogue.entries.length > 20
+      || new Set(catalogue.entries.map(entry => entry.code)).size !== catalogue.entries.length) throw new Error('Durable catalogue storage required.');
+    const entries = catalogue.entries.map(entry => {
+      if (!CATALOGUE_CODE.test(entry.code) || entry.bundle?.baseline?.quotationCode !== entry.code
+        || typeof entry.contentVersion !== 'string' || !entry.contentVersion || typeof entry.dropSetVersion !== 'string' || !entry.dropSetVersion) throw new Error('Invalid durable catalogue.');
+      validateDeploymentSnapshot(publicQuotationDemo(entry.bundle));
+      return [entry.code, { ...entry.bundle, contentVersion: entry.contentVersion, dropSetVersion: entry.dropSetVersion }];
+    });
+    return createQuotationServer({ bundles: new Map(entries), now, advisor, cloudOrigin: environment.APP_ORIGIN, sessionStorage, bookingStorage });
+  }
   if (catalogue) {
     validateDeploymentCatalogue(catalogue);
     return createQuotationServer({ bundles: new Map(catalogue.map(entry => [entry.code, selectionOnlyBundle(entry.snapshot)])), now, advisor, cloudOrigin: environment.APP_ORIGIN });
@@ -75,22 +87,24 @@ const assets = new Map([
   ['/assets/illustrative-stays.jpg', ['assets/illustrative-stays.jpg', 'image/jpeg']],
 ]);
 // `catalogue` is the private catalogue file shape: { schemaVersion: 1, entries: [{ code, bundle }] }.
-export function createQuotationDemoServer({ bundle, catalogue, now = () => new Date(), advisor } = {}) {
+export function createQuotationDemoServer({ bundle, catalogue, now = () => new Date(), advisor, sessionStorage, bookingStorage } = {}) {
   if (catalogue == null) return createQuotationServer({ bundle, now, advisor });
   if (bundle != null || catalogue.schemaVersion !== 1 || !Array.isArray(catalogue.entries) || !catalogue.entries.length || catalogue.entries.length > 20
     || catalogue.entries.some(entry => !CATALOGUE_CODE.test(entry?.code ?? '') || entry.bundle?.baseline?.quotationCode !== entry.code)
     || new Set(catalogue.entries.map(entry => entry.code)).size !== catalogue.entries.length) throw new Error('A prepared private quotation catalogue is required.');
-  return createQuotationServer({ bundles: new Map(catalogue.entries.map(entry => [entry.code, entry.bundle])), now, advisor });
+  return createQuotationServer({ bundles: new Map(catalogue.entries.map(entry => [entry.code, { ...entry.bundle,
+    ...(entry.contentVersion ? { contentVersion: entry.contentVersion, dropSetVersion: entry.dropSetVersion } : {}) }])), now, advisor, sessionStorage, bookingStorage });
 }
 const validBundle = bundle => bundle?.schemaVersion === 1 && bundle.transactionMode === 'selection-only' && Array.isArray(bundle.options)
   && bundle.baseline?.sourceType === 'quotation' && /^[a-f0-9]{64}$/.test(bundle.snapshotVersion);
-function createQuotationServer({ bundle: single, bundles = null, now = () => new Date(), cloudOrigin = null, advisor = { available: false, status: 'unconfigured' } }) {
+function createQuotationServer({ bundle: single, bundles = null, now = () => new Date(), cloudOrigin = null, advisor = { available: false, status: 'unconfigured' }, sessionStorage, bookingStorage }) {
   if (bundles ? [...bundles.values()].some(item => !validBundle(item) || !/^[A-Z]{3}$/.test(item.baseline.quotedRetail?.currency ?? '')) : !validBundle(single)) {
     throw new Error('A prepared private quotation demo snapshot is required.');
   }
   const sessions = new Map();
   let adviceWindow = 0; let adviceCount = 0; let advicePending = 0;
   const model = { available: advisor.available, status: advisor.status };
+  const postWatch = sessionStorage ? createPostWatchHandler({ sessionStorage, bookingStorage, bundles, now, advisor }) : null;
   const json = (res, status, data) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); };
   const server = createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
@@ -107,6 +121,8 @@ function createQuotationServer({ bundle: single, bundles = null, now = () => new
         ? { status: 'ok', surface: 'quotation-demo', mode: 'selection-only', model, catalogueSize: bundles.size }
         : { status: 'ok', surface: 'quotation-demo', mode: 'selection-only', model, snapshotVersion: single.snapshotVersion, optionCount: single.options.length });
       const cookie = /(?:^|;\s*)roomdrop_quote=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie ?? '')?.[1];
+      const actionRoute = postWatch && /^\/api\/quotation-demo\/q\/([A-Z0-9]{4,20})\/(confirm|advice|chat)$/.exec(url.pathname);
+      if (actionRoute && req.method === 'POST') return postWatch({ req, res, cookie, code: actionRoute[1], action: actionRoute[2], origin, json, error });
       let session = sessions.get(cookie);
       if (session?.expiresAt <= now().getTime()) { sessions.delete(cookie); session = null; }
       const openSession = () => {

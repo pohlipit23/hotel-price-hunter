@@ -41,7 +41,7 @@ export function createStayAdviser({ parent, before, getData, chatUrl = () => '/a
 
   let context, controller, generation = 0, draft = '', returnFocus;
   let notice = '', noticeKey;
-  const turns = [], openings = new Set(), composers = [];
+  const turns = [], openings = new Set(), composers = [], hydrated = new Set();
   function makeComposer(container, suffix, compact) {
     const form = el('form', null, 'stay-chat-form');
     const label = el('label', 'Ask about your options', 'sr-only'); label.htmlFor = 'stay-question-' + suffix;
@@ -161,6 +161,18 @@ export function createStayAdviser({ parent, before, getData, chatUrl = () => '/a
       const data = getData();
       const scope = [data?.code ?? 'single', data?.snapshotVersion, watchBinding(data?.watch)].join(':');
       const key = [scope, next.pageContext, next.optionId || 'overview'].join(':');
+      if (!hydrated.has(scope) && data?.conversation?.watchBinding === watchBinding(data.watch)
+        && Array.isArray(data.conversation.chatHistory)) {
+        for (const turn of data.conversation.chatHistory.slice(-4)) {
+          if (!['drops-overview', 'drop-detail'].includes(turn.pageContext) || turn.snapshotVersion !== data.snapshotVersion
+            || typeof turn.question !== 'string' || typeof turn.reply !== 'string') continue;
+          const turnKey = [scope, turn.pageContext, turn.optionId || 'overview'].join(':');
+          const label = turn.pageContext === 'drop-detail' ? 'Your Drop' : 'Compare your Drops';
+          turns.push({ role: 'user', text: turn.question.slice(0, 1200), key: turnKey, scope, label },
+            { role: 'assistant', text: turn.reply.slice(0, 6000), key: turnKey, scope, label });
+        }
+        hydrated.add(scope);
+      }
       if (context?.scope !== scope) updateDraft('');
       if (context?.key !== key || !next.enabled) { generation++; controller?.abort(); controller = undefined; }
       context = { ...next, optionId: next.optionId ?? null, key, scope };

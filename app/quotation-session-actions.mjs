@@ -1,14 +1,25 @@
 // Part 2 additions only. Session allocation, capacity, expiry ownership and arming belong to Part 1.
 import { randomBytes } from 'node:crypto';
-import { replayResult, watchBinding } from './public/booking-live-data.js';
+import { replayResult, watchBinding, currentConfirmation } from './public/booking-live-data.js';
 import { watchBlocker } from './domain/altovo-quotation.mjs';
 
 export function actionError(code, status = 409, extra = {}) {
   return Object.assign(new Error('Reload RoomDrop and review the current Drops.'), { code, status, ...extra });
 }
+// Part 1's per-code GET can spread this read projection without changing the watch seam.
+export function publicPostWatchState({ scope, bundle }) {
+  const snapshot = { ...bundle, code: bundle.baseline.quotationCode, watch: scope?.watch, confirmation: scope?.confirmation };
+  const binding = watchBinding(scope?.watch);
+  const current = ['completed', 'empty'].includes(replayResult(snapshot).status);
+  const history = current && scope.contextBinding === binding ? (scope.chatHistory ?? []).slice(-4) : [];
+  return { confirmation: currentConfirmation(snapshot), conversation: { watchBinding: current ? binding : null,
+    chatHistory: history.map(({ pageContext, optionId, snapshotVersion, question, reply }) => ({ pageContext, optionId, snapshotVersion, question, reply })) } };
+}
 export function requireCurrentWatch({ scope, bundle, body, at }) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw actionError('INVALID_SELECTION', 400);
   if (body.snapshotVersion !== bundle.snapshotVersion) throw actionError('DROPS_CHANGED');
+  if ((scope?.contentVersion !== undefined && scope.contentVersion !== (bundle.contentVersion ?? bundle.snapshotVersion))
+    || (scope?.dropSetVersion !== undefined && bundle.dropSetVersion !== undefined && scope.dropSetVersion !== bundle.dropSetVersion)) throw actionError('DROPS_CHANGED');
   if (!scope?.watch) throw actionError('WATCH_NOT_ARMED');
   const watch = scope.watch;
   if ((watch.contentVersion !== undefined && watch.contentVersion !== (bundle.contentVersion ?? bundle.snapshotVersion))
@@ -70,20 +81,16 @@ export function mergeAdvice({ scope, bundle, body, at, ticket, advice, chat }) {
   }
 }
 // Adapts Part 1's synchronous transactional update helper without allocating sessions or writing watches.
-// `update(id, change)` must atomically read the current session, call change and commit its return value.
-export function createSessionActions({ update, now = () => new Date() }) {
-  if (typeof update !== 'function') throw actionError('SESSION_STORAGE_REQUIRED', 503);
-  const change = async (id, code, csrfToken, operation) => {
-    let result;
-    await update(id, session => {
-      if (!session || !Number.isFinite(session.expiresAt) || session.expiresAt <= now().getTime()
-        || session.csrfToken !== csrfToken) throw actionError('DEMO_SESSION_REQUIRED', 403);
-      const scope = session.byCode?.[code];
-      if (!scope) throw actionError('WATCH_NOT_ARMED');
-      result = operation(session, scope); return session;
-    });
-    return result;
-  };
+// Contract v1: transact(cookieValue, fn) persists in-place changes and returns fn's result after commit.
+export function createSessionActions({ sessionStorage, now = () => new Date() }) {
+  if (typeof sessionStorage?.transact !== 'function') throw actionError('SESSION_STORAGE_REQUIRED', 503);
+  const change = (id, code, csrfToken, operation) => sessionStorage.transact(id, session => {
+    if (!session || !Number.isFinite(session.expiresAt) || session.expiresAt <= now().getTime()
+      || session.csrfToken !== csrfToken) throw actionError('DEMO_SESSION_REQUIRED', 403);
+    const scope = session.byCode?.[code];
+    if (!scope) throw actionError('WATCH_NOT_ARMED');
+    return operation(session, scope);
+  });
   return {
     confirm: ({ id, code, csrfToken, bundle, body }) => {
       const confirmedAt = now().toISOString(), selectionId = `demo-${randomBytes(12).toString('hex')}`;
