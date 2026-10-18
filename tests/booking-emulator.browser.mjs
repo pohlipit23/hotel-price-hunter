@@ -75,6 +75,8 @@ async function armFromGrid(page, code, minimum) {
   const response = page.waitForResponse(r => r.url().endsWith(`/q/${code}/watch`) && r.request().method() === 'POST');
   await page.locator('#arm-watch').click();
   const receipt = await (await response).json();
+  // The hand-off after the committed arm: leave the booking site, open the RoomDrop app.
+  await visible(page, 'handoff'); await page.locator('#open-roomdrop').click();
   await visible(page, 'armed-strip');
   assert.equal(new URL(page.url()).hash, '#drops-' + code);
   return { receipt, detail: await page.locator('#armed-detail').innerText() };
@@ -107,7 +109,7 @@ try {
         assert.match(await page.locator('#booked-room').innerText(), /Room photo[\s\S]*Executive Marina Bay Room/i);
       }
       await loaded(page, '#booked-screen img');
-      assert.match(await page.locator('#booked-note').innerText(), /A real Altovo staging quotation standing in for a confirmed booking · captured 18 Oct 2026/);
+      assert.match(await page.locator('#booked-note').innerText(), /Altovo staging quotation standing in for a confirmed booking - captured 18 Oct 2026/);
       assert.equal(await page.locator('#setup-drop').isDisabled(), code === HYATT);
       await shot(page, 'booked-' + code.toLowerCase(), width);
       await page.locator('#booked-back').click(); await visible(page, 'catalogue-screen');

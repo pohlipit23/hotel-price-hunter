@@ -557,6 +557,60 @@ footer p { margin: 0; }
 .armed-copy p { margin: 0; overflow-wrap: anywhere; }
 .armed-strip .secondary { grid-column: 1 / -1; width: 100%; min-height: 44px; }
 .lower-minimum { width: 100%; margin-top: 10px; }
+/* Journey strip: pick (Altovo) -> set up (RoomDrop) -> get your drop (RoomDrop app). Full on start, compact later. */
+.journey-strip { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; max-width: 100%; gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
+.journey-step { display: grid; gap: 3px; min-width: 0; border: 2px dashed var(--line); border-radius: 16px; padding: 10px 12px; background: rgba(255, 255, 255, .55); color: var(--muted); }
+.journey-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.journey-num { display: grid; flex: 0 0 26px; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #e0e8f0; color: var(--muted); font: 800 13px/1 var(--body); }
+.journey-title { color: var(--ink); font: 700 16px/1.2 var(--heading); }
+.journey-tag { border-radius: 999px; padding: 2px 8px; background: #fff0eb; color: var(--coral); font-size: 11px; font-style: normal; font-weight: 800; letter-spacing: .03em; }
+.journey-step[data-step="3"] .journey-tag { background: var(--blue-bg); color: #23466e; }
+.journey-text { font-size: 13px; line-height: 1.35; }
+.journey-step[aria-current] { border: 2px solid var(--ink); background: var(--surface); box-shadow: 0 6px 14px rgba(32, 44, 59, .08); transform: rotate(-.6deg); }
+.journey-step[aria-current] .journey-num { background: var(--ink); color: var(--surface); }
+.journey-step.passed .journey-num { background: var(--green-bg); color: var(--green); }
+.journey-compact { display: flex; gap: 6px; margin-bottom: 10px; }
+.journey-compact .journey-step { flex: 1 1 0; grid-template-columns: minmax(0, 1fr); min-width: 0; overflow: hidden; padding: 6px 8px; border-radius: 12px; }
+.journey-compact .journey-tag { flex: 0 0 auto; }
+.journey-compact .journey-text { display: none; }
+.journey-compact .journey-step[aria-current] { min-width: 0; transform: none; }
+.journey-compact .journey-head { flex-wrap: nowrap; min-width: 0; }
+.journey-compact .journey-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.journey-compact .journey-title { font-size: 13px; }
+.journey-compact .journey-num { flex-basis: 22px; width: 22px; height: 22px; font-size: 11px; }
+@media (max-width: 639px) {
+  .journey-compact .journey-step:not([aria-current]) { flex: 0 0 auto; }
+  .journey-compact .journey-step:not([aria-current]) .journey-title, .journey-compact .journey-tag { display: none; }
+}
+@media (min-width: 640px) { .journey-strip:not(.journey-compact) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Optional delivery email on setup. */
+.delivery-field { display: grid; gap: 7px; }
+.delivery-field label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-weight: 500; }
+.delivery-mark svg { display: block; width: 22px; height: 22px; fill: none; stroke: var(--blue); stroke-width: 2; stroke-linejoin: round; }
+.optional-tag { border-radius: 999px; padding: 1px 8px; background: #eef1f5; color: var(--muted); font-size: 11px; font-weight: 700; }
+#delivery-email { width: 100%; min-height: 48px; border: 2px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--surface); color: var(--ink); font: 500 16px/1.2 var(--body); }
+#delivery-email:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+#delivery-email[aria-invalid="true"] { border-color: var(--coral); }
+.delivery-saved { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+.delivery-saved .secondary { min-height: 44px; }
+.field-problem { margin: 0; color: var(--coral); font-size: 14px; font-weight: 700; }
+.delivery-consent { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+/* Hand-off after the committed arm: an airmail ticket with an "Armed" stamp, then into the RoomDrop app. */
+.handoff-stamp, .handoff-box { display: none; }
+.handoff .checking-drops { display: none; }
+.handoff .checking-card { position: relative; border: 0; padding: 30px 22px 26px;
+  background: repeating-linear-gradient(-45deg, var(--coral) 0 10px, var(--surface) 10px 18px, var(--blue) 18px 28px, var(--surface) 28px 36px); }
+.handoff .checking-card::before { position: absolute; inset: 8px; border-radius: 16px; background: var(--surface); content: ''; }
+.handoff .checking-card > * { position: relative; }
+.handoff .handoff-stamp { display: flex; width: 104px; height: 104px; flex-direction: column; align-items: center; justify-content: center; border: 3px solid var(--green); border-radius: 50%;
+  box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 5px var(--green); color: var(--green); text-transform: uppercase; transform: rotate(-10deg); }
+.handoff-stamp span { font-size: 10px; font-weight: 800; letter-spacing: .1em; }
+.handoff-stamp strong { font: 800 22px/1.05 var(--heading); }
+.handoff #checking-status { font-size: 18px; }
+.handoff .handoff-box:not([hidden]) { display: grid; justify-items: center; gap: 12px; max-width: 30em; }
+.handoff-text { margin: 0; color: var(--muted); }
+.handoff-email { margin: 0; border: 1.5px dashed #b8c7d7; border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+#open-roomdrop { min-width: min(100%, 260px); }
 
 @media (min-width: 640px) {
   .catalogue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

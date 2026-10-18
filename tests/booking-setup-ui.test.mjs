@@ -2,7 +2,8 @@
 // These are the display rules in app/public/booking-judge.js; the browser walk is tests/booking-judge.browser.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { armRequestBody, armedDetail, cannotStart, capturedNote, cardFacts, cardPhoto, minimumOptions, roomPhoto } from '../app/public/booking-judge.js';
+import { JOURNEY, armRequestBody, armedDetail, cannotStart, capturedNote, cardFacts, cardPhoto, deliveryEmailField, handoffCopy, journeyStep, minimumOptions,
+  roomPhoto, savedDelivery } from '../app/public/booking-judge.js';
 
 const siam = {
   code: 'AIRB000180', blocker: null, tag: 'ready', hotel: { name: 'Siam Kempinski Hotel Bangkok', cityCode: 'BKK', countryCode: 'TH' },
@@ -42,10 +43,10 @@ test('a start card shows city, curated scenario label and current eligibility', 
   assert.deepEqual(cardFacts({ ...siam, card: null }).city, 'BKK, Thailand');
 });
 
-test('the Original Booking note names the staging source and the capture date', () => {
+test('the Original Booking note names the Altovo staging source and the capture date', () => {
   const baseline = { source: { system: 'altovo-staging', readAt: '2026-10-18' } };
-  assert.equal(capturedNote({ baseline }), 'A real Altovo staging quotation standing in for a confirmed booking · captured 18 Oct 2026');
-  assert.equal(capturedNote({ baseline: { source: {} } }), 'A real Altovo staging quotation standing in for a confirmed booking');
+  assert.equal(capturedNote({ baseline }), 'Altovo staging quotation standing in for a confirmed booking - captured 18 Oct 2026');
+  assert.equal(capturedNote({ baseline: { source: {} } }), 'Altovo staging quotation standing in for a confirmed booking');
 });
 
 test('cannot-start reasons have a title and short reason; unknown reasons stay unknown', () => {
@@ -76,6 +77,43 @@ test('the arm request names the committed revision so a stale tab cannot replace
   const data = { snapshotVersion: 'a'.repeat(64), watch: null };
   assert.deepEqual(armRequestBody(data, 5000), { snapshotVersion: 'a'.repeat(64), consent: true, minimumSavingMinor: 5000, expectedRevision: 0 });
   assert.equal(armRequestBody({ ...data, watch: { revision: 2 } }, 1000).expectedRevision, 2);
+});
+
+test('the arm request carries the delivery email only when the judge typed or removed one', () => {
+  const data = { snapshotVersion: 'a'.repeat(64), watch: null };
+  assert.deepEqual(armRequestBody(data, 5000, 'judge@example.test'),
+    { snapshotVersion: 'a'.repeat(64), consent: true, minimumSavingMinor: 5000, expectedRevision: 0, deliveryEmail: 'judge@example.test' });
+  assert.equal(armRequestBody(data, 5000, null).deliveryEmail, null);
+  assert.equal(Object.hasOwn(armRequestBody(data, 5000, undefined), 'deliveryEmail'), false);
+});
+
+test('the delivery email field: optional, trimmed, basic format and at most 254 characters', () => {
+  assert.deepEqual(deliveryEmailField(''), { email: undefined, problem: null });
+  assert.deepEqual(deliveryEmailField('   '), { email: undefined, problem: null });
+  assert.deepEqual(deliveryEmailField(' judge@example.test '), { email: 'judge@example.test', problem: null });
+  for (const value of ['judge', 'judge@example', 'ju dge@example.test', 'a@b@example.test', 'a'.repeat(250) + '@x.io'])
+    assert.equal(deliveryEmailField(value).problem, 'Check the email address, or leave it empty.', value);
+  // A saved address the judge chose to remove is sent as null; an empty field otherwise keeps it.
+  assert.deepEqual(deliveryEmailField('', { remove: true }), { email: null, problem: null });
+  assert.equal(savedDelivery({ watch: { delivery: { channel: 'email', maskedEmail: 'j***@example.test', status: 'pending-service' } } }), 'j***@example.test');
+  assert.equal(savedDelivery({ watch: { minimumSavingMinor: 1000 } }), null);
+});
+
+test('the journey strip: pick on Altovo, set up in RoomDrop, get the drop in the RoomDrop app', () => {
+  assert.deepEqual(JOURNEY.map(step => [step.title, step.tag]), [['Pick a booking', null], ['Set up a drop', 'RoomDrop'], ['Get your drop', 'RoomDrop app']]);
+  assert.equal(JOURNEY[0].text, "Made on Altovo's booking engine, not part of this submission. RoomDrop starts at the confirmation.");
+  assert.equal(JOURNEY[1].text, 'Invite on the confirmation page (or in the confirmation email).');
+  assert.equal(JOURNEY[2].text, 'Cheaper room found? It arrives by email.');
+  assert.deepEqual(['catalogue-screen', 'booked-screen', 'setup-screen', 'checking-screen', 'booking-summary', 'comparison', 'simulated-switch', null].map(journeyStep),
+    [1, 2, 2, 2, 3, 3, 3, null]);
+});
+
+test('the hand-off after arming says the judge leaves the booking site, from the committed receipt only', () => {
+  const data = { watch: { revision: 1, firstCheck: { dropOptionIds: ['a'] } } };
+  assert.deepEqual(handoffCopy(data), { title: 'Drop Watch armed', lead: "You're leaving the booking site.",
+    text: 'In real life your drop arrives by email. For this demo we open the RoomDrop app now.', email: null, action: 'Open RoomDrop' });
+  assert.equal(handoffCopy({ watch: { ...data.watch, delivery: { maskedEmail: 'j***@example.test', status: 'pending-service' } } }).email, 'j***@example.test');
+  assert.equal(handoffCopy({ watch: null }), null);
 });
 
 test('the armed state is described only from the committed receipt', () => {

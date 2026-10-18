@@ -17,6 +17,10 @@ export function dropSavingMinor(baseline, option) { return baseline.quotedRetail
 export function qualifyingDrops(baseline, options, minimumSavingMinor) {
   return options.filter(option => isDisplayedDrop(baseline, option) && dropSavingMinor(baseline, option) >= minimumSavingMinor);
 }
+// The optional address a drop may later be sent to: a basic check only (one @, no spaces, a dotted
+// domain, at most 64 characters before the @ and 254 in all). The server applies the same rule.
+const EMAIL = /^[^\s@]{1,64}@[^\s@.]+(?:\.[^\s@.]+)+$/;
+export function deliveryEmailValid(value) { return typeof value === 'string' && value.length <= 254 && EMAIL.test(value); }
 // What a catalogue card demonstrates, derived from the blocker and the free-cancellation deadline.
 export function watchTag(blocker, freeUntil, at = new Date()) {
   if (blocker) return 'cannot-start';
