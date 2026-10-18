@@ -1,6 +1,6 @@
 import { bookingView, comparisonLabels, replayResult, currentConfirmation } from './booking-live-data.js';
 import { createStayAdviser } from './stay-advice.js';
-import { cardPhoto } from './booking-judge.js';
+import { cardPhoto, closeoutCopy, CLOSEOUT_VIDEO } from './booking-judge.js';
 
 /** Use the existing booking screens and shared cards; confirmation is selection-only.
  * Catalogue mode adds the judge flow in front: Original Booking, Drop Watch setup and a replayed first check. */
@@ -14,27 +14,29 @@ export async function startBookingDemo(ui) {
   const adviser = createStayAdviser({ parent: $('comparison'), before: $('price-details'),
     overviewParent: $('deal-list').querySelector('.section-heading'), getData: () => data, chatUrl: () => api('chat') });
   const explanation = 'Estimated savings before final pricing and fees. Full cancellation terms and room matching still need verification.';
-  const judgeScreens = { start: 'catalogue-screen', booked: 'booked-screen', setup: 'setup-screen', checking: 'checking-screen', launch: 'launch-screen' };
+  const judgeScreens = { start: 'catalogue-screen', booked: 'booked-screen', setup: 'setup-screen', checking: 'checking-screen', launch: 'launch-screen', closeout: 'closeout-screen' };
   const stepIndex = catalogueMode ? { booked: 0, setup: 1, checking: 1, options: 2, review: 3, confirmed: 4 } : { options: 0, review: 1, confirmed: 2 };
-  const routes = { start: 'start', booked: 'booked', setup: 'setup', options: 'drops', review: 'review', confirmed: 'confirmed' };
+  const routes = { start: 'start', booked: 'booked', setup: 'setup', options: 'drops', review: 'review', confirmed: 'confirmed', closeout: 'done' };
   const steps = screen => {
     const existing = ['options', 'review', 'confirmed'].includes(screen);
     for (const [name, id] of Object.entries(judgeScreens)) $(id).hidden = screen !== name;
     $('booking-summary').hidden = !existing || screen === 'review'; $('comparison').hidden = screen !== 'review';
     $('simulated-switch').hidden = screen !== 'confirmed'; $('current-ticket').hidden = screen === 'confirmed';
-    $('deal-list').hidden = screen === 'confirmed' || screen === 'launch'; $('price-watch').hidden = catalogueMode || screen === 'confirmed';
+    $('deal-list').hidden = ['confirmed', 'launch', 'closeout'].includes(screen); $('price-watch').hidden = catalogueMode || screen === 'confirmed';
     // From the Drops page on, the RoomDrop app has no demo strip or footer; only the judge header stays.
     $('armed-strip').hidden = true;
     document.querySelector('footer').hidden = catalogueMode && (existing || screen === 'launch');
     // Inside the app frame: the agency's site for the booking pages, RoomDrop from the Drops page on.
     if (catalogueMode) {
-      const site = screen === 'start' ? null : existing || screen === 'launch' ? 'roomdrop' : 'agency';
-      $('app-frame').dataset.site = site ?? 'none'; shownSite = site;
+      // The start page and the closeout sit outside both sites: the judge is before or after the app.
+      const site = ['start', 'closeout'].includes(screen) ? null : existing || screen === 'launch' ? 'roomdrop' : 'agency';
+      $('app-frame').dataset.site = site ?? 'none'; shownSite = site; shownScreen = screen;
       // While the splash plays, the frame and the judge bar both flag that the actual app is starting.
       $('app-frame').classList.toggle('launching', screen === 'launch'); $('judge-bar').classList.toggle('judge-bar-entering', screen === 'launch');
       // The launch splash carries its own logo, so the header waits until the Drops page.
       document.querySelector('.site-header').hidden = !site || screen === 'launch';
       $('judge-bar-text').textContent = screen === 'launch' ? 'Now starting the RoomDrop app · the hackathon submission'
+        : screen === 'closeout' ? 'The RoomDrop app ends here · thanks for judging'
         : site === 'roomdrop' ? 'Hackathon submission starts here' : 'How this demo works';
       document.querySelector('.brand').hidden = site !== 'roomdrop'; $('agency-brand').hidden = site !== 'agency';
     }
@@ -54,7 +56,7 @@ export async function startBookingDemo(ui) {
     : screen === 'review' ? '#comparison' : screen === 'confirmed' ? '#confirmed' : '#booking-summary';
   // Entering RoomDrop from anywhere else (the agency pages, the start page or a fresh load) plays a short launch
   // splash first; moving between RoomDrop pages does not. Focus requested meanwhile lands once the page shows.
-  let shownSite = null, launchTimer = null, pendingFocus = null;
+  let shownSite = null, shownScreen = null, launchTimer = null, pendingFocus = null;
   const launchMs = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 2000 : 5000;
   const navigate = (screen, push = true) => {
     const state = { bookingScreen: screen, optionId: screen === 'review' ? selected?.offerId : null, code: screen === 'start' ? null : code };
@@ -64,7 +66,8 @@ export async function startBookingDemo(ui) {
   const show = screen => {
     clearTimeout(launchTimer); launchTimer = null; pendingFocus = null;
     const reveal = () => { steps(screen); window.scrollTo({ top: 0, behavior: 'instant' }); };
-    if (!catalogueMode || !['options', 'review', 'confirmed'].includes(screen) || shownSite === 'roomdrop') return reveal();
+    // Back from the closeout returns to the confirmation directly; the app is not starting again.
+    if (!catalogueMode || !['options', 'review', 'confirmed'].includes(screen) || shownSite === 'roomdrop' || shownScreen === 'closeout') return reveal();
     steps('launch'); window.scrollTo({ top: 0, behavior: 'instant' }); $('launch-title').focus({ preventScroll: true });
     launchTimer = setTimeout(() => {
       launchTimer = null; reveal();
@@ -290,7 +293,11 @@ export async function startBookingDemo(ui) {
     if (screen === 'start') { navigate('start', push); focusHeading('catalogue-title'); return; }
     status('');
     if (screen === 'setup' && data.blocker) screen = 'booked';
-    if (['options', 'review', 'confirmed'].includes(screen) && !data.watch) screen = data.blocker ? 'booked' : 'setup';
+    if (['options', 'review', 'confirmed', 'closeout'].includes(screen) && !data.watch) screen = data.blocker ? 'booked' : 'setup';
+    if (screen === 'closeout') {
+      if (data.confirmation) { closeout(push); return; }
+      screen = 'options';
+    }
     if (screen === 'booked') { judge.renderBooked(data); navigate('booked', push); focusHeading('booked-title'); return; }
     if (screen === 'setup') { judge.renderSetup(data); navigate('setup', push); focusHeading('setup-title'); return; }
     // Once a drop is chosen the app is finished: Drops and review routes land on the confirmation.
@@ -339,20 +346,37 @@ export async function startBookingDemo(ui) {
   $('judge-consent').addEventListener('change', () => { $('setup-message').textContent = ''; $('setup-message').classList.remove('error'); });
   $('change-minimum').addEventListener('click', () => go('setup', code)); $('lower-minimum').addEventListener('click', () => go('setup', code));
   $('drops-minimum').addEventListener('click', () => go('setup', code));
-  // Neither choice is stored yet; the buttons only acknowledge the judge's pick on this page.
+  // The "What next?" pick ends the app: it is not stored server side, only remembered in this tab for the closeout.
+  const choiceKey = () => 'roomdrop-closeout-' + code;
+  const savedChoice = () => { try { return sessionStorage.getItem(choiceKey()); } catch { return null; } };
   function nextChoice(choice) {
     $('keep-watching').setAttribute('aria-pressed', String(choice === 'watch'));
     $('keep-for-good').setAttribute('aria-pressed', String(choice === 'keep'));
-    $('switch-next-message').textContent = choice === 'watch' ? 'Got it. Fresh drops will show up here.'
-      : choice === 'keep' ? 'Got it. This booking is yours to keep.' : '';
+    if (!choice) return;
+    try { sessionStorage.setItem(choiceKey(), choice); } catch {}
+    closeout();
+  }
+  function closeout(push = true) {
+    const copy = closeoutCopy(savedChoice());
+    $('closeout-choice').textContent = copy.choice; $('closeout-choice').hidden = !copy.choice;
+    $('closeout-steps').replaceChildren(...copy.steps.map(text => node('li', text)));
+    // The video player is only created here, so no other page contacts YouTube.
+    if (!$('closeout-video-frame').firstElementChild) {
+      const frame = document.createElement('iframe');
+      Object.assign(frame, { src: CLOSEOUT_VIDEO, title: 'RoomDrop demo video', allowFullscreen: true, referrerPolicy: 'strict-origin-when-cross-origin' });
+      frame.allow = 'accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share';
+      $('closeout-video-frame').append(frame);
+    }
+    navigate('closeout', push); focusHeading('closeout-title');
   }
   $('keep-watching').addEventListener('click', () => nextChoice('watch'));
   $('keep-for-good').addEventListener('click', () => nextChoice('keep'));
+  $('closeout-restart').addEventListener('click', () => go('start'));
   document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); go('start'); });
   function followLocation() {
     if (busy) { pendingRoute = true; return; }
     pendingRoute = false;
-    const parsed = /^#(start|booked|setup|drops|review|confirmed)(?:-([A-Z0-9]{4,20}))?$/.exec(location.hash);
+    const parsed = /^#(start|booked|setup|drops|review|confirmed|done)(?:-([A-Z0-9]{4,20}))?$/.exec(location.hash);
     const route = Object.keys(routes).find(key => routes[key] === parsed?.[1]) ?? 'start';
     const state = history.state, target = parsed?.[2];
     const optionId = state?.code === target && state?.bookingScreen === route ? state.optionId : undefined;
@@ -370,7 +394,7 @@ export async function startBookingDemo(ui) {
     // Judges only pick bookings a Drop Watch can start on; non-refundable ones stay in the data, off the picker.
     judge.renderCatalogue(entries.filter(entry => entry.blocker !== 'NON_REFUNDABLE'), (next, trigger) => { lastTrigger = trigger; go('booked', next); });
     chrome(); $('content').hidden = false; status('');
-    const parsed = /^#(booked|setup|drops|review|confirmed)-([A-Z0-9]{4,20})$/.exec(location.hash);
+    const parsed = /^#(booked|setup|drops|review|confirmed|done)-([A-Z0-9]{4,20})$/.exec(location.hash);
     const screen = parsed ? Object.keys(routes).find(key => routes[key] === parsed[1]) : 'start';
     const optionId = history.state?.code === parsed?.[2] ? history.state?.optionId : undefined;
     history.replaceState({ bookingScreen: screen, code: parsed?.[2] ?? null, optionId }, '', screen === 'start' ? '#start' : location.hash);

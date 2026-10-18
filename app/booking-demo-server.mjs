@@ -29,7 +29,8 @@ export function createBookingDemoServer({ bundle, snapshot, catalogue, reviewedC
     if (api) { req.url = '/api/quotation-demo' + (api[1] ?? ''); return delegate(req, res); }
     if (req.url === '/health' || req.url === '/healthz') return delegate(req, res);
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+    // frame-src: only the demo video on the judge closeout (privacy-enhanced YouTube embed).
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-src https://www.youtube-nocookie.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     if (environment) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
     const port = server.address()?.port;
     const validHost = environment ? req.headers.host === new URL(environment.APP_ORIGIN).host

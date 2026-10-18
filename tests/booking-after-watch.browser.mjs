@@ -32,7 +32,9 @@ const report = { status: 'started', storage: 'test-memory-session-with-actual-v3
 try {
   for (const width of [320, 390, 768, 1024, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 1000 }, reducedMotion: 'reduce' });
+    // The closeout's YouTube embed is expected; it is blocked (no live call) and counted apart from other external requests.
     await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue()
+      : new URL(route.request().url()).origin === 'https://www.youtube-nocookie.com' ? (report.closeoutVideo = (report.closeoutVideo ?? 0) + 1, route.abort())
       : (report.external.push(route.request().url()), route.abort()));
     const page = await context.newPage();
     page.on('pageerror', error => report.errors.push(error.message));
@@ -102,10 +104,12 @@ try {
     for (const id of ['switch-state', 'switch-trail', 'switch-reassurance', 'switch-money', 'switch-message', 'done-button'])
       assert.equal(await page.locator('#' + id).isVisible(), false, 'confirmed hides ' + id);
     assert.equal(await page.locator('#switch-next').isVisible(), true);
-    await page.locator('#keep-watching').click();
-    assert.equal(await page.locator('#keep-watching').getAttribute('aria-pressed'), 'true');
-    assert.equal(await page.locator('#switch-next-message').innerText(), 'Got it. Fresh drops will show up here.');
-    await shot('confirmed'); await page.reload(); await visible('simulated-switch');
+    await shot('confirmed');
+    // "Keep watching" ends the app on the judge closeout; Back returns to the confirmation.
+    await page.locator('#keep-watching').click(); await visible('closeout-screen');
+    assert.equal(await page.locator('#closeout-choice').innerText(), 'You chose: keep watching for drops');
+    await shot('closeout'); await page.goBack(); await visible('simulated-switch');
+    await page.reload(); await visible('simulated-switch');
     assert.equal(await page.locator('#switch-to-photo img').getAttribute('src'), '/' + photo.asset);
     const initial = await (await context.request.get(origin + '/api/booking-demo/q/' + code)).json();
     assert.equal(initial.confirmation.reservationCreated, false); assert.equal(initial.confirmation.quoteModified, false);

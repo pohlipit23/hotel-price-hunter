@@ -10,8 +10,19 @@ export const JOURNEY = Object.freeze([
   { title: 'Get your drop', tag: 'RoomDrop app', text: 'Cheaper room found? It arrives by email.' },
 ]);
 // Which journey step a visible screen belongs to: the start grid, the booking site, then the RoomDrop app.
-const STEP_OF = { 'catalogue-screen': 1, 'booked-screen': 2, 'setup-screen': 2, 'checking-screen': 2, 'launch-screen': 3, 'booking-summary': 3, comparison: 3, 'simulated-switch': 3 };
+// The closeout comes after all three steps, so every step shows as passed there.
+const STEP_OF = { 'catalogue-screen': 1, 'booked-screen': 2, 'setup-screen': 2, 'checking-screen': 2, 'launch-screen': 3, 'booking-summary': 3, comparison: 3, 'simulated-switch': 3, 'closeout-screen': 4 };
 export function journeyStep(screenId) { return STEP_OF[screenId] ?? null; }
+// The closeout after the confirmation's "What next?" pick: what would happen next outside the demo.
+export const CLOSEOUT_VIDEO = 'https://www.youtube-nocookie.com/embed/zKe3UFlgUNc';
+export function closeoutCopy(choice) {
+  const steps = ['Your agency books the new room, then cancels the original.', 'The difference comes back to you, after any fees.'];
+  if (choice === 'watch') return { choice: 'You chose: keep watching for drops',
+    steps: [...steps, 'RoomDrop keeps watching your new booking and emails you if it drops again.'] };
+  if (choice === 'keep') return { choice: 'You chose: keep this booking for good',
+    steps: [...steps, 'Your Drop Watch stops. No more checks or emails for this stay.'] };
+  return { choice: '', steps };
+}
 const EMAIL_PROBLEM = 'Check the email address, or leave it empty.';
 // The optional delivery address as typed: empty means none (or keep a saved one), `remove` drops a saved one.
 export function deliveryEmailField(value, { remove = false } = {}) {

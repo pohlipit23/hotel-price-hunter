@@ -293,7 +293,29 @@ details[open] > summary::after { transform: rotate(225deg); }
 .switch-next-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
 .switch-next-actions button { min-height: 54px; border-radius: 999px; padding: 12px 18px; font-weight: 600; }
 .switch-next-actions .secondary[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
-.switch-next-message { min-height: 1.5em; margin: 10px 0 0; color: var(--muted); font-size: 14px; }
+/* Judge closeout: the airmail ticket again, now stamped Done, beside the demo video. */
+.closeout-screen { align-items: start; }
+.closeout-card { position: relative; display: grid; justify-items: center; gap: 8px; border-radius: 22px; padding: 30px 22px 26px; text-align: center;
+  background: repeating-linear-gradient(-45deg, var(--coral) 0 10px, var(--surface) 10px 18px, var(--blue) 18px 28px, var(--surface) 28px 36px); }
+.closeout-card::before { position: absolute; inset: 8px; border-radius: 16px; background: var(--surface); content: ''; }
+.closeout-card > * { position: relative; }
+.closeout-stamp { display: flex; width: 104px; height: 104px; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 6px; border: 3px solid var(--coral); border-radius: 50%;
+  box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 5px var(--coral); color: var(--coral); text-transform: uppercase; transform: rotate(-10deg); }
+.closeout-stamp span { font-size: 10px; font-weight: 800; letter-spacing: .1em; }
+.closeout-stamp strong { font: 800 24px/1.05 var(--heading); }
+.closeout-card h1 { margin: 0; font-size: 26px; line-height: 1.2; }
+.closeout-choice { margin: 2px 0 0; border-radius: 999px; padding: 5px 12px; background: var(--blue-bg); color: var(--ink); font-size: 14px; font-weight: 500; }
+.closeout-next-title { margin: 14px 0 2px; font-size: 18px; }
+.closeout-steps { display: grid; gap: 10px; max-width: 30em; margin: 0; padding: 0; list-style: none; counter-reset: closeout; text-align: left; }
+.closeout-steps li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: center; counter-increment: closeout; font-size: 15px; }
+.closeout-steps li::before { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; background: #fdf1ef; color: var(--coral); content: counter(closeout); font: 700 14px/1 var(--body); }
+.closeout-honest { margin: 6px 0 4px; color: var(--muted); font-size: 13px; }
+.closeout-card .primary { width: min(100%, 320px); border-radius: 999px; }
+.closeout-video { display: grid; justify-items: center; gap: 8px; margin: 0; }
+.closeout-video-frame { width: min(100%, 315px); aspect-ratio: 9 / 16; overflow: hidden; border-radius: 18px; background: var(--ink); }
+.closeout-video-frame iframe { display: block; width: 100%; height: 100%; border: 0; }
+.closeout-video figcaption { color: var(--muted); font-size: 13px; }
+@media (min-width: 760px) { .closeout-screen { grid-template-columns: minmax(0, 1fr) 300px; } }
 .demo-controls { margin-top: 13px; border: 2px dashed #9aa9ba; border-radius: 15px; padding: 4px 12px 12px; background: #fbfcfd; }
 .demo-controls > summary { color: var(--muted); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
 .demo-controls p { margin: 0 0 8px; color: var(--muted); font-size: 12px; }

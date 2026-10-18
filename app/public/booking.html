@@ -134,6 +134,24 @@
           </div>
         </section>
 
+        <!-- Judge-only closeout after the confirmation's "What next?" choice: the RoomDrop app has ended. -->
+        <section id="closeout-screen" class="judge-screen closeout-screen" aria-labelledby="closeout-title" hidden>
+          <div class="closeout-card">
+            <span class="closeout-stamp" aria-hidden="true"><span>RoomDrop</span><strong>Done</strong></span>
+            <p class="eyebrow">Judge demo · end of the app</p>
+            <h1 id="closeout-title" tabindex="-1">That's the RoomDrop app, start to finish</h1>
+            <p id="closeout-choice" class="closeout-choice"></p>
+            <h2 class="closeout-next-title">What happens next in real life</h2>
+            <ol id="closeout-steps" class="closeout-steps"></ol>
+            <p class="closeout-honest">In this demo nothing was booked, cancelled or charged.</p>
+            <button id="closeout-restart" class="primary" type="button">Pick another booking</button>
+          </div>
+          <figure class="closeout-video">
+            <div id="closeout-video-frame" class="closeout-video-frame"></div>
+            <figcaption>The RoomDrop story in one short video</figcaption>
+          </figure>
+        </section>
+
         <section id="booking-summary" aria-labelledby="hotel">
           <article id="current-ticket" class="ticket current-ticket">
             <div class="ticket-caption">
@@ -192,7 +210,6 @@
                 <button id="keep-watching" class="primary" type="button" aria-pressed="false">Keep watching for drops</button>
                 <button id="keep-for-good" class="secondary" type="button" aria-pressed="false">Keep this booking for good</button>
               </div>
-              <p id="switch-next-message" class="switch-next-message" role="status"></p>
             </div>
             <ol id="switch-trail" class="switch-trail" aria-label="Switch progress"></ol>
             <p id="switch-reassurance" class="reassurance"></p>

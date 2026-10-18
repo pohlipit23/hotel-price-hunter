@@ -31,7 +31,9 @@ const SIAM = 'AIRB000180'; const HYATT = 'AIRB000179';
 try {
   for (const width of [320, 768, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: width === 1440 ? 'no-preference' : 'reduce' });
+    // The closeout's YouTube embed is expected; it is blocked (no live call) and counted apart from other external requests.
     await context.route('**/*', route => [origin, ...servers.map(item => item.origin)].includes(new URL(route.request().url()).origin) ? route.continue()
+      : new URL(route.request().url()).origin === 'https://www.youtube-nocookie.com' ? (report.closeoutVideo = (report.closeoutVideo ?? 0) + 1, route.abort())
       : (report.external.push(route.request().url()), route.abort()));
     const page = await context.newPage();
     page.on('pageerror', e => report.errors.push(e.message));
@@ -226,31 +228,50 @@ try {
       assert.equal(await page.locator('#' + id).isVisible(), false, width + ' confirmed hides ' + id);
     assert.equal(await page.locator('footer').isVisible(), false, 'no page footer on Confirmed'); await site('roomdrop');
     assert.equal(await page.locator('#switch-next-title').innerText(), 'What next?');
-    const pressed = async () => [await page.locator('#keep-watching').getAttribute('aria-pressed'), await page.locator('#keep-for-good').getAttribute('aria-pressed')];
-    assert.deepEqual(await pressed(), ['false', 'false']); assert.equal(await page.locator('#switch-next-message').innerText(), '');
-    // Neither choice is stored: picking one sends nothing to the server.
-    const sent = []; const onRequest = request => sent.push(request.method() + ' ' + request.url()); page.on('request', onRequest);
-    await page.locator('#keep-watching').click();
-    assert.deepEqual(await pressed(), ['true', 'false']);
-    assert.equal(await page.locator('#switch-next-message').innerText(), 'Got it. Fresh drops will show up here.');
-    await page.locator('#keep-for-good').focus(); await page.keyboard.press('Enter');
-    assert.deepEqual(await pressed(), ['false', 'true']);
-    assert.equal(await page.locator('#switch-next-message').innerText(), 'Got it. This booking is yours to keep.');
-    page.off('request', onRequest); assert.deepEqual(sent, [], 'next-step choice sent a request');
     await shot('confirmed');
-    await page.reload(); await visible('simulated-switch'); assert.deepEqual(await pressed(), ['false', 'false'], 'choice is not kept');
-    // Once confirmed, the review and Drops routes land on the confirmation. A pressed choice is reset each time
-    // the confirmation renders, which proves the route ran (the screen was already showing).
+    await page.reload(); await visible('simulated-switch');
+    // Once confirmed, the review and Drops routes land on the confirmation. The confirmation focuses its heading
+    // each time it renders, which proves the route ran (the screen was already showing).
     const landsConfirmed = async (route, hidden) => {
-      await page.locator('#keep-watching').click(); await page.goBack();
-      await page.locator('#keep-watching[aria-pressed="false"]').waitFor();
+      await page.locator('#keep-watching').focus(); await page.goBack();
+      await page.waitForFunction(() => document.activeElement?.id === 'switch-stage');
       assert.equal(new URL(page.url()).hash, '#' + route + '-' + SIAM);
       assert.deepEqual([await page.locator('#simulated-switch').isVisible(), await page.locator('#' + hidden).isVisible()], [true, false], route + ' lands on Confirmed');
     };
     await landsConfirmed('review', 'comparison'); await landsConfirmed('drops', 'deal-list');
 
+    // Either "What next?" choice ends the app on the judge closeout, outside both sites, with the video.
+    // Neither choice is sent to the server: no write while choosing (Back reloads the booking with plain GETs).
+    const sent = []; const onRequest = request => { if (new URL(request.url()).origin === origin && request.method() !== 'GET') sent.push(request.method() + ' ' + request.url()); };
+    page.on('request', onRequest);
+    const closeoutShows = async (choice, last) => {
+      await visible('closeout-screen'); await focused('closeout-title'); await site('none');
+      assert.equal(new URL(page.url()).hash, '#done-' + SIAM);
+      assert.equal(await page.locator('#closeout-title').innerText(), "That's the RoomDrop app, start to finish");
+      assert.equal(await page.locator('#closeout-choice').innerText(), choice);
+      const stepsText = await page.locator('#closeout-steps li').allInnerTexts();
+      assert.equal(stepsText.length, 3); assert.match(stepsText[2], last);
+      assert.equal(await page.locator('#judge-bar-text').innerText(), 'The RoomDrop app ends here · thanks for judging');
+      assert.equal(await page.locator('#journey-strip li.passed').count(), 3, 'every journey step passed');
+      assert.equal(await page.locator('#closeout-video-frame iframe').getAttribute('src'), 'https://www.youtube-nocookie.com/embed/zKe3UFlgUNc');
+      assert.deepEqual([await page.locator('#deal-list').isVisible(), await page.locator('#simulated-switch').isVisible()], [false, false]);
+    };
+    await page.locator('#keep-watching').click();
+    await closeoutShows('You chose: keep watching for drops', /emails you if it drops again/);
+    await shot('closeout');
+    // Back returns straight to the confirmation: no launch splash, the app is not starting again.
+    await page.goBack(); await visible('simulated-switch');
+    assert.equal(await page.locator('#launch-screen').isVisible(), false, 'no splash on the way back from the closeout');
+    await page.locator('#keep-for-good').focus(); await page.keyboard.press('Enter');
+    await closeoutShows('You chose: keep this booking for good', /Drop Watch stops/);
+    page.off('request', onRequest); assert.deepEqual(sent, [], 'next-step choice sent a request');
+    // A reload keeps the choice in this tab.
+    await page.reload(); await closeoutShows('You chose: keep this booking for good', /Drop Watch stops/);
+
+    // Pick another booking returns to the start page.
+    await page.locator('#closeout-restart').click(); await visible('catalogue-screen'); await focused('catalogue-title');
+    assert.equal(new URL(page.url()).hash, '#start');
     // Cannot start: the reason, with the setup action shown but disabled; direct setup links fall back.
-    await page.locator('.brand').click(); await visible('catalogue-screen'); await focused('catalogue-title');
     // Not on the picker, but a direct link still shows why it cannot start.
     await page.evaluate(code => { location.hash = '#booked-' + code; }, HYATT); await visible('booked-screen'); await visible('booked-blocked');
     assert.equal(await page.locator('#setup-drop').isDisabled(), true);
