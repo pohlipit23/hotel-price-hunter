@@ -3,7 +3,6 @@ import { readFile, writeFile, mkdir, realpath } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { resolve, dirname, relative, isAbsolute, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { deploymentQuotationSnapshot, deploymentCatalogue } from '../app/quotation-demo-server.mjs';
 
 const sourceFiles = ['package.json','package-lock.json','app/quotation-advisor.mjs','app/stay-chat.mjs','app/gemini.mjs','app/prompts/quotation-advice.txt','app/prompts/stay-chat.txt','app/prompts/stay-chat-opening.txt',
 'app/public/stay-advice.js','app/public/stay-advice.css','app/booking-cloud.mjs','app/booking-demo-server.mjs','app/quotation-demo-server.mjs','app/quotation-session-actions.mjs',
@@ -24,8 +23,6 @@ export async function main(args = process.argv.slice(2), { root = fileURLToPath(
   const path = await realpath(resolve(workspace, input)); const part = relative(local, path);
   if (!part || part === '..' || part.startsWith('..' + sep) || isAbsolute(part)) throw Error('PRIVATE_SNAPSHOT_REQUIRED');
   const privateData = JSON.parse(await readFile(path, 'utf8'));
-  // A catalogue release packages every entry's public snapshot; booking-cloud prefers it over the single snapshot.
-  const release = catalogueInput ? deploymentCatalogue(privateData) : deploymentQuotationSnapshot(privateData);
   const releaseName = catalogueInput ? 'booking-catalogue.json' : 'booking-demo.json';
   const git = command => execFileSync('git', command, { cwd: workspace, windowsHide: true, maxBuffer: 16 * 1024 * 1024 });
   if (git(['rev-parse', `${source}^{commit}`]).toString().trim() !== source) throw Error('SOURCE_COMMIT_UNAVAILABLE');
@@ -37,10 +34,14 @@ export async function main(args = process.argv.slice(2), { root = fileURLToPath(
   }
   const dockerfile = git(['show', `${source}:Dockerfile.booking`]); await writeFile(resolve(context, 'Dockerfile'), dockerfile, { flag: 'wx' });
   files.push({ path: 'Dockerfile', sha256: hash(dockerfile), bytes: dockerfile.length });
+  // Validate and project with the frozen commit's code, never the possibly dirty preparation checkout.
+  const { deploymentQuotationSnapshot, deploymentCatalogue } = await import(pathToFileURL(resolve(context, 'app/quotation-demo-server.mjs')).href);
+  const release = catalogueInput ? deploymentCatalogue(privateData) : deploymentQuotationSnapshot(privateData);
   const bytes = Buffer.from(JSON.stringify(release) + '\n'); await writeFile(resolve(context, releaseName), bytes, { flag: 'wx' });
   files.push({ path: releaseName, sha256: hash(bytes), bytes: bytes.length });
   files.sort((a, b) => a.path.localeCompare(b.path)); const contextSha256 = hash(JSON.stringify(files));
   const manifest = { sourceCommit: source, contextSha256, snapshotSha256: hash(bytes),
+    releaseGate: 'requires-integrated-firestore-and-release-approval',
     ...(catalogueInput ? { catalogue: release.map(entry => ({ code: entry.code, snapshotVersion: entry.snapshot.snapshotVersion })) } : { snapshotVersion: release.snapshotVersion }),
     contextDirectory: context, privateSnapshot: path, uncommittedFilesExcluded: true, files,
     localImageTag: `roomdrop-booking:${source.slice(0, 12)}-${contextSha256.slice(0, 12)}`,
