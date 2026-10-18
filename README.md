@@ -1,24 +1,109 @@
-# RoomDrop · Hotel Price Hunter prototype
+<p align="center">
+  <img src="submission/readme/roomdrop-wordmark.png" alt="RoomDrop" width="420">
+</p>
 
-**Current production AI:** the existing booking review now uses **Gemini 3.8 Flash** (`gemini-3.8-flash`, global, LOW thinking). Open a drop and use **Ask Gemini**. Revision `hotel-price-hunter-00015-b8d` is live with all traffic; 270 regression tests and three real production advice checks passed. The booking layout, public access and agency/watch/data boundaries were preserved. See [production release](docs/gemini-production-release.md), [earlier evaluation](docs/gemini-38-evaluation.md) and `.env.quotation.example`.
+<h3 align="center">Book early. Still catch the drop. 💧</h3>
 
-The Gemini stay adviser restores the original hackathon AI requirement in selected-room review. Travellers ask about price, room/meal differences and uncertain plans, with two previous exchanges retained per option. Gemini understands the priority and selects grounded recommendations; application code renders prices and enforces selection-only authority. See [the contract](docs/quotation-gemini-contract.md) and [initial restoration verification](docs/quotation-gemini-verification.md). Historical milestone/deployment paragraphs below describe earlier releases.
+<p align="center">
+  Hotel prices drop after you book. RoomDrop keeps watching your exact stay, and when a cheaper room shows up, you get a <b>drop</b>.
+</p>
 
-For an authorised live quotation-advice run, use the existing project, approved `GOOGLE_CLOUD_LOCATION` / `GEMINI_MODEL`, attached identity or local ADC, and explicit `QUOTATION_ADVICE_ENABLED=true`. Start with `node --env-file-if-exists=.env scripts/serve-quotation-demo.mjs --snapshot=.local/quotation-demo/DEMOP010223-selected-bundle.json --port=8094`. No startup/page-load generation occurs. Never add browser keys or reuse the exhausted historical inference allowance. The quotation image now packages the pinned SDK dependencies; deployment needs both the reviewed image and explicit model configuration. Historical booking/Firestore milestones below describe the separate earlier server.
+<p align="center">
+  <a href="https://hotel-price-hunter-2qbcpylngq-as.a.run.app"><img alt="Try the live demo" src="https://img.shields.io/badge/Try_the_live_demo-c2402f?style=for-the-badge&logo=googlecloud&logoColor=white"></a>
+  <a href="submission/roomdrop-demo.mp4"><img alt="Watch the video" src="https://img.shields.io/badge/Watch_the_video-202c3b?style=for-the-badge&logo=youtube&logoColor=white"></a>
+  <a href="https://aibuildercup.com"><img alt="AI Builder Cup 2026" src="https://img.shields.io/badge/AI_Builder_Cup-2026-f5c542?style=for-the-badge"></a>
+</p>
 
-One Node application serves the mobile public jury flow and its API, with Firestore persistence and server-side Gemini advice through Vertex AI. The approved RoomDrop customer flow starts from the current booking and three horizontal photographic alternatives, using hotel-name headings and relationship pills. The selected-offer review shows net savings and captures explicit approval directly, without a requirements/settings form. Distinct replacement, cancellation and refund stages persist across refresh. Existing enrolment, standing-permission and advice APIs remain available; scheduled monitoring and email delivery remain future work.
+<p align="center">
+  <img alt="Gemini 3.8 Flash" src="https://img.shields.io/badge/Gemini_3.8_Flash-Vertex_AI-4285F4?logo=googlegemini&logoColor=white">
+  <img alt="Cloud Run" src="https://img.shields.io/badge/Cloud_Run-asia--southeast1-4285F4?logo=googlecloud&logoColor=white">
+  <img alt="Firestore" src="https://img.shields.io/badge/Cloud_Firestore-transactions_%2B_TTL-FFCA28?logo=firebase&logoColor=black">
+  <img alt="Node.js 22" src="https://img.shields.io/badge/Node.js-22-5FA04E?logo=nodedotjs&logoColor=white">
+</p>
 
-Only the allowlisted [anonymised jury fixture](fixtures/jury-booking.json) is public. All booking/rate facts and the USD 25 agency minimum are fictional demonstration settings. Supplier identities are fictional. There is no arbitrary booking lookup, private retrieval route, or live transaction adapter.
+---
 
-The initial RoomDrop customer release `c9a7d7f` established its own private Google IAP gate for `pete@altovo.com`; the agency service remains a separate reader. Independent image/runtime/direct-access verification passed **44+4** checks within the explicit inherited-IAM limit. The user confirmed the live watch/switch/agency check; one approved job execution then passed **20/20** checks and persisted the expected unsupported-replacement fixture outcome. The watch job retains that source; the customer clarity release is described below. Scheduler remains absent, Gemini disabled and notifications preview-only. See [the initial execution record](docs/roomdrop-cloud-execution.md), [daily job contract](docs/daily-watch-cloud-contract.md) and [offline setup bundle](docs/roomdrop-cloud-setup.md).
+## 🎬 See it in action
 
-The [private customer app](https://hotel-price-hunter-2qbcpylngq-as.a.run.app/) now runs the approved clarity revision `hotel-price-hunter-00008-87j`, with shorter watch copy, one three-step guide, explicit next-action labels and a clean completed state. [Local verification](docs/customer-clarity-verification.md) records the UI, keyboard and refund/consent regressions. [Release checks](docs/customer-clarity-execution.md) pass **40/40**, including preserved data, private access and unchanged agency/watch configuration. Signed-in visual confirmation of this new revision remains pending; browser automation could not connect.
+<p align="center">
+  <a href="submission/roomdrop-demo.mp4">
+    <img src="submission/readme/demo-video-poster.png" alt="Watch the RoomDrop demo (3:32)" width="820">
+  </a>
+  <br>
+  <sub>Click to play the 3:32 demo, or <a href="https://hotel-price-hunter-2qbcpylngq-as.a.run.app">try it yourself</a>: pick a booking, set your minimum and watch the drops land.</sub>
+</p>
 
-The subsequent [B1 customer redesign](docs/roomdrop-b1-verification.md) is integrated in local source and the temporary phone preview. Photo tickets, negative saving stamps, offer filters and illustrated review facts carry through the customer flow. Watch consent is explicit; approval retries survive Back and reload. Simulated transaction steps remain manual inside a Demo only disclosure. The [verified B1 image](docs/roomdrop-b1-release.md) is prepared locally and awaits deployment approval; the private cloud service still has the earlier clarity design.
+## 💡 The idea
 
-The current [three-option mobile refinement](docs/three-drop-options-verification.md) keeps a slim existing-booking summary above the best overall, same-hotel and same-room drops, including overlapping winners. Non-refundable offers carry a Final drop warning and explicit watch-ending acknowledgement. Standard buttons with small room-key icons open review and approve separately; the mobile approval bar, readable penalties and visible return focus remain. This refinement is available in the fictional temporary preview and has not been deployed to Cloud Run.
+You booked a hotel three months out. Smart move... until the price falls the week before. Most travellers never notice, and the agency never tells them.
 
-The public fixture uses a labelled frozen `demoNow` for decisions. Its original `checkedAt` and `expiresAt` stay intact; displaying a snapshot does not perform a live supplier check. Visitor expiry, request limits, and audit `recordedAt` use actual wall time. Any future private/live flow must use actual time for offer and permission validity.
+**RoomDrop fixes that.** It re-shops the exact stay on live supplier rates and turns every cheaper room into a drop: same hotel, same dates, a big saving stamp, and the fine print (cancellation, refunds, what you give up) right there on the card.
+
+| Step | What happens |
+| --- | --- |
+| 🧳 **1. Book as usual** | The traveller books with their agency, early, the way they always do. |
+| 🎯 **2. Arm a Drop Watch** | Pick a minimum saving worth switching for. RoomDrop does the watching. |
+| 💧 **3. Catch the drop** | Cheaper rooms arrive as drops, each with a minus-stamp saving and honest caveats. |
+| ✨ **4. Ask Gemini, then switch** | Unsure? Ask Gemini. Happy? Tick any flexibility you give up and confirm. |
+
+And for agencies, it's the same engine: re-shop held bookings and win back margin. 🏨➡️💰
+
+## 📸 A peek inside
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="submission/screenshots/drop%20overview.png" alt="Drops overview"><br><sub><b>Your drops</b>, sorted best first</sub></td>
+    <td align="center" width="33%"><img src="submission/screenshots/drop%20details.png" alt="Drop details"><br><sub><b>Peek at a drop</b>: price, room, the fine print</sub></td>
+    <td align="center" width="33%"><img src="submission/screenshots/gemini%20chat%20roomdrop.png" alt="Ask Gemini"><br><sub><b>Ask Gemini</b> whether to switch</sub></td>
+  </tr>
+</table>
+
+## 🧠 Gemini that never makes up a price
+
+Gemini 3.8 Flash on Vertex AI powers the drop adviser and chat. It's helpful, and it's kept on a short leash:
+
+- 📐 **Schema-bound replies.** Gemini answers in structured JSON, never free-form prices.
+- ✅ **Server re-validation.** Every reply is checked against the facts on screen before it renders, so the model can't invent a number.
+- ✂️ **Short and sweet.** At most three statements and 70 words per reply.
+- 🔒 **No authority.** Gemini explains and recommends; only the traveller can switch.
+
+## ☁️ Built on Google Cloud
+
+| Piece | What it does |
+| --- | --- |
+| **Cloud Run** (asia-southeast1) | Hosts the public Node.js app, a private agency console behind Google IAP, and a price-watch Cloud Run Job. |
+| **Gemini 3.8 Flash on Vertex AI** | The drop adviser and chat, with schema-bound JSON replies. |
+| **Cloud Firestore** | Bookings, append-only drops, Drop Watch consent and sessions, using transactions and TTL. |
+| **Firebase tooling** | The Firestore emulator runs our integration tests locally. |
+
+## 🏆 Built for the AI Builder Cup
+
+<p align="center">
+  <a href="https://aibuildercup.com">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="submission/ai-builders-cup-logo-transparent.png">
+      <img src="submission/ai-builders-cup-logo.png" alt="AI Builder Cup: Build in JAPAC. Build for the world." width="360">
+    </picture>
+  </a>
+</p>
+
+RoomDrop is **Team Triple-8**'s entry to the [Google Cloud AI Builder Cup 2026](https://aibuildercup.com). Build in JAPAC, build for the world. 🌏
+
+## 🚀 Run it locally in one line
+
+```powershell
+npm ci --ignore-scripts; node scripts/serve-booking-demo.mjs --fixture --port=8094
+```
+
+Then open http://127.0.0.1:8094/ and follow the judge bar. The fixture mode uses a deterministic demo catalogue and in-memory state: no cloud, no keys, no real bookings. Run the tests with `npm test`.
+
+> **Heads up:** every booking, rate and saving in the demo is fictional or a replayed capture. RoomDrop never changes a real reservation or takes a payment.
+
+---
+
+# 🛠️ For builders: the deep end
+
+Everything below is the detailed engineering record: local setup with Firestore, Gemini configuration, the public API, the simulated switch, the agency console and the price watch.
 
 ## Local application
 
@@ -147,7 +232,7 @@ See [the identity contract](docs/agency-iap-contract.md) and [private deployment
 
 Use **Watch for better rates** to save checks-and-alerts consent and the first simulated check in one action; **Stop watching** revokes it. This grants no switch permission and changes no booking, enrolment or saved stay requirements. Updates are collapsed by default and explicitly preview-only: none are emailed. Daily/weekly/offers-only record policy uses existing saved preferences; manual refund progress and agency-attention records remain evidence-bound.
 
-`POST /api/price-watch` accepts `{bookingVersion,watchVersion,enabled}` plus the bootstrap's server-issued `Idempotency-Key` and normal session/origin/CSRF guards. `GET /api/notifications?limit=20` returns own-session safe previews (limit 1–50). New watch rates have separately generated simulated identities, actual check times and bound money; they are read-only observations and are not passed into the frozen demo approval flow. The original operation clock and approved source snapshots remain unchanged. Unsupported replacement sources record a failed check rather than claiming no saving exists.
+`POST /api/price-watch` accepts `{bookingVersion,watchVersion,enabled}` plus the bootstrap's server-issued `Idempotency-Key` and normal session/origin/CSRF guards. `GET /api/notifications?limit=20` returns own-session safe previews (limit 1-50). New watch rates have separately generated simulated identities, actual check times and bound money; they are read-only observations and are not passed into the frozen demo approval flow. The original operation clock and approved source snapshots remain unchanged. Unsupported replacement sources record a failed check rather than claiming no saving exists.
 
 With the explicit demo/emulator environment from the local setup, run the packaged local worker once or leave its bounded 60-second polling loop active:
 
@@ -167,3 +252,30 @@ The proposed deployment to project `sincere-apex-511418-p0` is documented in [th
 The original Cloudflare pitch remains in `src/pitch.html`, `worker/index.js` and `designs/`. `npm run build` regenerates only the Worker HTML; `npm run dev:pitch` starts its separate local Worker. Its existing username/password configuration remains separate from the jury application. `npm run deploy:pitch` is the existing publication path and requires separate deployment authorisation.
 
 The [previous hosted pitch](https://hotel-price-hunter-pitch.clear-olm-9015.chatgpt.site) is not the new application. The [design snapshots](designs/README.md) preserve Travel journal, Clean comparison and Booking changes. See [the data contract](docs/data-contract.md), [decision examples](docs/decision-examples.md) and [integration evidence](docs/integration-feasibility.md) for current live integration limits.
+
+## 📜 Build log
+
+<details>
+<summary>Earlier milestones and releases (historical; revisions and counts describe those releases, not today's app)</summary>
+
+**Current production AI:** the existing booking review now uses **Gemini 3.8 Flash** (`gemini-3.8-flash`, global, LOW thinking). Open a drop and use **Ask Gemini**. Revision `hotel-price-hunter-00015-b8d` is live with all traffic; 270 regression tests and three real production advice checks passed. The booking layout, public access and agency/watch/data boundaries were preserved. See [production release](docs/gemini-production-release.md), [earlier evaluation](docs/gemini-38-evaluation.md) and `.env.quotation.example`.
+
+The Gemini stay adviser restores the original hackathon AI requirement in selected-room review. Travellers ask about price, room/meal differences and uncertain plans, with two previous exchanges retained per option. Gemini understands the priority and selects grounded recommendations; application code renders prices and enforces selection-only authority. See [the contract](docs/quotation-gemini-contract.md) and [initial restoration verification](docs/quotation-gemini-verification.md). Historical milestone/deployment paragraphs below describe earlier releases.
+
+For an authorised live quotation-advice run, use the existing project, approved `GOOGLE_CLOUD_LOCATION` / `GEMINI_MODEL`, attached identity or local ADC, and explicit `QUOTATION_ADVICE_ENABLED=true`. Start with `node --env-file-if-exists=.env scripts/serve-quotation-demo.mjs --snapshot=.local/quotation-demo/DEMOP010223-selected-bundle.json --port=8094`. No startup/page-load generation occurs. Never add browser keys or reuse the exhausted historical inference allowance. The quotation image now packages the pinned SDK dependencies; deployment needs both the reviewed image and explicit model configuration. Historical booking/Firestore milestones below describe the separate earlier server.
+
+One Node application serves the mobile public jury flow and its API, with Firestore persistence and server-side Gemini advice through Vertex AI. The approved RoomDrop customer flow starts from the current booking and three horizontal photographic alternatives, using hotel-name headings and relationship pills. The selected-offer review shows net savings and captures explicit approval directly, without a requirements/settings form. Distinct replacement, cancellation and refund stages persist across refresh. Existing enrolment, standing-permission and advice APIs remain available; scheduled monitoring and email delivery remain future work.
+
+Only the allowlisted [anonymised jury fixture](fixtures/jury-booking.json) is public. All booking/rate facts and the USD 25 agency minimum are fictional demonstration settings. Supplier identities are fictional. There is no arbitrary booking lookup, private retrieval route, or live transaction adapter.
+
+The initial RoomDrop customer release `c9a7d7f` established its own private Google IAP gate for `pete@altovo.com`; the agency service remains a separate reader. Independent image/runtime/direct-access verification passed **44+4** checks within the explicit inherited-IAM limit. The user confirmed the live watch/switch/agency check; one approved job execution then passed **20/20** checks and persisted the expected unsupported-replacement fixture outcome. The watch job retains that source; the customer clarity release is described below. Scheduler remains absent, Gemini disabled and notifications preview-only. See [the initial execution record](docs/roomdrop-cloud-execution.md), [daily job contract](docs/daily-watch-cloud-contract.md) and [offline setup bundle](docs/roomdrop-cloud-setup.md).
+
+The [private customer app](https://hotel-price-hunter-2qbcpylngq-as.a.run.app/) now runs the approved clarity revision `hotel-price-hunter-00008-87j`, with shorter watch copy, one three-step guide, explicit next-action labels and a clean completed state. [Local verification](docs/customer-clarity-verification.md) records the UI, keyboard and refund/consent regressions. [Release checks](docs/customer-clarity-execution.md) pass **40/40**, including preserved data, private access and unchanged agency/watch configuration. Signed-in visual confirmation of this new revision remains pending; browser automation could not connect.
+
+The subsequent [B1 customer redesign](docs/roomdrop-b1-verification.md) is integrated in local source and the temporary phone preview. Photo tickets, negative saving stamps, offer filters and illustrated review facts carry through the customer flow. Watch consent is explicit; approval retries survive Back and reload. Simulated transaction steps remain manual inside a Demo only disclosure. The [verified B1 image](docs/roomdrop-b1-release.md) is prepared locally and awaits deployment approval; the private cloud service still has the earlier clarity design.
+
+The current [three-option mobile refinement](docs/three-drop-options-verification.md) keeps a slim existing-booking summary above the best overall, same-hotel and same-room drops, including overlapping winners. Non-refundable offers carry a Final drop warning and explicit watch-ending acknowledgement. Standard buttons with small room-key icons open review and approve separately; the mobile approval bar, readable penalties and visible return focus remain. This refinement is available in the fictional temporary preview and has not been deployed to Cloud Run.
+
+The public fixture uses a labelled frozen `demoNow` for decisions. Its original `checkedAt` and `expiresAt` stay intact; displaying a snapshot does not perform a live supplier check. Visitor expiry, request limits, and audit `recordedAt` use actual wall time. Any future private/live flow must use actual time for offer and permission validity.
+
+</details>
