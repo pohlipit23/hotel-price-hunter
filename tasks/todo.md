@@ -42,10 +42,13 @@ grants no new live-call allowance; each step marked LIVE needs separate explicit
 user approval before it runs. Never change Altovo code/settings, call
 confirm-quote, create supplier bookings or commit `.local\`.
 
-- [ ] S0.1 Inspect the two existing projections first (AIRB000179, AIRB000180
+- [x] S0.1 Inspect the two existing projections first (AIRB000179, AIRB000180
   under ignored `.local\altovo-sample\`): allowlisted keys, cancellation schedule,
   provenance and which scenario slots they fill. Record the remaining scenario
   gaps before requesting any creation or capture. Local only, no live call.
+  Done 18 Oct: AIRB000180 fills refundable/armable (Drops still missing),
+  AIRB000179 fills non-refundable/cannot-start; closing-soon and currency/board
+  variety remain gaps. Needs for S0.2 recorded in the verification doc, Part 1 S0.1.
 - [ ] S0.2 Quotation creation by the owner (OWNER, LIVE staging UI): the owner
   creates the missing air1 quotations to fill the recorded gaps; quotations stay
   `status='quote'`. Record the approved air1 code list as tenant provenance.
@@ -68,24 +71,30 @@ confirm-quote, create supplier bookings or commit `.local\`.
 
 ### F0: Audit available captures and existing scaffolding
 
-- [ ] Acceptance: inventory the two ignored air1 projections, any captured Gateway
+- [x] Acceptance: inventory the two ignored air1 projections, any captured Gateway
   results, concurrent catalogue/runtime/UI changes and their ownership, and the remaining
   six-card scenario needs. Record source/tenant provenance and missing evidence
   without printing private payloads or changing current application behavior.
 - Verify: local schema/key/provenance inspection, `.local\` ignore checks and
   capture integrity hashes. No live call or Firestore write.
+- Evidence: verification doc, Part 1 F0 (18 Oct): key/provenance inventory,
+  SHA-256 of both projections and the unrelated 16 Oct Gateway files, ignore
+  checks, scaffolding gaps; no Gateway capture exists for either curated code.
 - Depends on: plan approval (given 18 October 2026). Small, two documentation files:
   `docs\public-demo-firestore-verification.md`, `tasks\todo.md`.
 
 ### F1: Validate the Altovo catalogue adapter and capture preparation
 
-- [ ] Acceptance: review/extend existing scaffolding for the actual projection
+- [x] Acceptance: review/extend existing scaffolding for the actual projection
   shape, UTC cancellation schedules and explicit agency search defaults. Prepare
   display-safe per-code bundles/card metadata; private supplier/raw fields remain
   private. Dry-run performs no upstream calls; live capture remains separately gated.
 - Verify: `node --test .\tests\altovo-catalogue.test.mjs` with sanitised fixtures
   and injected Gateway responses, covering sentinel/naive/conflicting deadlines,
   missing facts, money/currency bindings, cannot-start and valid-empty captures.
+- Evidence: commit 4393134; 15 tests in the new file pass (28 with the adapter
+  and catalogue suites). Preparation now needs `--approved-codes`, dry-runs by
+  default with no upstream call or write, and records per-code capture status.
 - Depends on: F0. Medium, three files: `app\domain\altovo-quotation.mjs`,
   `scripts\prepare-altovo-catalogue.mjs`, `tests\altovo-catalogue.test.mjs`.
 
