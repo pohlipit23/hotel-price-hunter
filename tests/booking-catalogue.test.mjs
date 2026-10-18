@@ -3,23 +3,14 @@ import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import { createBookingDemoServer } from '../app/booking-demo-server.mjs';
 import { createQuotationDemoServer, createHostedQuotationDemoServer, deploymentCatalogue } from '../app/quotation-demo-server.mjs';
+import { createBookingStorage } from '../app/booking-storage.mjs';
 import { altovoCatalogueFixture, FIXTURE_CHECKED_AT } from './fixtures/altovo-catalogue.mjs';
+import { NOW, curated, emulatorCatalogue, integration, listen, rehash, sha256, visit } from './fixtures/roomdrop-harness.mjs';
 
 const OPEN = 'AIRB000180'; const BLOCKED = 'AIRB000179';
-async function app(t, { now = () => new Date('2026-10-20T00:00:00Z'), advisor } = {}) {
-  const server = createBookingDemoServer({ catalogue: altovoCatalogueFixture(), now, advisor });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
-  const origin = `http://127.0.0.1:${server.address().port}`;
-  const visitor = async () => {
-    const response = await fetch(origin + '/api/booking-demo/catalogue');
-    const cookie = response.headers.get('set-cookie').split(';')[0]; const list = await response.json();
-    const get = async code => fetch(origin + '/api/booking-demo/q/' + code, { headers: { Cookie: cookie } });
-    const post = (code, action, body, headers = {}) => fetch(`${origin}/api/booking-demo/q/${code}/${action}`, { method: 'POST',
-      headers: { Origin: origin, Cookie: cookie, 'X-CSRF-Token': list.csrfToken, 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) });
-    return { cookie, list, get, post };
-  };
-  return { origin, visitor };
+async function app(t, { now = NOW, advisor } = {}) {
+  const origin = await listen(t, createBookingDemoServer({ catalogue: altovoCatalogueFixture(), now, advisor }));
+  return { origin, visitor: () => visit(origin) };
 }
 const snapshotOf = code => altovoCatalogueFixture().entries.find(entry => entry.code === code).bundle.snapshotVersion;
 const arm = (minimumSavingMinor, code = OPEN) => ({ snapshotVersion: snapshotOf(code), consent: true, minimumSavingMinor });
@@ -82,12 +73,15 @@ test('arming a Drop Watch needs consent, a minimum at or above the agency floor,
   assert.equal((await (await v.get(OPEN)).json()).watch, null);
 
   const armed = await (await v.post(OPEN, 'watch', arm(5000))).json();
-  assert.equal(armed.watch.minimumSavingMinor, 5000); assert.equal(armed.watch.armedAt, '2026-10-20T00:00:00.000Z');
-  assert.deepEqual(armed.watch.firstCheck, { replayed: true, checkedAt: FIXTURE_CHECKED_AT, dropOptionIds: ['option-fixture-final-deluxe', 'option-fixture-flex-premier'] });
+  assert.equal(armed.watch.minimumSavingMinor, 5000); assert.equal(armed.watch.armedAt, '2026-10-20T00:00:00.000Z'); assert.equal(armed.watch.revision, 1);
+  assert.deepEqual((({ mode, replayed, status, checkedAt, dropOptionIds }) => ({ mode, replayed, status, checkedAt, dropOptionIds }))(armed.watch.firstCheck),
+    { mode: 'captured-replay', replayed: true, status: 'completed', checkedAt: FIXTURE_CHECKED_AT, dropOptionIds: ['option-fixture-final-deluxe', 'option-fixture-flex-premier'] });
   assert.deepEqual(armed.dropOptionIds, ['option-fixture-final-deluxe', 'option-fixture-flex-premier']);
   assert.deepEqual((await (await v.get(OPEN)).json()).watch, armed.watch);
-  assert.deepEqual((await (await v.post(OPEN, 'watch', arm(25000))).json()).dropOptionIds, []);
-  assert.deepEqual((await (await v.post(OPEN, 'watch', arm(1000))).json()).dropOptionIds.length, 3);
+  // A new minimum must name the revision it replaces; a request built on revision 0 is stale.
+  await expectError(await v.post(OPEN, 'watch', arm(25000)), 409, 'WATCH_REVISION_STALE');
+  assert.deepEqual((await (await v.post(OPEN, 'watch', { ...arm(25000), expectedRevision: 1 })).json()).dropOptionIds, []);
+  assert.deepEqual((await (await v.post(OPEN, 'watch', { ...arm(1000), expectedRevision: 2 })).json()).dropOptionIds.length, 3);
   assert.equal((await (await v.get(OPEN)).json()).watch.minimumSavingMinor, 1000);
 });
 
@@ -162,3 +156,108 @@ test('hosted catalogue strips private references and refuses private keys, misma
   });
   assert.equal(body.status, 200); assert.match(body.cookie, /; Secure/); assert.equal(body.json.entries.length, 2);
 });
+
+test('hosted booking storage needs durable Firestore sessions and no other data source', async () => {
+  const environment = { NODE_ENV: 'production', K_SERVICE: 'hotel-price-hunter', GOOGLE_CLOUD_PROJECT: 'sincere-apex-511418-p0', APP_SURFACE: 'customer', APP_ORIGIN: 'https://hotel-price-hunter-2qbcpylngq-as.a.run.app' };
+  const bookingStorage = { listCatalogue: async () => [], getBooking: async () => null };
+  const firestoreSessions = { mode: 'firestore', create: async () => null, get: async () => null, transact: async () => null };
+  assert.throws(() => createBookingDemoServer({ bookingStorage, environment }), /Firestore/);
+  assert.throws(() => createBookingDemoServer({ bookingStorage, sessionStorage: { ...firestoreSessions, mode: 'test-memory' }, environment }), /Firestore/);
+  assert.throws(() => createBookingDemoServer({ bookingStorage, sessionStorage: firestoreSessions, catalogue: deploymentCatalogue(altovoCatalogueFixture()), environment }));
+  assert.throws(() => createBookingDemoServer({ bookingStorage, catalogue: altovoCatalogueFixture() }));
+  assert.throws(() => createBookingDemoServer({ catalogue: altovoCatalogueFixture(), sessionStorage: firestoreSessions }));
+  assert.doesNotThrow(() => createBookingDemoServer({ bookingStorage, sessionStorage: firestoreSessions, environment }).close());
+});
+
+// ---- Firestore emulator: the imported curated fixture, durable sessions, test-owned collections only. ----
+
+test('Firestore catalogue: imported entries in card order, with cards and request-time blockers, and a hashed durable session', integration, async t => {
+  const { first, prefix, storage, versions } = await emulatorCatalogue(t);
+  const origin = await listen(t, createBookingDemoServer({ ...storage(first), now: NOW }));
+  const v = await visit(origin);
+  assert.equal(v.response.status, 200); assert.match(v.cookie, /^roomdrop_quote=[a-f0-9]{64}$/);
+  assert.deepEqual(v.list.entries.map(entry => [entry.code, entry.blocker, entry.tag, entry.optionCount, entry.snapshotVersion]),
+    [[OPEN, null, 'ready', 3, versions[OPEN].contentVersion], [BLOCKED, 'NON_REFUNDABLE', 'cannot-start', 0, versions[BLOCKED].contentVersion]]);
+  assert.deepEqual(v.list.entries.map(entry => entry.card), curated().cards.map(({ code, ...card }) => card));
+  assert.deepEqual(v.list.entries[0].quotedRetail, { totalMinor: 233552, currency: 'MYR' });
+  assert.doesNotMatch(JSON.stringify(v.list), /FIXTURE-PRIVATE|fixture-contract|privateReferences|rateDetail|sourceId/);
+  // Only the cookie digest names the stored session; the raw value is stored nowhere.
+  const raw = v.cookie.split('=')[1];
+  const stored = await first.collection(`${prefix}PublicSessionsV1`).doc(sha256(raw)).get();
+  assert.equal(stored.data().csrfToken, v.list.csrfToken);
+  assert.doesNotMatch(JSON.stringify((await first.collection(`${prefix}PublicSessionsV1`).get()).docs.map(doc => [doc.id, doc.data()])), new RegExp(raw));
+  // The same browser keeps its session; the capture date stays visible per code.
+  const again = await visit(origin, { cookie: v.cookie });
+  assert.equal(again.response.headers.get('set-cookie'), null); assert.equal(again.list.csrfToken, v.list.csrfToken);
+  const closing = await listen(t, createBookingDemoServer({ ...storage(first, () => new Date('2027-02-05T00:00:00Z')), now: () => new Date('2027-02-05T00:00:00Z') }));
+  assert.equal((await visit(closing)).list.entries[0].tag, 'closing-soon');
+});
+
+test('Firestore bootstrap: shared facts plus only this session\'s watch; unknown, encoded and malformed codes never reach storage', integration, async t => {
+  const { first, storage, versions } = await emulatorCatalogue(t);
+  const { bookingStorage, sessionStorage } = storage(first);
+  const looked = [];
+  const counted = { ...bookingStorage, getBooking: code => { looked.push(code); return bookingStorage.getBooking(code); } };
+  const origin = await listen(t, createBookingDemoServer({ bookingStorage: counted, sessionStorage, now: NOW }));
+  const v = await visit(origin);
+  const data = await (await v.get(OPEN)).json();
+  assert.deepEqual([data.code, data.snapshotVersion, data.dropSetVersion, data.options.length, data.blocker, data.agencyMinimumSavingMinor, data.watch, data.confirmation],
+    [OPEN, versions[OPEN].contentVersion, versions[OPEN].dropSetVersion, 3, null, 1000, null, null]);
+  assert.deepEqual(data.capture, { status: 'observed', capturedAt: '2026-10-18T12:10:00.000Z' });
+  assert.equal(data.csrfToken, v.list.csrfToken); assert.equal(data.baseline.quotationCode, OPEN);
+  assert.doesNotMatch(JSON.stringify(data), /FIXTURE-PRIVATE|privateReferences|rateDetail|sourceId/);
+  assert.deepEqual([(await (await v.get(BLOCKED)).json()).blocker, (await (await v.get(BLOCKED)).json()).capture], ['NON_REFUNDABLE', { status: 'not-searched', capturedAt: null }]);
+  looked.length = 0;
+  for (const code of ['AIRB999999', 'airb000180', 'AIRB000180/extra', '%41IRB000180', 'AIRB000180%2Fwatch', 'AIRB0001800000000000000'])
+    assert.equal((await v.get(code)).status, 404, code);
+  for (const path of ['/api/booking-demo/q/AIRB000180?x=1', '/api/booking-demo/catalogue?code=AIRB999999', '/api/quotation-demo/q/AIRB000180'])
+    assert.ok([400, 404].includes((await fetch(origin + path, { headers: { Cookie: v.cookie } })).status), path);
+  assert.equal((await v.post('AIRB999999', 'watch', { snapshotVersion: 'x', consent: true, minimumSavingMinor: 1000 })).status, 404);
+  assert.deepEqual(looked, []);
+});
+
+test('Firestore sessions: two judges and two codes stay isolated, and a restart keeps the committed watch', integration, async t => {
+  const { first, second, storage, versions } = await emulatorCatalogue(t);
+  const server = createBookingDemoServer({ ...storage(first), now: NOW });
+  const origin = await listen(t, server);
+  const a = await visit(origin); const b = await visit(origin);
+  const armA = await (await a.post(OPEN, 'watch', { snapshotVersion: versions[OPEN].contentVersion, consent: true, minimumSavingMinor: 1000 })).json();
+  assert.equal(armA.watch.revision, 1);
+  assert.equal((await (await b.get(OPEN)).json()).watch, null);
+  assert.equal((await (await a.get(BLOCKED)).json()).watch, null);
+  const armB = await (await b.post(OPEN, 'watch', { snapshotVersion: versions[OPEN].contentVersion, consent: true, minimumSavingMinor: 15000 })).json();
+  assert.deepEqual(armB.dropOptionIds, ['option-fixture-flex-premier']);
+  assert.deepEqual((await (await a.get(OPEN)).json()).watch, armA.watch);
+  assert.equal((await b.post(OPEN, 'watch', { snapshotVersion: versions[OPEN].contentVersion, consent: true, minimumSavingMinor: 5000 }, { 'X-CSRF-Token': a.list.csrfToken })).status, 403);
+  // Restart: a new app instance with new storage objects on another client, same emulator.
+  await new Promise(resolve => { server.closeAllConnections(); server.close(resolve); });
+  const restarted = await listen(t, createBookingDemoServer({ ...storage(second), now: NOW }));
+  const back = await visit(restarted, { cookie: a.cookie });
+  assert.equal(back.response.headers.get('set-cookie'), null); assert.equal(back.list.csrfToken, a.list.csrfToken);
+  assert.deepEqual((await (await back.get(OPEN)).json()).watch, armA.watch);
+  assert.deepEqual((await (await visit(restarted, { cookie: b.cookie })).get(OPEN).then(response => response.json())).watch, armB.watch);
+});
+
+test('Firestore Drop sets: a later capture makes the stored watch stale for that code only', integration, async t => {
+  const { first, second, prefix, storage, versions } = await emulatorCatalogue(t);
+  const origin = await listen(t, createBookingDemoServer({ ...storage(second), now: NOW }));
+  const v = await visit(origin);
+  const body = { snapshotVersion: versions[OPEN].contentVersion, consent: true, minimumSavingMinor: 1000 };
+  const armed = await (await v.post(OPEN, 'watch', body)).json();
+  assert.equal(armed.watch.dropSetVersion, versions[OPEN].dropSetVersion);
+  // The admin importer adds Drop set 2 for AIRB000180 (one Drop with a new id) while the app runs.
+  const later = curated(); const siam = later.entries[0];
+  siam.bundle.checkedAt = siam.capture.checkedAt = '2026-10-19T08:00:00.000Z';
+  siam.bundle.options = siam.bundle.options.slice(2).map(option => ({ ...option, optionId: `${option.optionId}-later` }));
+  siam.capture.offerCount = siam.capture.optionCount = 1; rehash(siam.bundle);
+  const added = await createBookingStorage({ firestore: first, prefix }).importBundle(later, { execute: true });
+  assert.deepEqual(added.entries.map(entry => entry.result), ['drop-set-added', 'unchanged']);
+  const fresh = await (await v.get(OPEN)).json();
+  assert.deepEqual([fresh.watch, fresh.dropSetVersion, fresh.options.map(option => option.optionId), fresh.capture.capturedAt],
+    [null, added.entries[0].dropSetVersion, ['option-fixture-flex-premier-later'], '2026-10-19T08:00:00.000Z']);
+  // The old revision no longer exists for the new Drop set, so a request built on it is stale.
+  assert.equal((await (await v.post(OPEN, 'watch', { ...body, minimumSavingMinor: 5000, expectedRevision: 1 })).json()).error.code, 'WATCH_REVISION_STALE');
+  const rearmed = await (await v.post(OPEN, 'watch', body)).json();
+  assert.deepEqual([rearmed.watch.revision, rearmed.watch.dropSetVersion, rearmed.dropOptionIds], [1, added.entries[0].dropSetVersion, ['option-fixture-flex-premier-later']]);
+});
+

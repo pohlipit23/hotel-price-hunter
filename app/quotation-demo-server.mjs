@@ -1,11 +1,13 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { publicQuotationDemo } from './domain/quotation-demo.mjs';
 import { QUOTATION_MODEL } from './quotation-advisor.mjs';
 import { isDisplayedDrop } from './public/drop-eligibility.js';
-import { agencyMinimumSavingMinor, qualifyingDrops, watchTag } from './public/drop-watch.js';
+import { agencyMinimumSavingMinor, watchTag } from './public/drop-watch.js';
 import { watchBlocker } from './domain/altovo-quotation.mjs';
+import { armDropWatch, armRequest, committedWatch } from './domain/booking-drop-watch.mjs';
+import { createMemorySessionStorage } from './quotation-session-storage.mjs';
 
 export function validateLocalQuotationMode(env = process.env) {
   if (env.NODE_ENV === 'production' || env.K_SERVICE || env.CLOUD_RUN_JOB || (env.BIND_HOST && env.BIND_HOST !== '127.0.0.1')) {
@@ -56,12 +58,21 @@ export function deploymentCatalogue(privateCatalogue) {
   validateDeploymentCatalogue(catalogue); return catalogue;
 }
 const selectionOnlyBundle = snapshot => ({ ...snapshot, privateReferences: Object.fromEntries(snapshot.options.map(option => [option.optionId, { selectionOnly: true }])) });
-export function createHostedQuotationDemoServer({ snapshot, catalogue, environment = process.env, now, advisor } = {}) {
+// `bookingStorage` + `sessionStorage` (app/booking-storage.mjs, app/quotation-session-storage.mjs) serve the
+// Firestore-backed judge catalogue; hosted mode requires Firestore sessions and never falls back to memory.
+export function createHostedQuotationDemoServer({ snapshot, catalogue, bookingStorage, sessionStorage, environment = process.env, now, advisor } = {}) {
   validateCloudQuotationMode(environment);
-  if ((snapshot == null) === (catalogue == null)) throw new Error('Provide exactly one hosted snapshot or catalogue.');
+  if ([snapshot, catalogue, bookingStorage].filter(value => value != null).length !== 1) throw new Error('Provide exactly one hosted snapshot, catalogue or booking storage.');
+  if (bookingStorage) {
+    if (sessionStorage?.mode !== 'firestore') throw new Error('Hosted booking storage requires durable Firestore sessions.');
+    return createQuotationServer({ store: { bookings: bookingStorage, sessions: sessionStorage }, now, advisor, cloudOrigin: environment.APP_ORIGIN });
+  }
+  if (sessionStorage != null) throw new Error('Session storage is only used with booking storage.');
   if (catalogue) {
     validateDeploymentCatalogue(catalogue);
-    return createQuotationServer({ bundles: new Map(catalogue.map(entry => [entry.code, selectionOnlyBundle(entry.snapshot)])), now, advisor, cloudOrigin: environment.APP_ORIGIN });
+    // The packaged file catalogue keeps its existing process-local sessions until F9a replaces it with Firestore.
+    return createQuotationServer({ store: fileCatalogueStore(catalogue.map(entry => ({ code: entry.code, bundle: selectionOnlyBundle(entry.snapshot) })), { now, processLocal: true }),
+      now, advisor, cloudOrigin: environment.APP_ORIGIN });
   }
   validateDeploymentSnapshot(snapshot);
   return createQuotationServer({ bundle: selectionOnlyBundle(snapshot), now, advisor, cloudOrigin: environment.APP_ORIGIN });
@@ -73,23 +84,71 @@ const assets = new Map([
   ['/assets/roomdrop-key-icon.png', ['assets/roomdrop-key-icon.png', 'image/png']],
   ['/assets/illustrative-stays.jpg', ['assets/illustrative-stays.jpg', 'image/jpeg']],
 ]);
-// `catalogue` is the private catalogue file shape: { schemaVersion: 1, entries: [{ code, bundle }] }.
-export function createQuotationDemoServer({ bundle, catalogue, now = () => new Date(), advisor } = {}) {
+// `catalogue` is the private catalogue file shape: { schemaVersion: 1, entries: [{ code, bundle, capture? }] }.
+// `bookingStorage` serves the Firestore catalogue instead; local runs may pair it with memory sessions.
+export function createQuotationDemoServer({ bundle, catalogue, bookingStorage, sessionStorage, now = () => new Date(), advisor } = {}) {
+  if (bookingStorage != null) {
+    if (bundle != null || catalogue != null) throw new Error('Provide exactly one quotation snapshot, catalogue or booking storage.');
+    return createQuotationServer({ store: { bookings: bookingStorage, sessions: sessionStorage ?? createMemorySessionStorage({ now }) }, now, advisor });
+  }
+  if (sessionStorage != null) throw new Error('Session storage is only used with booking storage.');
   if (catalogue == null) return createQuotationServer({ bundle, now, advisor });
   if (bundle != null || catalogue.schemaVersion !== 1 || !Array.isArray(catalogue.entries) || !catalogue.entries.length || catalogue.entries.length > 20
     || catalogue.entries.some(entry => !CATALOGUE_CODE.test(entry?.code ?? '') || entry.bundle?.baseline?.quotationCode !== entry.code)
     || new Set(catalogue.entries.map(entry => entry.code)).size !== catalogue.entries.length) throw new Error('A prepared private quotation catalogue is required.');
-  return createQuotationServer({ bundles: new Map(catalogue.entries.map(entry => [entry.code, entry.bundle])), now, advisor });
+  return createQuotationServer({ store: fileCatalogueStore(catalogue.entries, { now }), now, advisor });
 }
 const validBundle = bundle => bundle?.schemaVersion === 1 && bundle.transactionMode === 'selection-only' && Array.isArray(bundle.options)
   && bundle.baseline?.sourceType === 'quotation' && /^[a-f0-9]{64}$/.test(bundle.snapshotVersion);
-function createQuotationServer({ bundle: single, bundles = null, now = () => new Date(), cloudOrigin = null, advisor = { available: false, status: 'unconfigured' } }) {
-  if (bundles ? [...bundles.values()].some(item => !validBundle(item) || !/^[A-Z]{3}$/.test(item.baseline.quotedRetail?.currency ?? '')) : !validBundle(single)) {
+// A file catalogue behind the same read interface as booking storage. A file entry without a capture
+// record counts as observed only when it holds Drops; no Drops is never presented as an empty search.
+function fileCatalogueStore(entries, { now, processLocal = false }) {
+  if (entries.some(({ bundle }) => !validBundle(bundle) || !/^[A-Z]{3}$/.test(bundle.baseline.quotedRetail?.currency ?? ''))) {
     throw new Error('A prepared private quotation demo snapshot is required.');
   }
+  const records = new Map(entries.map(({ code, bundle, capture }, index) => {
+    const status = ['observed', 'observed-empty'].includes(capture?.status) ? capture.status : bundle.options.length ? 'observed' : 'not-searched';
+    const dropSetVersion = createHash('sha256').update(JSON.stringify({ checkedAt: bundle.checkedAt, options: bundle.options })).digest('hex');
+    return [code, { code, order: index + 1, contentVersion: bundle.snapshotVersion, dropSetVersion, bundle,
+      capture: { status, capturedAt: status === 'not-searched' ? null : bundle.checkedAt } }];
+  }));
+  const bookings = {
+    async listCatalogue() { return [...records.values()].map(({ code, order, contentVersion, dropSetVersion }) => ({ code, order, contentVersion, dropSetVersion, card: null })); },
+    async getBooking(code) { const record = records.get(code); return record ? { ...record, capture: { ...record.capture } } : null; },
+  };
+  // The explicit empty environment keeps the pre-F9a hosted file catalogue on process-local sessions, as before.
+  const sessions = createMemorySessionStorage({ now, catalogueCodes: [...records.keys()], ...(processLocal ? { environment: {} } : {}) });
+  return { bookings, sessions };
+}
+// Storage and arm refusals the routes report; anything else is a bounded 503 with no detail.
+const REFUSALS = { INVALID_WATCH: 400, WATCH_CONSENT_REQUIRED: 400, MINIMUM_SAVING_INVALID: 400, DEMO_SESSION_REQUIRED: 403, BOOKING_UNAVAILABLE: 404,
+  SNAPSHOT_CHANGED: 409, WATCH_REVISION_STALE: 409, WATCH_CANNOT_START: 409, CAPTURE_UNAVAILABLE: 503, CATALOGUE_UNAVAILABLE: 503 };
+const refusal = code => Object.assign(new Error('The booking demo is unavailable.'), { code });
+function createQuotationServer({ bundle: single, store = null, now = () => new Date(), cloudOrigin = null, advisor = { available: false, status: 'unconfigured' } }) {
+  if (store ? typeof store.bookings?.listCatalogue !== 'function' || typeof store.bookings.getBooking !== 'function'
+    || ['create', 'get', 'transact'].some(name => typeof store.sessions?.[name] !== 'function') : !validBundle(single)) {
+    throw new Error('A prepared private quotation demo snapshot is required.');
+  }
+  // Single mode keeps whole sessions here. Catalogue mode keeps the durable session (csrf, expiry and
+  // byCode[code].watch) in `store.sessions`; this map then holds only the process-local confirmation,
+  // advice and chat state of those sessions until Part 2 (F4b) makes it durable.
   const sessions = new Map();
   let adviceWindow = 0; let adviceCount = 0; let advicePending = 0;
   const model = { available: advisor.available, status: advisor.status };
+  // The reviewed manifest: the bounded list of catalogue codes and their cards, read once and never
+  // seeded or imported here. A failed read is retried by the next request.
+  let manifest = null; let catalogueSize = null;
+  const loadManifest = () => manifest ??= store.bookings.listCatalogue().then(listed => {
+    if (!Array.isArray(listed) || !listed.length || listed.length > 20 || listed.some(entry => !CATALOGUE_CODE.test(entry?.code ?? ''))) throw refusal('CATALOGUE_UNAVAILABLE');
+    catalogueSize = listed.length; return new Map(listed.map(entry => [entry.code, entry.card ?? null]));
+  }).catch(() => { manifest = null; throw refusal('CATALOGUE_UNAVAILABLE'); });
+  const local = (cookieValue, durable) => {
+    const time = now().getTime();
+    for (const [key, value] of sessions) if (value.expiresAt <= time) sessions.delete(key);
+    const state = sessions.get(cookieValue) ?? { confirmation: null, adviceWindow: 0, adviceCount: 0, adviceHistory: {}, chatHistory: [], byCode: {} };
+    state.csrfToken = durable.csrfToken; state.expiresAt = durable.expiresAt; sessions.set(cookieValue, state);
+    return state;
+  };
   const json = (res, status, data) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); };
   const server = createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
@@ -102,66 +161,85 @@ function createQuotationServer({ bundle: single, bundles = null, now = () => new
         : !['127.0.0.1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress) || ![`127.0.0.1:${port}`, `localhost:${port}`].includes(req.headers.host)) return error(403, 'LOCAL_ORIGIN_REQUIRED');
       const origin = cloudOrigin || `http://${req.headers.host}`; const url = new URL(req.url, origin);
       if (url.search) return error(400, 'ARBITRARY_LOOKUP_DENIED');
-      if (['/health', '/healthz'].includes(url.pathname) && req.method === 'GET') return json(res, 200, bundles
-        ? { status: 'ok', surface: 'quotation-demo', mode: 'selection-only', model, catalogueSize: bundles.size }
+      if (['/health', '/healthz'].includes(url.pathname) && req.method === 'GET') return json(res, 200, store
+        ? { status: 'ok', surface: 'quotation-demo', mode: 'selection-only', model, catalogueSize }
         : { status: 'ok', surface: 'quotation-demo', mode: 'selection-only', model, snapshotVersion: single.snapshotVersion, optionCount: single.options.length });
       const cookie = /(?:^|;\s*)roomdrop_quote=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie ?? '')?.[1];
-      let session = sessions.get(cookie);
-      if (session?.expiresAt <= now().getTime()) { sessions.delete(cookie); session = null; }
-      const openSession = () => {
+      // Catalogue mode: every booking is addressed by its catalogue code in the path, never by query.
+      const route = store ? /^\/api\/quotation-demo\/q\/([A-Z0-9]{4,20})(?:\/(watch|confirm|advice|chat))?$/.exec(url.pathname) : null;
+      const catalogueRead = store && req.method === 'GET' && (url.pathname === '/api/quotation-demo/catalogue' || Boolean(route && !route[2]));
+      let session = null; let durable = null; let booking = null; let cards = null;
+      if (catalogueRead || (route?.[2] && req.method === 'POST')) {
+        // Only codes in the reviewed manifest are ever looked up; the durable session is read once per request.
+        cards = await loadManifest();
+        if (route && !cards.has(route[1])) return error(404, 'BOOKING_UNAVAILABLE');
+        durable = await store.sessions.get(cookie);
+        if (durable) session = local(cookie, durable);
+      } else if (!store) {
+        session = sessions.get(cookie);
+        if (session?.expiresAt <= now().getTime()) { sessions.delete(cookie); session = null; }
+      }
+      const loadBooking = async code => (booking = await store.bookings.getBooking(code));
+      const openSession = async () => {
         if (session) return true;
+        const setCookie = id => res.setHeader('Set-Cookie', `roomdrop_quote=${id}; Path=/; HttpOnly; SameSite=Strict; Max-Age=3600${cloudOrigin ? '; Secure' : ''}`);
+        if (store) {
+          let created;
+          try { created = await store.sessions.create(); } catch (failure) { if (failure?.code === 'SESSION_CAPACITY') return false; throw failure; }
+          durable = created.session; session = local(created.cookieValue, durable); setCookie(created.cookieValue);
+          return true;
+        }
         for (const [key, value] of sessions) if (value.expiresAt <= now().getTime()) sessions.delete(key);
         if (sessions.size >= 64) return false;
         const id = randomBytes(32).toString('hex'); session = { csrfToken: randomBytes(32).toString('hex'), expiresAt: now().getTime() + 3600000, confirmation: null, adviceWindow: 0, adviceCount: 0, adviceHistory: {}, chatHistory: [], byCode: {} };
-        sessions.set(id, session); res.setHeader('Set-Cookie', `roomdrop_quote=${id}; Path=/; HttpOnly; SameSite=Strict; Max-Age=3600${cloudOrigin ? '; Secure' : ''}`);
+        sessions.set(id, session); setCookie(id);
         return true;
       };
-      // Catalogue mode: every booking is addressed by its catalogue code in the path, never by query.
-      const route = bundles ? /^\/api\/quotation-demo\/q\/([A-Z0-9]{4,20})(?:\/(watch|confirm|advice|chat))?$/.exec(url.pathname) : null;
-      const codeScope = code => (session.byCode[code] ??= { watch: null, confirmation: null, adviceHistory: {}, chatHistory: [] });
-      if (req.method === 'GET' && (bundles ? url.pathname === '/api/quotation-demo/catalogue' || (route && !route[2]) : url.pathname === '/api/quotation-demo')) {
+      // The armed watch is durable session state, current only for the booking's present versions; it is
+      // mirrored into the process-local scope the confirm, advice and chat branches read.
+      const codeScope = code => {
+        const scope = session.byCode[code] ??= { watch: null, confirmation: null, adviceHistory: {}, chatHistory: [] };
+        scope.watch = committedWatch(durable, code, booking); return scope;
+      };
+      if (req.method === 'GET' && (store ? catalogueRead : url.pathname === '/api/quotation-demo')) {
         if (req.headers['sec-fetch-site'] === 'cross-site') return error(403, 'LOCAL_ORIGIN_REQUIRED');
-        if (route && !bundles.has(route[1])) return error(404, 'BOOKING_UNAVAILABLE');
-        if (!openSession()) return error(503, 'DEMO_SESSION_CAPACITY');
-        if (!bundles) return json(res, 200, { ...publicQuotationDemo(single), csrfToken: session.csrfToken, confirmation: session.confirmation, model });
+        if (route && !(await loadBooking(route[1]))) return error(404, 'BOOKING_UNAVAILABLE');
+        if (!(await openSession())) return error(503, 'DEMO_SESSION_CAPACITY');
+        if (!store) return json(res, 200, { ...publicQuotationDemo(single), csrfToken: session.csrfToken, confirmation: session.confirmation, model });
         const at = now();
         if (!route) {
-          const entries = [...bundles].map(([code, item]) => {
+          const listed = await Promise.all([...cards.keys()].map(code => store.bookings.getBooking(code)));
+          if (listed.some(item => !item)) throw refusal('CATALOGUE_UNAVAILABLE');
+          const entries = listed.map(({ code, bundle: item }) => {
             const b = item.baseline; const blocker = watchBlocker(b, at); const freeUntil = b.cancellation?.freeUntil ?? null;
             return { code, snapshotVersion: item.snapshotVersion, checkedAt: item.checkedAt,
               hotel: { name: b.hotel.name, star: b.hotel.star ?? null, cityCode: b.hotel.cityCode ?? null, countryCode: b.hotel.countryCode ?? null },
               stay: b.stay, occupancy: b.occupancy, room: b.room, quotedRetail: b.quotedRetail,
               cancellation: { nonRefundable: b.cancellation?.nonRefundable === true, freeUntil }, blocker, tag: watchTag(blocker, freeUntil, at),
-              optionCount: item.options.length };
+              optionCount: item.options.length, card: cards.get(code) };
           });
           return json(res, 200, { schemaVersion: 1, entries, csrfToken: session.csrfToken });
         }
-        const code = route[1]; const item = bundles.get(code); const scope = codeScope(code);
-        return json(res, 200, { ...publicQuotationDemo(item), code, csrfToken: session.csrfToken, blocker: watchBlocker(item.baseline, at),
+        const code = route[1]; const item = booking.bundle; const scope = codeScope(code);
+        return json(res, 200, { ...publicQuotationDemo(item), code, dropSetVersion: booking.dropSetVersion, capture: booking.capture,
+          csrfToken: session.csrfToken, blocker: watchBlocker(item.baseline, at),
           agencyMinimumSavingMinor: agencyMinimumSavingMinor(item.baseline.quotedRetail.currency), watch: scope.watch, confirmation: scope.confirmation, model });
       }
-      const singlePost = !bundles && ['/api/quotation-demo/confirm', '/api/quotation-demo/advice', '/api/quotation-demo/chat'].includes(url.pathname);
+      const singlePost = !store && ['/api/quotation-demo/confirm', '/api/quotation-demo/advice', '/api/quotation-demo/chat'].includes(url.pathname);
       if ((singlePost || route?.[2]) && req.method === 'POST') {
-        if (route && !bundles.has(route[1])) return error(404, 'BOOKING_UNAVAILABLE');
         if (!session || req.headers.origin !== origin || req.headers['x-csrf-token'] !== session.csrfToken
           || req.headers['sec-fetch-site'] === 'cross-site') return error(403, 'DEMO_SESSION_REQUIRED');
         if (!(req.headers['content-type'] ?? '').startsWith('application/json')) return error(400, 'INVALID_SELECTION');
         const chunks = []; let size = 0;
         for await (const chunk of req) { size += chunk.length; if (size > 4096) return error(413, 'SELECTION_TOO_LARGE'); chunks.push(chunk); }
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return error(400, 'INVALID_SELECTION'); }
-        const bundle = route ? bundles.get(route[1]) : single; const scope = route ? codeScope(route[1]) : session;
+        if (route && !(await loadBooking(route[1]))) return error(404, 'BOOKING_UNAVAILABLE');
+        const bundle = route ? (booking.bundle.privateReferences ? booking.bundle : selectionOnlyBundle(booking.bundle)) : single; const scope = route ? codeScope(route[1]) : session;
         if (route?.[2] === 'watch') {
-          if (!body || typeof body !== 'object' || Array.isArray(body)
-            || Object.keys(body).some(key => !['snapshotVersion', 'consent', 'minimumSavingMinor'].includes(key))) return error(400, 'INVALID_WATCH');
-          if (body.consent !== true) return error(400, 'WATCH_CONSENT_REQUIRED');
-          if (!Number.isSafeInteger(body.minimumSavingMinor) || body.minimumSavingMinor < agencyMinimumSavingMinor(bundle.baseline.quotedRetail.currency)) return error(400, 'MINIMUM_SAVING_INVALID');
-          if (body.snapshotVersion !== bundle.snapshotVersion) return error(409, 'SNAPSHOT_CHANGED');
-          const reason = watchBlocker(bundle.baseline, now());
-          if (reason) return error(409, 'WATCH_CANNOT_START', { reason });
-          const dropOptionIds = qualifyingDrops(bundle.baseline, bundle.options, body.minimumSavingMinor).map(option => option.optionId);
-          // The first check replays the captured Gateway observation; no live search runs here.
-          scope.watch = { armedAt: now().toISOString(), minimumSavingMinor: body.minimumSavingMinor, firstCheck: { replayed: true, checkedAt: bundle.checkedAt, dropOptionIds } };
-          return json(res, 200, { watch: scope.watch, dropOptionIds });
+          // The booking and its current Drop set are read before the transaction; the arm, the version
+          // checks and the captured first-check replay then commit together, and only then is the receipt sent.
+          const request = armRequest(body, bundle.baseline.quotedRetail.currency); const at = now();
+          return json(res, 200, await store.sessions.transact(cookie, draft => armDropWatch(draft, { code: route[1], booking, request, at })));
         }
         // An armed Drop Watch narrows the Drops this booking may discuss or confirm to the ones it found.
         const watched = route ? scope.watch?.firstCheck.dropOptionIds ?? null : null;
@@ -228,7 +306,13 @@ function createQuotationServer({ bundle: single, bundles = null, now = () => new
         res.writeHead(200, { 'Content-Type': `${type}${type.startsWith('text/') ? '; charset=utf-8' : ''}` }); return res.end(content);
       }
       return error(404, 'ROUTE_UNAVAILABLE');
-    } catch { if (!res.headersSent) return error(503, 'DEMO_UNAVAILABLE'); res.end(); }
+    } catch (failure) {
+      if (res.headersSent) return res.end();
+      // Known refusals keep their code (and a cannot-start reason); storage or SDK failures stay a bounded 503.
+      const status = Object.hasOwn(REFUSALS, failure?.code ?? '') ? REFUSALS[failure.code] : null;
+      if (!status) return error(503, 'DEMO_UNAVAILABLE');
+      return error(status, failure.code, typeof failure.reason === 'string' ? { reason: failure.reason } : {});
+    }
   });
   server.requestTimeout = 15000; server.headersTimeout = 10000;
   return server;
