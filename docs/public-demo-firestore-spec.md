@@ -441,9 +441,13 @@ catalogue keeps its existing process-local sessions until F9a.
   `capture: { status, capturedAt }`. `watch` is this session's committed receipt
   only while it is bound to the current content and Drop-set versions, else `null`.
 - `POST /api/booking-demo/q/<code>/watch`: body keys `snapshotVersion`, `consent`,
-  `minimumSavingMinor` and optional `expectedRevision`. A missing
-  `expectedRevision` means 0 (a first arm): a re-arm must send the current
-  `watch.revision`. The booking is read before the transaction, then
+  `minimumSavingMinor` and optional `expectedRevision`. An absent
+  `expectedRevision` skips the stale check: the committed minimum again is an
+  identical retry, and a new minimum makes the next revision. A present
+  `expectedRevision` that is not the current revision (0 before the first arm)
+  is `409 WATCH_REVISION_STALE`. Clients that re-arm send
+  `data.watch?.revision ?? 0` (`armRequestBody` in `app\public\booking-judge.js`).
+  The booking is read before the transaction, then
   `armDropWatch` (`app\domain\booking-drop-watch.mjs`) runs inside one
   `sessionStorage.transact`, in this order:
   1. snapshot check;
@@ -454,8 +458,8 @@ catalogue keeps its existing process-local sessions until F9a.
   6. replay and commit.
 
   The receipt is sent only after the commit.
-- An identical retry is the same minimum with `expectedRevision` equal to the
-  committed revision or the one before it. It returns the committed receipt
+- An identical retry is the same minimum with `expectedRevision` absent or equal
+  to the committed revision or the one before it. It returns the committed receipt
   unchanged. A new minimum on the current revision creates revision + 1. A new
   Drop set or content version resets the watch, and the revision then starts at 1.
 - Receipt: exactly the proposed shape above, plus one additive field,

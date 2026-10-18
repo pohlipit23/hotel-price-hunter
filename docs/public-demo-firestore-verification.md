@@ -434,8 +434,8 @@ Without the emulator:
   sources are refused;
 - database failure: `503 CATALOGUE_UNAVAILABLE` or `503 DEMO_UNAVAILABLE`, no SDK
   text, no cookie, and recovery once storage returns;
-- the existing file-catalogue tests through the same code path. A re-arm there
-  now needs `expectedRevision`.
+- the existing file-catalogue tests through the same code path. (Superseded by
+  5a85d4a: a re-arm without `expectedRevision` is no longer checked.)
 
 Commands (worktree, emulator `roomdrop-part1-firestore` 127.0.0.1:8181, project
 `demo-roomdrop-part1`, `RUN_FIRESTORE_INTEGRATION=1`, `NODE_ENV=test`):
@@ -451,7 +451,67 @@ Commands (worktree, emulator `roomdrop-part1-firestore` 127.0.0.1:8181, project
   320 px. The re-arm gets `409 WATCH_REVISION_STALE`, because the arm request in
   `app\public\booking-live.js` (Part 2 file) sends no `expectedRevision`. The
   first arm passes. This needs the coordinated one-line change described in the
-  Part 1 report (F7a).
+  Part 1 report (F7a). Fixed by 5a85d4a below.
 
-Still open: the browser flow above, F6/F7a screens (cards, photos, capture note),
-hosted startup wiring (F9a) and the emulator launcher (F11a).
+Still open: hosted startup wiring (F9a) and the emulator launcher (F11a).
+
+### Arm request fix: optional expectedRevision (18 October 2026)
+
+Commits `5a85d4a` and `b0cc105`. Contract v3 makes `expectedRevision` optional.
+An absent value skips the stale check: the committed minimum again returns the
+same receipt, and a new minimum makes the next revision. A present value that is
+not the current revision is `409 WATCH_REVISION_STALE`. New tests cover absent,
+stale and current, both in the pure arm and over HTTP. The racing first-arm
+emulator test and one catalogue test now send revision 0 explicitly, because
+only an explicit revision can lose a race.
+
+### F6 and F7a: Start grid, Original Booking, setup and armed state (18 October 2026)
+
+Commits `8390e8e` (screens) and `0694b94` (browser walk). Files:
+`app\public\booking-judge.js`, the catalogue and booked sections of
+`app\public\booking.html` and `app\public\booking.css`,
+`tests\booking-setup-ui.test.mjs` (new) and `tests\booking-judge.browser.mjs`.
+
+- Start cards come from the catalogue `card`: the curated city with the country,
+  dates, retail price, the scenario label and the request-time eligibility tag.
+  The scenario label shows only while the booking can still start. With
+  `photo: null` (all six real cards until S0.5) the card shows a drawn airmail
+  fallback ("No photo yet" with the city), never another hotel's picture.
+- The Original Booking page keeps "Your agency booked this" and the single "Set
+  up a drop" action, and adds the capture date: "A real Altovo staging quotation
+  standing in for a confirmed booking · captured 18 Oct 2026" (from
+  `baseline.source.readAt`). A booking that cannot start shows its reason, and the
+  setup action stays visible but disabled (`aria-describedby` the reason).
+- Setup offers minimum choices from the 10.00 floor in the booking currency's
+  minor units (MYR, JPY and KWD unit cases). Consent is required. The armed line
+  comes only from the committed receipt. `armRequestBody` sends
+  `expectedRevision: data.watch?.revision ?? 0`.
+- The browser walk serves `tests\fixtures\curated-bookings.json` through the
+  storage read interface with memory sessions, on port 0. At 320, 768 and 1440 px
+  it covers the grid with no text inputs and no partner logo, and opening a card
+  by keyboard. It goes through setup by Tab, arrow and Space, and the consent
+  prompt. An injected `503` arm keeps the setup screen with "could not be armed"
+  and no armed or checking screen, and the retry arms. A reload shows the same
+  armed line, and bootstrap returns the same `watch` as the arm response. It also
+  covers re-arms to revision 3, Drops, Review and Confirmed, and the cannot-start
+  paths. A second server at 15 Feb 2027 shows "Cannot start: free cancellation
+  ended" with no scenario label, and the Original Booking page shows "Free
+  cancellation has ended".
+
+Commands (worktree; emulator variables as above for the first):
+
+- `node --test .\tests\altovo-catalogue.test.mjs .\tests\booking-storage.test.mjs .\tests\quotation-session-storage.test.mjs .\tests\booking-catalogue.test.mjs .\tests\booking-drop-watch.test.mjs .\tests\quotation-demo-server.test.mjs .\tests\booking-setup-ui.test.mjs`:
+  tests 83, pass 83, fail 0, skipped 0.
+- `node --test .\tests\booking-setup-ui.test.mjs`: tests 7, pass 7.
+- `npm test` without emulator variables: tests 382, pass 353, fail 0, skipped 29.
+- `node .\tests\booking-judge.browser.mjs`: passed (all four check groups,
+  no page errors, no external requests). Screenshots are in the ignored
+  `.local\judge-flow\browser\`: `start`, `booked`, `setup`, `arm-failed`,
+  `checking`, `armed`, `empty`, `review`, `confirmed` and `cannot-start` at each
+  width, plus `ended-start-768` and `ended-booked-768`.
+
+Open: the arm `fetch` is in `app\public\booking-live.js` (Part 2), which still
+sends no `expectedRevision`. It works because an absent value is allowed, but a
+stale tab can then replace a newer setup. Part 2 should send
+`judge.armRequestBody(data, minimum)`. Reviewed photos (S0.5) also need exact
+asset routes in `app\booking-demo-server.mjs`.
