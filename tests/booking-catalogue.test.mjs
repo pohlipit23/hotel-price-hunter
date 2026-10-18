@@ -78,8 +78,8 @@ test('arming a Drop Watch needs consent, a minimum at or above the agency floor,
     { mode: 'captured-replay', replayed: true, status: 'completed', checkedAt: FIXTURE_CHECKED_AT, dropOptionIds: ['option-fixture-final-deluxe', 'option-fixture-flex-premier'] });
   assert.deepEqual(armed.dropOptionIds, ['option-fixture-final-deluxe', 'option-fixture-flex-premier']);
   assert.deepEqual((await (await v.get(OPEN)).json()).watch, armed.watch);
-  // A new minimum must name the revision it replaces; a request built on revision 0 is stale.
-  await expectError(await v.post(OPEN, 'watch', arm(25000)), 409, 'WATCH_REVISION_STALE');
+  // A request that names revision 0 once revision 1 exists is stale (an absent expectedRevision skips this check).
+  await expectError(await v.post(OPEN, 'watch', { ...arm(25000), expectedRevision: 0 }), 409, 'WATCH_REVISION_STALE');
   assert.deepEqual((await (await v.post(OPEN, 'watch', { ...arm(25000), expectedRevision: 1 })).json()).dropOptionIds, []);
   assert.deepEqual((await (await v.post(OPEN, 'watch', { ...arm(1000), expectedRevision: 2 })).json()).dropOptionIds.length, 3);
   assert.equal((await (await v.get(OPEN)).json()).watch.minimumSavingMinor, 1000);
