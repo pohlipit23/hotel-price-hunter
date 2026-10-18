@@ -68,13 +68,15 @@ confirm-quote, create supplier bookings or commit `.local\`.
   (NON_REFUNDABLE). Still missing: closing soon within days, a non-MYR currency,
   more than one night, more than one adult. 181's best Drops are room only
   against a breakfast baseline.
-- [ ] S0.5 Photo/scenario metadata: reviewed local photo assets, card ordering,
+- [x] S0.5 Photo/scenario metadata: reviewed local photo assets, card ordering,
   city and scenario labels supplied as curated facts, not invented metadata.
-  Pending the owner. Only a provisional draft exists (ignored
-  `.local\cards-draft.json`, `photo: null`, labels and order unreviewed).
-  18 Oct: photo path built and tested offline (capture keeps Gateway
-  `imageSources`; importer `--images=PATH` attaches reviewed local card and Drop
-  photos). Still open: owner live re-capture, reviewed download, asset routes.
+  Done 18 Oct: labels, city names and order owner-approved (`.local\cards-draft.json`).
+  Eight owner-approved photos committed (f386e57; six hotel, booked room for 181
+  and 182; 184 room rejected), from the air1 share-link JSON because Gateway
+  search-by-id had no image fields. Exact asset routes (633faac), `card.roomPhoto`
+  (add2bd1), rendering with hotel and room labels (dacf89a). Each Drop reuses its
+  hotel photo, alt suffixed " - hotel photo"; Part 2 still has to render it.
+  Verification doc, Part 1 "S0.5 photos".
 - [x] S0.6 Guarded Firestore import: emulator import through the F2 importer
   (local, test-owned data); a production Firestore import is a separate LIVE step
   requiring explicit approval and is not part of Part 1 acceptance.
@@ -82,6 +84,10 @@ confirm-quote, create supplier bookings or commit `.local\`.
   the Part 1 emulator (dry run, then execute, then an identical retry that
   returned `unchanged`). Read back with `loadHostedCatalogue` and `getDrops`.
   The import must be redone if the S0.5 review changes a card.
+  Redone 18 Oct with the reviewed image manifest: the photo cards gave
+  `BOOKING_CHANGED` over the old records, so the six bookings were cleared from
+  the Part 1 emulator only, then imported (`created` x6, retry `unchanged` x6)
+  and read back with photos and no remote URL.
 - Verify: per-code bundle validation via F1/F2, coverage matrix of scenario slots
   versus captured evidence, `.local\` ignore checks. Two samples prove mechanics
   only; the six-entry matrix stays open until supplied and captured.
@@ -218,7 +224,8 @@ This is the Part 1/Part 2 seam.
 - Evidence: commits 8390e8e and 0694b94; verification doc, Part 1 F6 and F7a.
   Every real card has `photo: null` until S0.5, so judges see the drawn fallback.
   A reviewed photo also needs its exact `/assets/...` route in
-  `app\booking-demo-server.mjs` when S0.5 supplies it.
+  `app\booking-demo-server.mjs` when S0.5 supplies it. Done 18 Oct (S0.5): all
+  six real cards now show reviewed hotel photos; the fallback remains for none.
 - Verify: `node --test .\tests\booking-setup-ui.test.mjs` and
   `node .\tests\booking-judge.browser.mjs` (existing base-snapshot harness; the
   proposed `booking-firestore.browser.mjs` is Part 2's integrated harness); inspect
@@ -245,6 +252,9 @@ This is the Part 1/Part 2 seam.
 
 ### F9a: Minimum hosted Firestore wiring for setup (Part 1 of F9)
 
+Reassigned to Codex by the user on 18 October 2026 (with F10a); not done in the
+Part 1 worktree.
+
 - [ ] Acceptance: inject real Firestore booking/session storage at hosted startup
   for catalogue, bootstrap and arm, keeping production emulator/credential/origin
   guards intact. Startup never seeds or imports data. No memory/file fallback for
@@ -256,6 +266,9 @@ This is the Part 1/Part 2 seam.
 
 ### F10a: Minimum packaging closure for setup (Part 1 of F10)
 
+Reassigned to Codex by the user on 18 October 2026 (with F9a); not done in the
+Part 1 worktree.
+
 - [ ] Acceptance: release preparation and `Dockerfile.booking` include the new
   Part 1 modules (adapter, booking/session storage, arm domain) and their
   dependency closure, excluding credentials and private captures.
@@ -266,12 +279,19 @@ This is the Part 1/Part 2 seam.
 
 ### F11a: Part 1 acceptance evidence (Part 1 of F11)
 
-- [ ] Acceptance: an emulator-only launcher seeds only explicit reviewed test
+- [x] Acceptance: an emulator-only launcher seeds only explicit reviewed test
   captures via the guarded importer. Browser evidence shows start grid ->
   Original Booking -> setup -> committed armed state; setup survives an app
   restart against the same emulator; two judges on one code and one judge across
   two codes do not overwrite one another. Record Part 1 evidence in its own
   section of the verification report, local versus live proof separately.
+- Evidence: commits d3db493 and 6808e32; verification doc, Part 1 F11a. Local
+  emulator proof only (the F10a dependency moved to Codex; no packaged image is
+  claimed). `tests\booking-emulator.browser.mjs` passed: seeded launch, six photo
+  cards, Original Booking with hotel/room photos, two judges and two codes kept
+  apart, restart without seed keeps every setup. Emulator suites 99/99,
+  `npm test` 393 tests, 362 pass, 0 fail, 31 skipped; `git diff --check` clean.
+  Live calls made today by the owner are listed separately there.
 - Verify: `node .\tests\booking-judge.browser.mjs`, the Part 1 emulator tests,
   `npm test` with pass/fail/skip counts, and `git diff --check`.
 - Depends on: F10a. Small, three files: `scripts\serve-booking-demo.mjs`,
@@ -279,11 +299,18 @@ This is the Part 1/Part 2 seam.
 
 ### Checkpoint Part 1: Drop Watch armed
 
-- [ ] Emulator/API evidence proves isolation, one committed arm with its first
+- [x] Emulator/API evidence proves isolation, one committed arm with its first
   replay receipt and restart recovery across independent app/storage instances.
-- [ ] The replay is labelled as captured data, never a fresh rate search; expired
+  (F4a/F5a emulator tests with two clients; F11a launcher restart test and
+  browser walk.)
+- [x] The replay is labelled as captured data, never a fresh rate search; expired
   sessions and non-armable bookings cannot arm. Relevant tests run.
-- [ ] Arm receipt shape matches the spec seam; Part 2 has been told of any change.
+  (`firstCheck.mode: 'captured-replay'`, "Replayed check · captured ... · not
+  live"; expired session 403 `DEMO_SESSION_REQUIRED`, non-refundable and ended
+  windows 409 `WATCH_CANNOT_START`; emulator suites 99/99.)
+- [x] Arm receipt shape matches the spec seam; Part 2 has been told of any change.
+  (Receipt unchanged since contract v3. The S0.5 storage additions, Drop `photo`
+  and optional `card.roomPhoto`, are read-side only and reported for Part 2.)
 
 ## Part 2 - RoomDrop app after watch activation
 

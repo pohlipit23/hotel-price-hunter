@@ -563,3 +563,140 @@ sends no `expectedRevision`. It works because an absent value is allowed, but a
 stale tab can then replace a newer setup. Part 2 should send
 `judge.armRequestBody(data, minimum)`. Reviewed photos (S0.5) also need exact
 asset routes in `app\booking-demo-server.mjs`.
+
+### S0.5 photos: reviewed assets, image manifest and re-import (18 October 2026)
+
+Commits `f386e57` (assets), `633faac` (static routes), `add2bd1` (`card.roomPhoto`)
+and `dacf89a` (rendering).
+
+Provenance. The second guarded Gateway run (5 calls) returned no image fields
+in search-by-id, so the photos came from the air1 quotation share-link JSON
+(hotel avatar and booked-room images), read in the owner's logged-in browser.
+Source URLs: the shared checkout's ignored
+`.local\altovo-sample\image-sources-2026-10-18.json`; download record with
+SHA-256 and bytes: `.local\altovo-sample\image-downloads-2026-10-18.json`. The
+owner approved 9 downloads and reviewed them; the AIRB000184 room photo (a
+bathroom toiletries close-up) was rejected and deleted. The first capture,
+`catalogue-87ab61f1-...`, stays the Drops of record; `catalogue-722868cc-...` is
+not imported. Labels, city names and order in `.local\cards-draft.json` are
+owner-approved; its status now also records the approved photos.
+
+Committed assets (`app\public\assets\`, public reviewed images):
+
+| Asset | Size | Bytes | SHA-256 | Alt (owner-approved) |
+| --- | --- | --- | --- | --- |
+| `roomdrop-airb000179-hotel.jpg` | 350x259 | 29361 | `c37163f7eeb49dbecc6b4c6a6dc32714666be8965e8089eedd8ae0257614f4ed` | Grand Hyatt Kuala Lumpur lobby at night |
+| `roomdrop-airb000180-hotel.jpg` | 350x207 | 29645 | `0edabded9b3826965a454654de9066f86d0da513e1339a21a948f6d45a264184` | Siam Kempinski Hotel Bangkok and its pool gardens |
+| `roomdrop-airb000181-hotel.jpg` | 350x233 | 33036 | `ffad05442298da0d92609810cb8231fa1a54f5bac9286dc3bd0e09a0ee9210e1` | Pan Pacific Singapore at dusk |
+| `roomdrop-airb000181-room.jpg` | 1200x800 | 128624 | `d7b04271290bc20f001862c489e89a42c3f6864a516925feb503b16bf41707b0` | Executive Marina Bay Room with a city view |
+| `roomdrop-airb000182-hotel.jpg` | 350x209 | 28368 | `c6a5e29606ac80e64f047ef5d1b32a22b1e8356a309801870420ed7892d0daf7` | PARKROYAL COLLECTION Pickering with its sky gardens |
+| `roomdrop-airb000182-room.jpg` | 1200x926 | 143297 | `2ab56bcfa7ccbbaaa5a5280d0cff37ebb8524d09d2218a58adb20b8b03f4662c` | Lifestyle Premier King room with a garden view |
+| `roomdrop-airb000183-hotel.jpg` | 350x262 | 29923 | `30700529bb819cf9eb8ef83efcdb74e2105153ae75c63f45716e71490c2dcb39` | The Park Lane Hong Kong at dusk |
+| `roomdrop-airb000184-hotel.jpg` | 350x263 | 30733 | `2590621056d95c690e70d30d9bd83ee64ee58dfa7d3cba49fe2764170d8276ec` | Kuala Lumpur skyline at sunset from Banyan Tree Kuala Lumpur |
+
+The six hotel photos are byte-identical to the download record. The two room
+photos were resized locally (PowerShell System.Drawing, high-quality bicubic,
+JPEG quality 82, no metadata) from 3000x2000 / 399891 bytes
+(`550808513c6e...`) and 2560x1975 / 402288 bytes (`372b34b3cd7f...`). The hotel
+avatars are only 350 px wide, so they look soft on the 1440 px Original Booking
+page; a larger source would need a new owner-approved download.
+
+- Static routes: each of the eight exact `/assets/...` paths is in the
+  allowlists of `app\booking-demo-server.mjs` and `app\quotation-demo-server.mjs`
+  (`image/jpeg`); the rejected 184 room photo and unknown names are 404.
+- Storage (additive to contract v4): the image manifest accepts `room` next to
+  `hotel` and `drops`. It fills the card's optional `roomPhoto` (`{ asset, alt }`,
+  absent when none), refuses a different existing room photo
+  (`IMAGE_MANIFEST_CONFLICT`); the importer refuses an unshipped room asset
+  (`CARD_PHOTO_MISSING`).
+- Image manifest: ignored `.local\s0.5\image-manifest.json` (3852 bytes, SHA-256
+  `bc8aa163fc742f75e70811e5555eceaa94aab0ba34cd0e3b926c99b6879e8fd6`): six hotel
+  photos, room photos for 181 and 182, and for each of the 12 Drops of 180 to 183
+  the hotel photo with its alt suffixed " - hotel photo" (no room-specific Drop
+  photo source exists).
+- Re-import into the Part 1 emulator (127.0.0.1:8181, `demo-roomdrop-part1`):
+  dry run `validated`; `--execute` over the S0.6 records gave `BOOKING_CHANGED`
+  (create-only records); the six `roomdropBookingsV1` records were then deleted
+  from this emulator only and the import executed (`created` x6); an identical
+  retry returned `unchanged` x6. Read-back with a new client: card order and
+  labels as approved, `card.photo` and `card.roomPhoto` equal the manifest,
+  every Drop from `getDrops` and every bundle option carries the hotel photo
+  with the " - hotel photo" alt, 179 and 184 still `CAPTURE_UNAVAILABLE`, and no
+  remote URL or `imageSources` in any record. New content versions (first 12
+  hex): 179 `d9d613f7e152`, 180 `00be05a4a41c`, 181 `b2ab7f5ae071`,
+  182 `f729d12c8651`, 183 `fff808d37063`, 184 `6a61cf9e7846`.
+- Rendering (Part 1 sections): start cards show the reviewed hotel photo on top
+  with a "Hotel photo" label; the drawn fallback has no label. The Original
+  Booking page labels its photo "Hotel photo" and, for 181 and 182, adds a
+  "Room photo" snapshot with the booked room name. No room photo (or a failed
+  load) shows nothing; the hotel photo never stands in for the room.
+- For Part 2: each Drop now has `photo: { asset, alt }` (the hotel photo, alt
+  ending " - hotel photo"). The Drop cards in `app\public\booking-live.js` still
+  show the generic "Illustrative photo"; they should render `'/' + drop.photo.asset`
+  with a visible "Hotel photo" label, and keep the fallback when `photo` is absent.
+
+### F11a: Part 1 acceptance evidence (18 October 2026)
+
+Commits `d3db493` (launcher) and `6808e32` (browser walk). F9a (hosted Firestore
+wiring) and F10a (packaging) were reassigned to Codex by the user and are not
+part of this evidence.
+
+`scripts\serve-booking-demo.mjs` adds an emulator-only mode:
+`--emulator=127.0.0.1:PORT --project=demo-... [--seed=PATH [--images=PATH]] [--port=N]`.
+It refuses production, Cloud Run and non-loopback binds (`LOCAL_MODE_REQUIRED`),
+a non-loopback emulator, a non-`demo-` project or a mismatched
+`FIRESTORE_EMULATOR_HOST` (`EMULATOR_REQUIRED`), and mixed or unknown arguments,
+before any client exists. Seeding runs only through the importer's guarded,
+create-only execute path; a refused seed stops the launch. Shared records and
+judge sessions live in the emulator. Advice is unconfigured in this mode.
+
+Local proof (no live call):
+
+- `tests\booking-catalogue.test.mjs` launcher cases: 14 refusals with no client
+  or import; against the emulator, a refused seed writes nothing, a seeded
+  launch serves the catalogue, a judge arms, a restart without a seed keeps the
+  same cookie, CSRF token and watch, and a second identical seed is `unchanged`.
+- `node .\tests\booking-emulator.browser.mjs` with the emulator variables:
+  passed, no page errors, no external requests. Launch 1:
+  `--seed=.local/s0.6/catalogue-import.json --images=.local/s0.5/image-manifest.json
+  --port=8194`, printed "Seeded through the guarded importer: AIRB000179
+  unchanged, ..." (all six unchanged). At 320, 768 and 1440 px: six cards in the
+  approved order, each with its reviewed hotel photo loaded and labelled, no
+  fallback; Original Booking for 181 (hotel and room photo), 180 (hotel only)
+  and 179 (hotel only, setup disabled). Judge A armed 181 (Any drop, MYR 10)
+  and 182 (MYR 50), both revision 1 with a `captured-replay` first check;
+  judge B armed 181 at MYR 100. Each judge kept their own watch, and B had none
+  on 182. Launch 2 had no seed; both judges reloaded into their committed
+  armed lines and identical bootstrap watches. Screenshots (ignored):
+  `.local\judge-flow\emulator\` `start`, `booked-airb000181`,
+  `booked-airb000180`, `booked-airb000179` at each width, `armed-airb000181-768`,
+  `restarted-armed-airb000181` at 768 and 390. The evidence sessions were then
+  deleted; the emulator holds only the six imported bookings.
+- `node .\tests\booking-judge.browser.mjs`: passed. The fixture's Siam card now
+  uses its reviewed hotel photo; the Hyatt card keeps the drawn fallback.
+- Observation for Part 2: an in-page hash change from `#drops-AIRB000182` to
+  `#drops-AIRB000181` kept showing 182's armed line until a reload. The walk
+  reloads; this was not investigated further.
+
+Commands (worktree; emulator variables `FIRESTORE_EMULATOR_HOST=127.0.0.1:8181`,
+`GOOGLE_CLOUD_PROJECT=demo-roomdrop-part1`, `RUN_FIRESTORE_INTEGRATION=1`,
+`NODE_ENV=test` for the first):
+
+- `node --test .\tests\altovo-quotation.test.mjs .\tests\altovo-catalogue.test.mjs .\tests\booking-storage.test.mjs .\tests\quotation-session-storage.test.mjs .\tests\booking-catalogue.test.mjs .\tests\booking-drop-watch.test.mjs .\tests\quotation-demo-server.test.mjs .\tests\booking-setup-ui.test.mjs`:
+  tests 99, pass 99, fail 0, skipped 0.
+- `npm test` without emulator variables: tests 393, pass 362, fail 0, skipped 31.
+- `node .\tests\booking-judge.browser.mjs`: passed.
+- `node .\tests\booking-emulator.browser.mjs` (emulator variables, no
+  `RUN_FIRESTORE_INTEGRATION`): passed.
+- `git diff --check`: clean.
+
+Live calls on 18 October 2026 (all owner-approved and owner-run in the owner's
+browser or session; this worktree made none):
+
+- S0.3 share-link reads: AIRB000181 to AIRB000184 for projections, then
+  AIRB000179 to AIRB000184 again for images; 10 seven-day share tokens minted in
+  total, none stored.
+- Gateway: 2 guarded runs of 5 calls each (1 login and 4 search-by-id), all as
+  recorded above; the second returned no image fields.
+- 9 image GETs for the approved downloads.
+- 2 failed Altovo probes, `hotels/details` and `image/list`, both 404 on air1.
