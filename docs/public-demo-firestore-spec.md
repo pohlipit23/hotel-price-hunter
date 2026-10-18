@@ -310,6 +310,30 @@ adapters, including catalogue bounds, invariant rejection, unchanged watches,
 receipt/context persistence and `ttlAt`. This is storage compatibility proof,
 not a branch merge or acceptance of the unfinished GET/watch integration.
 
+#### Part 2 contract v3 follow-up
+
+The arm body now sends `expectedRevision: data.watch?.revision ?? 0`, as requested
+by Part 1. A stale response preserves the committed receipt and asks the judge to
+reload the latest setup; catalogue/runtime unavailability stays on setup without
+claiming a successful arm. The receipt adapter accepts `firstCheck.captureStatus`
+only as `observed` or `observed-empty`, and rejects contradictory capture metadata
+or a claimed empty capture with nonempty captured options. Legacy receipts remain
+supported. Bootstrap `dropSetVersion` continues to bind receipt validity; `card`
+is additive display metadata.
+
+Hosted startup now passes `bookingStorage` as its sole catalogue source, with
+the already validated loaded entries separately named `reviewedCatalogue` for
+Part 2's version guards. This avoids passing the conflicting `catalogue` source
+argument to Part 1's v3 factory. Reconcile the remaining GET/watch implementation
+only during the separately authorised integration.
+
+Read-only follow-up for Part 1: in `d14f70f`, `armRequest` defaults an omitted
+`expectedRevision` to 0 and `armDropWatch` compares it to the current revision.
+Changing a minimum after revision 1 without the field therefore appears to reject
+with `WATCH_REVISION_STALE`, whereas the v3 interface notes describe omission as
+no stale check. This is source inspection, not an executed Part 1 arm test. The
+Part 2 client always supplies the field and does not depend on omission semantics.
+
 ### The seam: the atomic arm operation and its receipt
 
 "Starts the watcher" means: valid consent and minimum saved, armed state

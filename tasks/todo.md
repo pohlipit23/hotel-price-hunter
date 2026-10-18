@@ -394,6 +394,21 @@ Contract v2 follow-up (Part 2 only):
   AIRB000179-184 captured (180-183 armable with three Drops each, 179/184
   non-refundable); Part 2 has not inspected or imported those real captures.
 
+Contract v3 follow-up (Part 2 only):
+
+- [x] Send `expectedRevision: data.watch?.revision ?? 0` in the arm body; a
+  stale or unavailable response does not replace the committed receipt.
+- [x] Validate `firstCheck.captureStatus` and bootstrap capture/Drop-set metadata;
+  preserve legacy receipt support and honest empty/unavailable states.
+- [x] Pass `bookingStorage` as the sole factory source; retain loaded version
+  bindings separately as `reviewedCatalogue`. Recognise the new bounded 503 codes.
+- [x] `booking-v3.browser.mjs` passes at 320/768/1024/1440 px against an injected
+  v3 arm endpoint. The memory-receipt browser harness explicitly strips the new
+  request field for the untouched legacy base server and proves no revision logic.
+- [ ] Full integrated proof remains blocked by the no-merge/no-rebase boundary.
+  Also relay the source-inspected omitted-revision mismatch at `d14f70f` to Claude;
+  the updated client always includes the field and is unaffected by that fallback.
+
 - [ ] Plan approval (given 18 October 2026) precedes coding; local checks and raw
   acceptance evidence are complete. The full catalogue content matrix (S0) remains
   unchecked until supplied and captured; storage mechanics alone do not complete it.

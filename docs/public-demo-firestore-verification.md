@@ -3,18 +3,19 @@
 ## Part 2 - 18 October 2026
 
 Worktree: `.local\roomdrop-part2`, branch `codex/roomdrop-part2-app`.
-Base: `3c07af3`. Binding storage interface: v2 supplied by Claude through the user.
+Base: `3c07af3`. Binding storage interface: v3 supplied by Claude through the user.
 All runtime tests and evidence below are local. No live capture, model call,
 production import, source push, deployment, IAM/TTL change or Scheduler execution.
 
 | Boundary | Result | Evidence |
 | --- | --- | --- |
-| Node regressions, including actual v2 session and Part 2 emulator cases | Pass: 335 tests, 329 passed, 0 failed, 6 skipped | `.local\part2-node-tests-v2.log` |
+| Node regressions, including actual v2 session and Part 2 emulator cases | Pass: 336 tests, 330 passed, 0 failed, 6 skipped | `.local\part2-node-tests-v3.log` |
 | Part 2 transactions on real Firestore | Pass: independent clients, hashed test cookie ids, concurrent confirmations, allowance contention, context restart | `quotation-session-actions.test.mjs` with `RUN_ROOMDROP_PART2_FIRESTORE=1` |
 | Durable confirm/chat HTTP on real Firestore | Pass: separate servers/clients, restart recovery, stored follow-up context, unchanged watch/shared records | `quotation-durable-actions.test.mjs`, contract-v1 adapters over test-owned emulator documents |
 | Actual Part 1 v2 session adapter compatibility | Pass: memory and real Firestore, invariant/catalogue rejection, preserved watch, receipt/context persistence, `ttlAt` Timestamp | `part1-session-v2.test.mjs`; pinned `5535935` source read via `git show` and evaluated only in memory |
-| Full existing judge UI | Pass: 320/768/1440 px | `.local\judge-flow\browser\result.json`, 27 screenshots; memory arm |
-| Part 2 UI | Pass: 320/768/1024/1440 px, keyboard, refresh, isolation, rearm, empty/unavailable, no external requests | `.local\part2-browser\result.json`, 24 screenshots; memory arm and injected model |
+| Full existing judge UI | Historical pre-v3 pass: 320/768/1440 px; rerun after integration | `.local\judge-flow\browser\result.json`, 27 screenshots; untouched base arm predates `expectedRevision` |
+| Part 2 UI | Pass: 320/768/1024/1440 px, keyboard, refresh, isolation, rearm, empty/unavailable, no external requests | `.local\part2-browser\result.json`, 24 screenshots; explicit legacy request adapter, memory receipt and injected model |
+| v3 arm/rearm requests and refusal states | Pass: 320/768/1024/1440 px; first revision 0, current revision on rearm, stale/503 preserve the receipt | `.local\part2-v3-browser\result.json`; injected v3 arm endpoint, not actual Part 1 arm proof |
 | Historical single-snapshot booking UI | Pass: 320/768/1440 px | `.local\restore-booking-ui\browser\result.json`; synthetic two-Drop snapshot, no live rates |
 | Hosted startup | Pass with injected factories; storage failure precedes model/listen, stores close once, invalid production/emulator profiles rejected | `quotation-cloud.test.mjs` |
 | Manifest and dependency closure | Pass with explicitly injected Part 1 source doubles | `public-demo-release.test.mjs`; output is `test-prepared-offline`, no registry tag |
@@ -68,6 +69,11 @@ Claude reports all six codes AIRB000179-184 captured, with 180-183 armable and
 three Drops each, and 179/184 non-refundable. That is an owner report; Part 2
 has not read the real capture payloads or imported them.
 
+The v3 request test does not exercise omitted `expectedRevision`: the client now
+always supplies it. Source inspection of `d14f70f` found omission defaults to 0
+and still participates in the stale check, differing from the v3 interface text.
+This is recorded for Claude in the spec follow-up; no Part 1 code was edited.
+
 ### Reproduction
 
 ```powershell
@@ -78,6 +84,7 @@ $env:RUN_ROOMDROP_PART2_FIRESTORE='1'
 Remove-Item Env:RUN_FIRESTORE_INTEGRATION -ErrorAction SilentlyContinue
 npm.cmd test
 node tests\booking-after-watch.browser.mjs
+node tests\booking-v3.browser.mjs
 # Requires actual Part 1 modules integrated into this worktree:
 node tests\booking-firestore.browser.mjs
 git diff --check

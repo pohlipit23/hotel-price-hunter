@@ -1,6 +1,6 @@
 # Curated RoomDrop Part 2 release preparation
 
-Status: implementation against storage contract v2 is committed locally;
+Status: implementation against storage contract v3 is committed locally;
 integrated acceptance and a production release candidate are blocked on Part 1
 integration. No deployment/import/publication approval is requested yet. The
 reviewed catalogue content and exact production image are not ready to approve.
@@ -19,6 +19,9 @@ test storage. GET/watch integration still requires Part 1's implementation.
    unrelated shared-checkout work; reconcile only the agreed ownership sections.
 2. Wire Part 1's durable GET/watch and bootstrap projection
    `publicPostWatchState({ scope, bundle })`. Keep its atomic arm receipt unchanged.
+   The client now sends `expectedRevision`; startup supplies `bookingStorage` as
+   the sole source and keeps review metadata separately as `reviewedCatalogue`.
+   Preserve that source distinction when reconciling Part 1's factory changes.
 3. Run all Node and browser/emulator gates in the Part 2 verification document.
 4. Verify the six-scenario matrix, metadata, capture provenance and guarded import.
    Claude now reports AIRB000179-184 captured: 180-183 armable with three Drops

@@ -128,6 +128,10 @@ Approved two-part delivery (18 October 2026). Mixed F tasks are split into `a`
   session storage to manifest codes and handle `getDrops` booking-unavailable
   errors. `part1-session-v2.test.mjs` evaluates the committed session module
   read-only from `git show` to prove actual adapter compatibility without merging.
+  Contract v3 follow-up: send the current revision when arming/rearming, validate
+  receipt capture status, preserve stale/unavailable outcomes and pass storage as
+  the sole catalogue source. `booking-v3.browser.mjs` proves the request behaviour
+  against an injected v3 endpoint; it does not substitute for integrated acceptance.
 - Both parts branch from `roomdrop/judge-flow-base`, a snapshot of pre-existing
   shared-checkout work authored by neither part. Part 2 may start against the
   current memory-backed `/watch` receipt and switches to the Firestore-backed
