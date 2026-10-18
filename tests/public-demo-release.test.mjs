@@ -7,24 +7,42 @@ import { resolve, dirname, posix } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { main } from '../scripts/prepare-booking-release.mjs';
 import { altovoCatalogueFixture } from './fixtures/altovo-catalogue.mjs';
+import { validateCatalogueManifest } from '../app/booking-cloud.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const source = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, windowsHide: true }).toString().trim();
 test('release preparation is offline by default and requires exact private input and commit', async () => {
   assert.equal((await main([])).status, 'offline');
-  for (const args of [['--prepare'], ['--prepare', '--source=HEAD', '--catalogue=.local/input.json'],
-    ['--prepare', '--deploy'], ['--prepare', '--prepare'], ['--prepare', `--source=${source}`, '--catalogue=package.json']])
+  for (const args of [['--prepare'], ['--prepare', '--source=HEAD', '--manifest=.local/input.json'],
+    ['--prepare', '--deploy'], ['--prepare', '--prepare'], ['--prepare', `--source=${source}`, '--manifest=package.json'],
+    ['--prepare', `--source=${source}`, '--snapshot=.local/old.json']])
     await assert.rejects(main(args));
 });
-test('frozen booking context has complete runtime imports, source hashes and a safe public catalogue', async t => {
+test('catalogue manifest includes only bounded reviewed codes and versions', () => {
+  const manifest = { schemaVersion: 1, entries: [{ code: 'TEST0001', contentVersion: 'content-v1', dropSetVersion: 'drops-v1' }] };
+  assert.equal(validateCatalogueManifest(manifest), manifest);
+  for (const bad of [{ ...manifest, token: 'private' }, { ...manifest, entries: [] },
+    { ...manifest, entries: [manifest.entries[0], manifest.entries[0]] },
+    { ...manifest, entries: [{ ...manifest.entries[0], bundle: {} }] },
+    { ...manifest, entries: [{ ...manifest.entries[0], code: '../private' }] }]) assert.throws(() => validateCatalogueManifest(bad));
+});
+test('test-injected booking context closes all runtime imports and packages only a code/version manifest', async t => {
   const input = resolve(root, '.local', `part2-package-${randomUUID()}.json`);
-  await mkdir(dirname(input), { recursive: true }); await writeFile(input, JSON.stringify(altovoCatalogueFixture()));
-  const result = await main(['--prepare', `--source=${source}`, `--catalogue=${input}`]);
-  assert.equal(result.status, 'prepared-offline');
+  const pins = { schemaVersion: 1, entries: [{ code: 'AIRB000180', contentVersion: altovoCatalogueFixture().entries[0].bundle.snapshotVersion, dropSetVersion: 'capture-v1' }] };
+  await mkdir(dirname(input), { recursive: true }); await writeFile(input, JSON.stringify(pins));
+  // Only test artifacts get source doubles, explicitly marked and excluded from registry tags.
+  const doubles = { 'app/booking-storage.mjs': 'export function createBookingStorage() { throw Error("Test source double"); }',
+    'app/quotation-session-storage.mjs': 'export function createFirestoreSessionStorage() { throw Error("Test source double"); }' };
+  const result = await main(['--prepare', `--source=${source}`, `--manifest=${input}`], {
+    readSource: async name => Object.hasOwn(doubles, name) ? doubles[name] : readFile(resolve(root, name)),
+  });
+  assert.equal(result.status, 'test-prepared-offline');
   const manifest = JSON.parse(await readFile(result.manifestPath, 'utf8'));
-  assert.equal(manifest.sourceCommit, source); assert.equal(manifest.uncommittedFilesExcluded, true);
+  assert.equal(manifest.sourceCommit, source); assert.equal(manifest.sourceMode, 'test-injected'); assert.equal(manifest.uncommittedFilesExcluded, false);
   const files = new Map(manifest.files.map(file => [file.path, file]));
   assert.ok(files.has('app/quotation-session-actions.mjs'));
+  assert.ok(files.has('app/booking-storage.mjs')); assert.ok(files.has('app/quotation-session-storage.mjs'));
+  assert.equal(files.has('booking-demo.json'), false); assert.equal(files.has('booking-catalogue.json'), false);
   for (const file of manifest.files) {
     const bytes = await readFile(resolve(result.contextDirectory, file.path));
     assert.equal(createHash('sha256').update(bytes).digest('hex'), file.sha256);
@@ -37,10 +55,10 @@ test('frozen booking context has complete runtime imports, source hashes and a s
     }
   }
   assert.equal(createHash('sha256').update(JSON.stringify(manifest.files)).digest('hex'), manifest.contextSha256);
-  const catalogue = JSON.parse(await readFile(resolve(result.contextDirectory, 'booking-catalogue.json'), 'utf8'));
-  assert.doesNotMatch(JSON.stringify(catalogue), /FIXTURE-PRIVATE|rateDetail|privateReferences|sourceId/);
+  const catalogue = JSON.parse(await readFile(resolve(result.contextDirectory, 'booking-catalogue-manifest.json'), 'utf8'));
+  assert.deepEqual(catalogue, pins);
   const { createBookingDemoServer } = await import(pathToFileURL(resolve(result.contextDirectory, 'app/booking-demo-server.mjs')).href);
-  const server = createBookingDemoServer({ catalogue: { schemaVersion: 1, entries: catalogue.map(entry => ({ code: entry.code, bundle: entry.snapshot })) },
+  const server = createBookingDemoServer({ catalogue: altovoCatalogueFixture(),
     now: () => new Date('2026-10-20T00:00:00Z') });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
@@ -55,5 +73,5 @@ test('frozen booking context has complete runtime imports, source hashes and a s
   assert.equal(confirmation.status, 200); assert.equal((await confirmation.json()).confirmation.reservationCreated, false);
   for (const asset of ['/booking-live.js', '/booking-live-data.js', '/stay-advice.js']) assert.equal((await fetch(origin + asset)).status, 200);
   assert.equal((await fetch(origin + '/api/import')).status, 404);
-  console.log(JSON.stringify({ evidence: 'frozen-memory-receipt-context-only', ...result }));
+  console.log(JSON.stringify({ evidence: 'test-injected-source-only', ...result }));
 });

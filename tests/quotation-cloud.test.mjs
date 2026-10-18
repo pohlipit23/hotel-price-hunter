@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
+import { EventEmitter } from 'node:events';
+import { startHostedDemo } from '../app/booking-cloud.mjs';
 import { createHostedQuotationDemoServer, validateCloudQuotationMode, deploymentQuotationSnapshot } from '../app/quotation-demo-server.mjs';
 
 const origin = 'https://hotel-price-hunter-2qbcpylngq-as.a.run.app';
@@ -58,4 +60,28 @@ test('hosted HTTP profile enforces the canonical host/origin and Secure cookie w
   const health = await (await wire(local + '/healthz', { headers: { Host: host } })).json();
   assert.equal(health.surface, 'quotation-demo'); assert.equal(health.mode, 'selection-only');
   assert.doesNotMatch(JSON.stringify(data), /PRIVATE-token|PRIVATE-source/);
+});
+
+test('curated startup loads only storage, passes contract-v1 stores and closes once on shutdown', async () => {
+  let closed = 0, made = 0, modelCreated = 0, received;
+  const signals = new EventEmitter(), server = new EventEmitter();
+  server.close = callback => callback(); server.closeAllConnections = () => {};
+  const stores = { bookingStorage: { marker: 'booking-storage' }, sessionStorage: { marker: 'sessions' }, close: async () => { closed++; } };
+  const catalogue = { entries: [{ code: 'TEST0001', contentVersion: 'content-v1', dropSetVersion: 'drops-v1', bundle: {} }] };
+  const app = await startHostedDemo({ environment: { ...environment(), PORT: '8294' }, signals,
+    storesFactory: async () => { made++; return stores; }, catalogueLoader: async storage => { assert.equal(storage, stores.bookingStorage); return catalogue; },
+    advisorFactory: async () => { modelCreated++; return { available: false }; },
+    serverFactory: options => { received = options; return server; }, listen: async (value, port) => { assert.equal(value, server); assert.equal(port, 8294); }, log: () => {} });
+  assert.equal(made, 1); assert.equal(modelCreated, 1); assert.equal(received.catalogue, catalogue);
+  assert.equal(received.sessionStorage, stores.sessionStorage); assert.equal(received.snapshot, undefined);
+  await Promise.all([app.stop(), app.stop()]); assert.equal(closed, 1); assert.equal(signals.listenerCount('SIGTERM'), 0);
+});
+test('curated startup fails closed before model/listen when storage/catalogue is missing and preserves production guards', async () => {
+  let closed = 0, models = 0, reads = 0;
+  const stores = { bookingStorage: {}, sessionStorage: {}, close: async () => { closed++; } };
+  const deps = { environment: environment(), signals: new EventEmitter(), storesFactory: async () => { reads++; return stores; },
+    catalogueLoader: async () => { throw Error('PRIVATE-storage'); }, advisorFactory: async () => { models++; }, log: () => {} };
+  await assert.rejects(startHostedDemo(deps), /PRIVATE-storage/); assert.equal(closed, 1); assert.equal(models, 0);
+  await assert.rejects(startHostedDemo({ ...deps, environment: { ...environment(), FIRESTORE_EMULATOR_HOST: '127.0.0.1:8281' } }));
+  assert.equal(reads, 1);
 });

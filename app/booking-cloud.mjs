@@ -1,24 +1,72 @@
 import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { createBookingDemoServer } from './booking-demo-server.mjs';
 import { validateCloudQuotationMode } from './quotation-demo-server.mjs';
 import { createQuotationAdvisor } from './quotation-advisor.mjs';
 
-// The judge catalogue wins when packaged; otherwise the single display snapshot is served as before.
-async function releaseData() {
-  const read = name => readFile(new URL('../release/' + name, import.meta.url), 'utf8');
-  try { return { catalogue: JSON.parse(await read('booking-catalogue.json')) }; }
-  catch (error) { if (error?.code !== 'ENOENT') throw error; }
-  return { snapshot: JSON.parse(await read('booking-demo.json')) };
+export function validateCatalogueManifest(manifest) {
+  if (!manifest || Object.keys(manifest).sort().join() !== 'entries,schemaVersion' || manifest.schemaVersion !== 1
+    || !Array.isArray(manifest.entries) || !manifest.entries.length || manifest.entries.length > 20
+    || new Set(manifest.entries.map(entry => entry?.code)).size !== manifest.entries.length
+    || manifest.entries.some(entry => !entry || Object.keys(entry).sort().join() !== 'code,contentVersion,dropSetVersion'
+      || !/^[A-Z0-9]{4,20}$/.test(entry.code) || !/^[a-zA-Z0-9._:-]{1,128}$/.test(entry.contentVersion ?? '')
+      || !/^[a-zA-Z0-9._:-]{1,128}$/.test(entry.dropSetVersion ?? ''))) throw Error('CATALOGUE_MANIFEST_INVALID');
+  return manifest;
 }
-try {
-  validateCloudQuotationMode(process.env);
-  const port = Number(process.env.PORT || 8080);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) throw Error();
-  const data = await releaseData();
-  const advisor = await createQuotationAdvisor();
-  const server = createBookingDemoServer({ ...data, environment: process.env, advisor });
-  server.on('error', () => { console.error('Booking demo could not start.'); process.exitCode = 1; });
-  server.listen(port, '0.0.0.0', () => console.log('Booking demo ready; room confirmation only.'));
-  const stop = () => { server.close(); server.closeAllConnections(); };
-  process.once('SIGTERM', stop); process.once('SIGINT', stop);
-} catch { console.error('Booking startup refused: verify the customer deployment profile and display snapshot.'); process.exitCode = 1; }
+async function createStores(environment) {
+  // Part 1 owns these factories. Never fall back if they or Firestore are unavailable.
+  const [{ Firestore }, { createBookingStorage }, { createFirestoreSessionStorage }] = await Promise.all([
+    import('@google-cloud/firestore'), import('./booking-storage.mjs'), import('./quotation-session-storage.mjs'),
+  ]);
+  const firestore = new Firestore({ projectId: environment.GOOGLE_CLOUD_PROJECT });
+  return { bookingStorage: createBookingStorage({ firestore }), sessionStorage: createFirestoreSessionStorage({ firestore }),
+    close: () => firestore.terminate() };
+}
+async function loadCatalogue(bookingStorage) {
+  const { loadHostedCatalogue } = await import('./booking-storage.mjs');
+  const manifest = validateCatalogueManifest(JSON.parse(await readFile(new URL('../release/booking-catalogue-manifest.json', import.meta.url), 'utf8')));
+  const loaded = await loadHostedCatalogue(bookingStorage);
+  if (!Array.isArray(loaded?.entries) || loaded.entries.length !== manifest.entries.length) throw Error('CATALOGUE_UNAVAILABLE');
+  const entries = manifest.entries.map(pin => {
+    const entry = loaded.entries.find(entry => entry.code === pin.code);
+    if (!entry || entry.contentVersion !== pin.contentVersion || entry.dropSetVersion !== pin.dropSetVersion) throw Error('CATALOGUE_UNAVAILABLE');
+    return entry;
+  });
+  return { entries };
+}
+const listenOn = (server, port) => new Promise((resolve, reject) => {
+  server.once('error', reject); server.listen(port, '0.0.0.0', () => { server.removeListener('error', reject); resolve(); });
+});
+export async function startHostedDemo({ environment = process.env, signals = process, storesFactory = createStores,
+  catalogueLoader = loadCatalogue, advisorFactory = createQuotationAdvisor, serverFactory = createBookingDemoServer,
+  listen = listenOn, log = console.log } = {}) {
+  validateCloudQuotationMode(environment);
+  const port = Number(environment.PORT || 8080);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw Error('INVALID_PORT');
+  let stores, server, stopping;
+  const stop = () => stopping ??= (async () => {
+    signals.removeListener('SIGTERM', stop); signals.removeListener('SIGINT', stop);
+    try {
+      if (server) await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
+    } finally { await stores?.close(); }
+  })();
+  try {
+    stores = await storesFactory(environment);
+    if (!stores?.bookingStorage || !stores.sessionStorage || typeof stores.close !== 'function') throw Error('DURABLE_STORAGE_REQUIRED');
+    const catalogue = await catalogueLoader(stores.bookingStorage);
+    if (!Array.isArray(catalogue?.entries) || !catalogue.entries.length || catalogue.entries.length > 20) throw Error('CATALOGUE_UNAVAILABLE');
+    const advisor = await advisorFactory({ environment });
+    server = serverFactory({ catalogue, sessionStorage: stores.sessionStorage, bookingStorage: stores.bookingStorage, environment, advisor });
+    await listen(server, port);
+    server.on('error', () => { log('RoomDrop runtime stopped: service unavailable.'); void stop(); });
+    signals.once('SIGTERM', stop); signals.once('SIGINT', stop);
+    log('RoomDrop ready; captured replay and selection only.');
+    return { server, stop };
+  } catch (failure) { await stop(); throw failure; }
+}
+export async function runHostedDemo(options) {
+  try { return await startHostedDemo(options); }
+  catch { console.error('RoomDrop startup refused: verify the customer profile, catalogue manifest and durable storage.'); process.exitCode = 1; }
+}
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) await runHostedDemo();
