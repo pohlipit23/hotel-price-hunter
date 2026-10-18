@@ -33,7 +33,7 @@ async function app(t, { advisor, retry = false } = {}) {
   const post = (action, body = {}, headers = {}) => fetch(origin + '/api/booking-demo/q/' + code + '/' + action, { method: 'POST',
     headers: { Cookie: 'roomdrop_quote=' + cookie, Origin: origin, 'X-CSRF-Token': 'durable-csrf', 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify({ snapshotVersion: bundle.snapshotVersion, watchBinding: watchBinding(watch), ...body }) });
-  return { post, sessions, record, sessionStorage, inTransaction: () => inTransaction, fail: () => { unavailable = true; } };
+  return { post, sessions, record, sessionStorage, bookingStorage, inTransaction: () => inTransaction, fail: () => { unavailable = true; } };
 }
 const selection = { optionId: 'option-fixture-flex-premier', acceptedDemoOnly: true };
 test('durable confirm reads only the injected store and returns the committed idempotent receipt', async t => {
@@ -65,6 +65,17 @@ test('durable route rejects changed catalogue versions without touching sessions
   const response = await a.post('confirm', selection); assert.equal(response.status, 409);
   assert.equal((await response.json()).error.code, 'DROPS_CHANGED');
   assert.equal(a.sessions.get(cookie).byCode[code].confirmation, undefined);
+});
+test('contract v2 unavailable bookings and invalid session state return bounded errors without a commit', async t => {
+  for (const [code, status, responseCode] of [['BOOKING_UNAVAILABLE', 404, 'BOOKING_UNAVAILABLE'],
+    ['SESSION_STATE_INVALID', 503, 'DEMO_UNAVAILABLE'], ['STORAGE_UNAVAILABLE', 503, 'DEMO_UNAVAILABLE']]) {
+    const a = await app(t), failure = Object.assign(Error('PRIVATE-storage-detail'), { code });
+    if (code === 'BOOKING_UNAVAILABLE') a.bookingStorage.getDrops = async () => { throw failure; };
+    else a.sessionStorage.transact = async () => { throw failure; };
+    const response = await a.post('confirm', selection); assert.equal(response.status, status, code);
+    const body = await response.json(); assert.equal(body.error.code, responseCode); assert.doesNotMatch(JSON.stringify(body), /PRIVATE/);
+    assert.equal(a.sessions.get(cookie).byCode['AIRB000180'].confirmation, undefined);
+  }
 });
 
 test('Firestore durable HTTP: independent instances recover receipts/context without process-local sessions',

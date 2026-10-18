@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import { EventEmitter } from 'node:events';
-import { startHostedDemo } from '../app/booking-cloud.mjs';
+import { startHostedDemo, createHostedStores } from '../app/booking-cloud.mjs';
 import { createHostedQuotationDemoServer, validateCloudQuotationMode, deploymentQuotationSnapshot } from '../app/quotation-demo-server.mjs';
 
 const origin = 'https://hotel-price-hunter-2qbcpylngq-as.a.run.app';
@@ -94,4 +94,18 @@ test('curated shutdown handles a storage-close failure with a bounded signal dia
     advisorFactory: async () => ({ available: false }), log: message => logs.push(message) });
   signals.emit('SIGTERM'); await assert.rejects(app.stop(), /PRIVATE-storage/);
   assert.equal(signals.listenerCount('SIGTERM'), 0); assert.doesNotMatch(logs.join(' '), /PRIVATE/);
+});
+
+test('contract v2 hosted factories use the guarded client and constrain sessions to manifest codes', async () => {
+  const calls = [], firestore = { terminate: async () => { calls.push('close'); } };
+  const bookingStorage = {}, sessionStorage = {};
+  const stores = await createHostedStores(environment(), {
+    readManifest: async () => ({ schemaVersion: 1, entries: [{ code: 'AIRB000180', contentVersion: 'a'.repeat(64), dropSetVersion: 'd'.repeat(64) }] }),
+    loadBookingModule: async () => ({ createRoomdropFirestore: async env => { assert.equal(env.GOOGLE_CLOUD_PROJECT, environment().GOOGLE_CLOUD_PROJECT); calls.push('client'); return firestore; },
+      createBookingStorage: options => { assert.equal(options.firestore, firestore); return bookingStorage; } }),
+    loadSessionModule: async () => ({ createFirestoreSessionStorage: options => { assert.equal(options.firestore, firestore);
+      assert.deepEqual(options.catalogueCodes, ['AIRB000180']); return sessionStorage; } }),
+  });
+  assert.equal(stores.bookingStorage, bookingStorage); assert.equal(stores.sessionStorage, sessionStorage);
+  await stores.close(); assert.deepEqual(calls, ['client', 'close']);
 });

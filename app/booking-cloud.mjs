@@ -14,20 +14,26 @@ export function validateCatalogueManifest(manifest) {
       || !/^[a-zA-Z0-9._:-]{1,128}$/.test(entry.dropSetVersion ?? ''))) throw Error('CATALOGUE_MANIFEST_INVALID');
   return manifest;
 }
-async function createStores(environment) {
+const readCatalogueManifest = async () => validateCatalogueManifest(JSON.parse(await readFile(new URL('../release/booking-catalogue-manifest.json', import.meta.url), 'utf8')));
+export async function createHostedStores(environment, {
+  readManifest = readCatalogueManifest,
+  loadBookingModule = () => import('./booking-storage.mjs'),
+  loadSessionModule = () => import('./quotation-session-storage.mjs'),
+} = {}) {
+  validateCloudQuotationMode(environment);
   // Part 1 owns these factories. Never fall back if they or Firestore are unavailable.
-  const [{ Firestore }, { createBookingStorage }, { createFirestoreSessionStorage }] = await Promise.all([
-    import('@google-cloud/firestore'), import('./booking-storage.mjs'), import('./quotation-session-storage.mjs'),
+  const [manifest, { createRoomdropFirestore, createBookingStorage }, { createFirestoreSessionStorage }] = await Promise.all([
+    readManifest().then(validateCatalogueManifest), loadBookingModule(), loadSessionModule(),
   ]);
-  const firestore = new Firestore({ projectId: environment.GOOGLE_CLOUD_PROJECT });
+  const firestore = await createRoomdropFirestore(environment);
   try {
-    return { bookingStorage: createBookingStorage({ firestore }), sessionStorage: createFirestoreSessionStorage({ firestore }),
+    return { bookingStorage: createBookingStorage({ firestore }), sessionStorage: createFirestoreSessionStorage({ firestore, catalogueCodes: manifest.entries.map(entry => entry.code) }),
       close: () => firestore.terminate() };
   } catch (failure) { await firestore.terminate(); throw failure; }
 }
 async function loadCatalogue(bookingStorage) {
   const { loadHostedCatalogue } = await import('./booking-storage.mjs');
-  const manifest = validateCatalogueManifest(JSON.parse(await readFile(new URL('../release/booking-catalogue-manifest.json', import.meta.url), 'utf8')));
+  const manifest = await readCatalogueManifest();
   const loaded = await loadHostedCatalogue(bookingStorage);
   if (!Array.isArray(loaded?.entries) || loaded.entries.length !== manifest.entries.length) throw Error('CATALOGUE_UNAVAILABLE');
   const entries = manifest.entries.map(pin => {
@@ -40,7 +46,7 @@ async function loadCatalogue(bookingStorage) {
 const listenOn = (server, port) => new Promise((resolve, reject) => {
   server.once('error', reject); server.listen(port, '0.0.0.0', () => { server.removeListener('error', reject); resolve(); });
 });
-export async function startHostedDemo({ environment = process.env, signals = process, storesFactory = createStores,
+export async function startHostedDemo({ environment = process.env, signals = process, storesFactory = createHostedStores,
   catalogueLoader = loadCatalogue, advisorFactory = createQuotationAdvisor, serverFactory = createBookingDemoServer,
   listen = listenOn, log = console.log } = {}) {
   validateCloudQuotationMode(environment);

@@ -31,7 +31,7 @@ test('test-injected booking context closes all runtime imports and packages only
   const pins = { schemaVersion: 1, entries: [{ code: 'AIRB000180', contentVersion: altovoCatalogueFixture().entries[0].bundle.snapshotVersion, dropSetVersion: 'capture-v1' }] };
   await mkdir(dirname(input), { recursive: true }); await writeFile(input, JSON.stringify(pins));
   // Only test artifacts get source doubles, explicitly marked and excluded from registry tags.
-  const doubles = { 'app/booking-storage.mjs': 'export function createBookingStorage() { throw Error("Test source double"); }',
+  const doubles = { 'app/booking-storage.mjs': 'export async function createRoomdropFirestore() { throw Error("Test source double"); } export function createBookingStorage() { throw Error("Test source double"); }',
     'app/quotation-session-storage.mjs': 'export function createFirestoreSessionStorage() { throw Error("Test source double"); }' };
   const result = await main(['--prepare', `--source=${source}`, `--manifest=${input}`], {
     readSource: async name => Object.hasOwn(doubles, name) ? doubles[name] : readFile(resolve(root, name)),
