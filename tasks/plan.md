@@ -4,8 +4,12 @@
 
 Source of truth: `docs\public-demo-firestore-spec.md`, updated with the approved
 judge-flow decisions in `docs\roomdrop-booking-setup-handoff.md`, and `GLOSSARY.md`.
-Status: proposed implementation plan; waiting for approval before application
-coding. The user explicitly requested the spec update and this plan together.
+Status: approved by the user on 18 October 2026, with one modification: delivery
+is split into Part 1 (sample preparation and judge setup through Drop Watch armed)
+and Part 2 (RoomDrop app after watch activation). Sample preparation is an explicit
+tracked task (S0). Do not ask for this approval again. Live capture/import,
+deployment and access changes keep their separate approval boundaries.
+The user explicitly requested the spec update and this plan together.
 Earlier unchecked intake tasks are superseded for this tranche; historical
 completed work and other open project tasks remain below.
 
@@ -80,7 +84,9 @@ instructions to overwrite another writer's changes.
 
 ### Implementation order and checkpoints
 
-Detailed acceptance and file ownership are in `tasks\todo.md`. Work is sequential:
+Detailed acceptance and file ownership are in `tasks\todo.md`. The seam, receipt
+and file-ownership rules are in the spec section "Delivery split, seam and
+ownership". Original order (historical reference):
 
 - F0-F2: audit captures/scaffolding, validate the adapter, then import/read one
   complete booking/Drops bundle through the emulator.
@@ -90,6 +96,27 @@ Detailed acceptance and file ownership are in `tasks\todo.md`. Work is sequentia
   context. Check both judges on one booking and one judge across two bookings.
 - F9-F11: hosted entrypoints, frozen release export, browser/restart acceptance and a
   concrete release bundle for a separate deployment/import decision.
+
+Approved two-part delivery (18 October 2026). Mixed F tasks are split into `a`
+(Part 1) and `b` (Part 2) sub-tasks:
+
+- Part 1 (Claude, `.local\roomdrop-part1`, branch `claude/roomdrop-part1-armed`):
+  S0 sample preparation; F0; F1; F2; F3a session core and watch entry; F4a
+  catalogue/per-code bootstrap; F5a atomic arm and first-check replay receipt;
+  F6 start grid and Original Booking confirmation; F7a consent/minimum setup,
+  cannot-start and armed state; F9a minimum hosted Firestore wiring for setup;
+  F10a minimum packaging closure; F11a Part 1 emulator/browser/restart evidence.
+  Part 1 ends at the committed arm receipt.
+- Part 2 (Codex, `.local\roomdrop-part2`, branch `codex/roomdrop-part2-app`):
+  F3b confirmation/context session fields; F4b confirm/advice/chat routes on
+  durable sessions; F5b membership, safe rearming, stale rejection and idempotent
+  selection receipts; F7b replay presentation and Deals/Review/Confirmed; F8
+  durable Gemini context; F9b complete hosted entrypoints; F10b frozen release
+  export; F11b integrated acceptance and release bundle.
+- Both parts branch from `roomdrop/judge-flow-base`, a snapshot of pre-existing
+  shared-checkout work authored by neither part. Part 2 may start against the
+  current memory-backed `/watch` receipt and switches to the Firestore-backed
+  receipt once F5a lands; the receipt contract changes only by coordination.
 
 No task is marked complete by this plan. All proposed tasks are small or medium
 and name at most five likely files. Extra files require an explicit task split.
@@ -144,6 +171,11 @@ Keep the desired six-card scenario matrix separate from implementation acceptanc
 two samples can verify storage mechanics, while complete catalogue content needs
 owner-created quotations and corresponding reviewed captures. Card photo/city and
 scenario descriptions must be supplied as curated facts, not invented metadata.
+This content work is the explicit Part 1 task S0 in `tasks\todo.md`, tracked as
+separate steps: inspect the two existing projections, owner quotation creation,
+sanitised projection capture, matching per-quotation Gateway Drop capture,
+photo/scenario metadata and guarded Firestore import. Each live step needs its
+own user approval; plan approval grants no new live-call allowance.
 
 ### Release and approval boundaries
 
@@ -160,7 +192,8 @@ configuration changes, session TTL, rollback and preservation of private service
 and data. The first persistent release may require fresh anonymous sessions.
 Do not import production Firestore data, deploy, change IAM/TTL, capture more live
 quotations/Gateway rates, make extra model calls, push source or commit `.local\`
-without the relevant authority. This task ends at plan approval, before coding.
+without the relevant authority. Plan approval was given on 18 October 2026 with
+the Part 1/Part 2 split; these release boundaries are unchanged by it.
 
 ## Gemini restored and deployed, 18 October
 

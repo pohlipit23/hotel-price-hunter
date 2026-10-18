@@ -4,9 +4,67 @@
 
 Contract: `docs\public-demo-firestore-spec.md`. Approved judge decisions:
 `docs\roomdrop-booking-setup-handoff.md`. Plan: `tasks\plan.md`.
-Status: proposed tasks awaiting plan approval; no implementation is claimed.
-These F0-F11 tasks replace the earlier unimplemented public-intake/shared-watch
-schedule. All historical project tasks below remain preserved.
+Status: plan approved by the user on 18 October 2026, with the modification that
+delivery is split into Part 1 (sample preparation and judge setup through Drop
+Watch armed) and Part 2 (RoomDrop app after watch activation). No implementation
+is claimed. Live capture/import, deployment and access changes keep separate
+approval boundaries. These S0 and F0-F11 tasks replace the earlier unimplemented
+public-intake/shared-watch schedule. All historical project tasks below remain preserved.
+
+The original F0-F11 tasks are redistributed below without changing their
+acceptance. Tasks that mixed both parts are split into `a` (Part 1) and `b`
+(Part 2). All tasks remain open: the base snapshot's memory-backed catalogue,
+`/watch` route and judge UI are unreviewed existing work, not proof of completion.
+
+Seam: Part 1 ends at the atomic arm operation (valid consent + minimum saved +
+armed state committed + the approved immediate captured first-check replay in the
+same transaction), which returns the receipt defined in the spec section
+"Delivery split, seam and ownership". Part 2 consumes that receipt and must not
+change the arm transaction contract without coordinating.
+
+Ownership: Part 1 is owned by Claude in worktree `.local\roomdrop-part1` (branch
+`claude/roomdrop-part1-armed`); Part 2 by Codex in `.local\roomdrop-part2`
+(branch `codex/roomdrop-part2-app`). Both branch from `roomdrop/judge-flow-base`,
+a snapshot of pre-existing uncommitted shared-checkout work authored by neither.
+Primary file ownership is listed in the spec. In this file each part appends or
+updates only its own Part section to minimise merge conflicts.
+
+## Part 1 - Sample preparation and judge setup through Drop Watch armed
+
+Owner: Claude. Append Part 1 notes and evidence only within this section.
+
+### S0: Prepare the curated sample quotations
+
+Goal: about six curated real quotations in the unchanged air1 Altovo staging B2B
+app: refundable/armable, non-refundable/cannot-start (AIRB000179), free
+cancellation closing soon, and variety in city, currency or board. Plan approval
+grants no new live-call allowance; each step marked LIVE needs separate explicit
+user approval before it runs. Never change Altovo code/settings, call
+confirm-quote, create supplier bookings or commit `.local\`.
+
+- [ ] S0.1 Inspect the two existing projections first (AIRB000179, AIRB000180
+  under ignored `.local\altovo-sample\`): allowlisted keys, cancellation schedule,
+  provenance and which scenario slots they fill. Record the remaining scenario
+  gaps before requesting any creation or capture. Local only, no live call.
+- [ ] S0.2 Quotation creation by the owner (OWNER, LIVE staging UI): the owner
+  creates the missing air1 quotations to fill the recorded gaps; quotations stay
+  `status='quote'`. Record the approved air1 code list as tenant provenance.
+- [ ] S0.3 Sanitised projection capture (LIVE, separate approval): owner-run,
+  dry-run by default, through `scripts\prepare-altovo-catalogue.mjs`; keep only
+  allowlisted fields, never tokens or raw responses. Evidence stays in `.local\`.
+- [ ] S0.4 Matching per-quotation Gateway Drop capture (LIVE, separate approval):
+  one bounded Gateway search per refundable quotation with a baseline built from
+  its projection and `my`/`my` adults-only agency defaults recorded as such.
+  Distinguish a valid zero-result capture from a missing/failed one.
+- [ ] S0.5 Photo/scenario metadata: reviewed local photo assets, card ordering,
+  city and scenario labels supplied as curated facts, not invented metadata.
+- [ ] S0.6 Guarded Firestore import: emulator import through the F2 importer
+  (local, test-owned data); a production Firestore import is a separate LIVE step
+  requiring explicit approval and is not part of Part 1 acceptance.
+- Verify: per-code bundle validation via F1/F2, coverage matrix of scenario slots
+  versus captured evidence, `.local\` ignore checks. Two samples prove mechanics
+  only; the six-entry matrix stays open until supplied and captured.
+- Depends on: F0 for S0.1; F1 before S0.3/S0.4 execution; F2 for S0.6.
 
 ### F0: Audit available captures and existing scaffolding
 
@@ -16,7 +74,7 @@ schedule. All historical project tasks below remain preserved.
   without printing private payloads or changing current application behavior.
 - Verify: local schema/key/provenance inspection, `.local\` ignore checks and
   capture integrity hashes. No live call or Firestore write.
-- Depends on: plan approval. Small, two documentation files:
+- Depends on: plan approval (given 18 October 2026). Small, two documentation files:
   `docs\public-demo-firestore-verification.md`, `tasks\todo.md`.
 
 ### F1: Validate the Altovo catalogue adapter and capture preparation
@@ -32,6 +90,9 @@ schedule. All historical project tasks below remain preserved.
   `scripts\prepare-altovo-catalogue.mjs`, `tests\altovo-catalogue.test.mjs`.
 
 ### F2: Import and read immutable catalogue bookings and Drops
+
+Shared storage foundation: Part 2 reads Drops through this module and does not
+write shared booking/Drop records.
 
 - [ ] Acceptance: default-dry-run importer creates reviewed air1 booking records
   and captured Drops, with explicit manifest/card metadata. Identical concurrent
@@ -53,52 +114,53 @@ schedule. All historical project tasks below remain preserved.
 - [ ] Coverage reports distinguish two source projections, actual captured Drops
   and remaining owner-created catalogue entries. No additional live calls implied.
 
-### F3: Persist isolated sessions with per-code choices
+### F3a: Persist isolated sessions and the per-code watch entry (Part 1 of F3)
 
 - [ ] Acceptance: hashed cookie-keyed sessions retain one-hour expiry, CSRF and
-  `byCode[code]` setup/replay/receipt/context. Two judges sharing a code and one judge
-  visiting two codes remain isolated. Maintain the transactional 64-session cap;
-  no code outside the bounded catalogue may allocate state.
+  `byCode[code].watch` (setup and replay receipt). Two judges sharing a code and
+  one judge visiting two codes remain isolated. Maintain the transactional
+  64-session cap; no code outside the bounded catalogue may allocate state.
+  Shared storage foundation for Part 2: the module exposes a transaction helper
+  that F3b extends with confirmation/context fields.
 - Verify: `node --test .\tests\quotation-session-storage.test.mjs` using separate
   emulator clients; cover restart, expiry, capacity contention, per-code version
-  invalidation, failed writes and no production memory fallback.
+  invalidation of the watch entry, failed writes and no production memory fallback.
 - Depends on: F2. Small, two files: `app\quotation-session-storage.mjs`,
   `tests\quotation-session-storage.test.mjs`.
 
-### F4: Serve catalogue and per-code bootstrap APIs
+### F4a: Serve catalogue and per-code bootstrap APIs (Part 1 of F4)
 
 - [ ] Acceptance: expose bounded path-based catalogue/per-code reads backed by
-  Firestore and the reviewed manifest. Create/restore private sessions; preserve
+  Firestore and the reviewed manifest, returning shared facts plus only this
+  session's `byCode[code].watch`. Create/restore private sessions; preserve
   canonical Host/Origin/CSRF and query rejection. No public import/share-link input,
   arbitrary-code lookup, capture-file access or Altovo/Gateway call exists.
-- Verify: `node --test .\tests\booking-catalogue-server.test.mjs .\tests\quotation-demo-server.test.mjs`;
-  test unknown/encoded/malformed codes, projection guards, cross-session isolation,
-  stale Drop versions and database unavailability using actual emulator storage.
-- Depends on: F3. Medium, four files: `app\booking-demo-server.mjs`,
-  `app\quotation-demo-server.mjs`, `tests\booking-catalogue-server.test.mjs`,
-  `tests\quotation-demo-server.test.mjs`.
+- Verify: `node --test .\tests\booking-catalogue.test.mjs` (existing base-snapshot
+  test, or the proposed `booking-catalogue-server.test.mjs`) and
+  `.\tests\quotation-demo-server.test.mjs`; test unknown/encoded/malformed codes,
+  projection guards, cross-session isolation, stale Drop versions and database
+  unavailability using actual emulator storage.
+- Depends on: F3a. Medium, four files: `app\booking-demo-server.mjs`,
+  `app\quotation-demo-server.mjs` (catalogue `GET` branches only),
+  `tests\booking-catalogue.test.mjs`, `tests\quotation-demo-server.test.mjs`.
 
-### F5: Arm and replay the first check atomically per session/code
+### F5a: Arm and replay the first check atomically per session/code (Part 1 of F5)
+
+This is the Part 1/Part 2 seam.
 
 - [ ] Acceptance: validate actual-time cancellation eligibility, explicit consent
   and a minimum of 10.00 in the booking currency. Commit one armed setup/replay
-  filtered by `isDisplayedDrop` and the threshold. Identical retries preserve the
-  receipt; deliberate rearming affects only that session/code. Confirm only a
-  current qualifying Drop for an armed watch, retaining acknowledgements and
-  `reservationCreated:false`, `quoteModified:false`, `customerRefund:null`.
+  filtered by `isDisplayedDrop` and the threshold in one transaction, and return
+  the spec's receipt only after commit. Identical retries preserve the receipt;
+  a stale arm request cannot replace a newer revision; a deliberate new minimum
+  creates a new revision for that session/code only. Missing or malformed captures
+  fail without commit; a valid empty replay commits honestly.
 - Verify: `node --test .\tests\booking-drop-watch.test.mjs` with emulator races,
   lost acknowledgements, raised minima, mixed currency, changing cancellation
   windows, missing versus empty captures and changed Drop sets; zero upstream calls.
-- Depends on: F4. Medium, four files: `app\domain\booking-drop-watch.mjs`,
-  `app\quotation-session-storage.mjs`, `app\quotation-demo-server.mjs`,
-  `tests\booking-drop-watch.test.mjs`.
-
-### Checkpoint F3-F5: Durable judge actions
-
-- [ ] Emulator/API evidence proves isolation, one committed first replay, guarded
-  confirmation and restart recovery across independent app/storage instances.
-- [ ] A replay is labelled as captured data, never a fresh rate search; expired
-  sessions and non-armable bookings cannot mutate/confirm. Relevant tests run.
+- Depends on: F4a. Medium, four files: `app\domain\booking-drop-watch.mjs`,
+  `app\quotation-session-storage.mjs`, `app\quotation-demo-server.mjs` (`/watch`
+  branch only), `tests\booking-drop-watch.test.mjs`.
 
 ### F6: Build the start grid and Original Booking confirmation page
 
@@ -106,25 +168,127 @@ schedule. All historical project tasks below remain preserved.
   price/scenario cards, then "Your agency booked this" and one "Set up a drop"
   action. Show staging quotation/capture-date note, cannot-start reason and honest
   image fallbacks. No Altovo/AirBorneo branding, arbitrary code or share-link input.
-- Verify: `node --test .\tests\booking-setup-ui.test.mjs` and the proposed
-  `node .\tests\booking-firestore.browser.mjs`; inspect mobile/desktop and keyboard
-  screenshots, dynamic scenario status and direct navigation/refresh.
-- Depends on: F4, F5. Medium, five files: `app\public\booking.html`,
-  `app\public\booking.css`, `app\public\booking-judge.js`,
-  `tests\booking-setup-ui.test.mjs`, `tests\booking-firestore.browser.mjs`.
+- Verify: `node --test .\tests\booking-setup-ui.test.mjs` and
+  `node .\tests\booking-judge.browser.mjs` (existing base-snapshot harness; the
+  proposed `booking-firestore.browser.mjs` is Part 2's integrated harness); inspect
+  mobile/desktop and keyboard screenshots, dynamic scenario status and direct
+  navigation/refresh.
+- Depends on: F4a, F5a. Medium, five files: `app\public\booking.html`,
+  `app\public\booking.css` (catalogue/booked sections), `app\public\booking-judge.js`,
+  `tests\booking-setup-ui.test.mjs`, `tests\booking-judge.browser.mjs`.
 
-### F7: Connect setup and replay to Deals, Review and Confirmed
+### F7a: Consent, minimum saving, cannot-start and armed state (Part 1 of F7)
 
-- [ ] Acceptance: explicit consent/minimum setup shows armed/replayed results with
-  capture and replay times. Feed only the session's qualifying captured Drops to
-  existing screens, ranking and labels; preserve reduced-flexibility consent,
+- [ ] Acceptance: explicit consent/minimum setup screens with the 10.00 floor,
+  cannot-start states from actual-time eligibility, and a visible committed armed
+  state driven only by the arm receipt. No extra customer step or delay; a failed
+  arm shows a retryable error and never a fake armed state.
+- Verify: `node .\tests\booking-judge.browser.mjs` reaching armed on mobile and
+  desktop with keyboard; reload after arming shows the same committed receipt.
+- Depends on: F6. Small, three files: `app\public\booking-judge.js`,
+  `app\public\booking.html` (setup/checking sections), `tests\booking-judge.browser.mjs`.
+
+### F9a: Minimum hosted Firestore wiring for setup (Part 1 of F9)
+
+- [ ] Acceptance: inject real Firestore booking/session storage at hosted startup
+  for catalogue, bootstrap and arm, keeping production emulator/credential/origin
+  guards intact. Startup never seeds or imports data. No memory/file fallback for
+  these routes in hosted mode.
+- Verify: `node --test .\tests\quotation-cloud.test.mjs` cases for catalogue and
+  arm with injected test dependencies and bounded missing-storage failure.
+- Depends on: F7a. Small, two files: `app\booking-cloud.mjs`,
+  `tests\quotation-cloud.test.mjs` (coordinate with F9b).
+
+### F10a: Minimum packaging closure for setup (Part 1 of F10)
+
+- [ ] Acceptance: release preparation and `Dockerfile.booking` include the new
+  Part 1 modules (adapter, booking/session storage, arm domain) and their
+  dependency closure, excluding credentials and private captures.
+- Verify: `node --test .\tests\public-demo-release.test.mjs` cases for the new
+  files; exact-context build of the packaged entrypoint against the emulator.
+- Depends on: F9a. Small, two files: `scripts\prepare-booking-release.mjs`,
+  `Dockerfile.booking` (coordinate with F10b).
+
+### F11a: Part 1 acceptance evidence (Part 1 of F11)
+
+- [ ] Acceptance: an emulator-only launcher seeds only explicit reviewed test
+  captures via the guarded importer. Browser evidence shows start grid ->
+  Original Booking -> setup -> committed armed state; setup survives an app
+  restart against the same emulator; two judges on one code and one judge across
+  two codes do not overwrite one another. Record Part 1 evidence in its own
+  section of the verification report, local versus live proof separately.
+- Verify: `node .\tests\booking-judge.browser.mjs`, the Part 1 emulator tests,
+  `npm test` with pass/fail/skip counts, and `git diff --check`.
+- Depends on: F10a. Small, three files: `scripts\serve-booking-demo.mjs`,
+  `docs\public-demo-firestore-verification.md` (Part 1 section), `tasks\todo.md`.
+
+### Checkpoint Part 1: Drop Watch armed
+
+- [ ] Emulator/API evidence proves isolation, one committed arm with its first
+  replay receipt and restart recovery across independent app/storage instances.
+- [ ] The replay is labelled as captured data, never a fresh rate search; expired
+  sessions and non-armable bookings cannot arm. Relevant tests run.
+- [ ] Arm receipt shape matches the spec seam; Part 2 has been told of any change.
+
+## Part 2 - RoomDrop app after watch activation
+
+Owner: Codex. Append Part 2 notes and evidence only within this section. Part 2
+consumes the Part 1 arm receipt and must not change the arm transaction contract
+without coordinating.
+
+### F3b: Session confirmation and context fields (Part 2 of F3)
+
+- [ ] Acceptance: extend the F3a session store with `byCode[code]` confirmation
+  and bounded conversation context and the session-wide advice counters, in the
+  same transactional, hashed, one-hour, 64-session model. Invalidate a
+  confirmation or context that no longer belongs to the current watch revision.
+- Verify: `node --test .\tests\quotation-session-storage.test.mjs` Part 2 cases:
+  restart, isolation and per-code invalidation of confirmation/context.
+- Depends on: F3a. Small, two files: `app\quotation-session-storage.mjs`
+  (additions only), `tests\quotation-session-storage.test.mjs` (Part 2 cases).
+
+### F4b: Confirm, advice and chat routes on durable sessions (Part 2 of F4)
+
+- [ ] Acceptance: confirm/advice/chat per-code routes read durable sessions and
+  the committed watch receipt; preserve Host/Origin/CSRF, query rejection,
+  bounds and no upstream call except the guarded model call outside transactions.
+- Verify: `node --test .\tests\quotation-demo-server.test.mjs` Part 2 cases with
+  actual emulator storage, cross-session isolation and database unavailability.
+- Depends on: F3b, F5a. Small, two files: `app\quotation-demo-server.mjs`
+  (confirm/advice/chat branches only), `tests\quotation-demo-server.test.mjs`.
+
+### F5b: Membership, safe rearming and idempotent selection receipts (Part 2 of F5)
+
+- [ ] Acceptance: confirm only a current qualifying Drop for an armed watch,
+  retaining acknowledgements and `reservationCreated:false`, `quoteModified:false`,
+  `customerRefund:null`. Same-Drop retries return one selection receipt; a rearm
+  invalidates a confirmation outside the new set; stale versions return
+  `DROPS_CHANGED`. Rearming uses the Part 1 arm operation unchanged.
+- Verify: `node --test .\tests\booking-drop-watch.test.mjs` Part 2 cases:
+  concurrent confirms, lost responses, rearm races and changed Drop sets.
+- Depends on: F4b. Medium, three files: `app\domain\booking-drop-watch.mjs`
+  (selection functions only), `app\quotation-demo-server.mjs`,
+  `tests\booking-drop-watch.test.mjs`.
+
+### Checkpoint F3-F5 (Part 2): Durable judge actions after arming
+
+- [ ] Emulator/API evidence proves guarded confirmation and restart recovery of
+  confirmation/context across independent app/storage instances.
+- [ ] Expired sessions and stale bindings cannot confirm. Relevant tests run.
+
+### F7b: Connect the replay result to Deals, Review and Confirmed (Part 2 of F7)
+
+- [ ] Acceptance: show armed/replayed results with capture and replay times from
+  the receipt. Feed only the session's qualifying captured Drops to existing
+  screens, ranking and labels; preserve reduced-flexibility consent,
   empty/unavailable states, navigation, refresh and idempotent confirmation.
 - Verify: `node --test .\tests\booking-live.test.mjs` plus the browser harness;
   prove two judges on one quotation and one judge across two quotations cannot
   leak or overwrite choices. A changed minimum cannot confirm an excluded Drop.
-- Depends on: F6. Medium, five files: `app\public\booking-judge.js`,
-  `app\public\booking-live.js`, `app\public\booking-live-data.js`,
-  `tests\booking-live.test.mjs`, `tests\booking-firestore.browser.mjs`.
+- Depends on: F7a, F5b. Medium, five files: `app\public\booking-live.js`,
+  `app\public\booking-live-data.js`, `app\public\booking.html` (options/review/
+  confirmed sections), `tests\booking-live.test.mjs`,
+  `tests\booking-firestore.browser.mjs`.
 
 ### F8: Preserve grounded Gemini context per judge and code
 
@@ -135,57 +299,57 @@ schedule. All historical project tasks below remain preserved.
 - Verify: `node --test .\tests\quotation-advice-server.test.mjs .\tests\booking-advice.test.mjs`;
   injected-provider counters prove transaction retries cause no extra inference,
   and cross-code navigation/concurrent writes remain safe. No real model calls.
-- Depends on: F7. Medium, five files: `app\quotation-demo-server.mjs`,
+- Depends on: F7b. Medium, five files: `app\quotation-demo-server.mjs`,
   `app\quotation-session-storage.mjs`, `app\public\stay-advice.js`,
   `tests\quotation-advice-server.test.mjs`, `tests\booking-advice.test.mjs`.
 
-### Checkpoint F6-F8: Complete local judge journey
+### Checkpoint F6-F8 (Part 2): Complete local judge journey
 
 - [ ] Start grid, Original Booking confirmation, cannot-start, consent/minimum,
   armed/replayed check, Deals, Review and Confirmed pass mobile/desktop inspection.
 - [ ] Catalogue facts and replay labels stay honest; two-session/multi-code
   isolation, keyboard navigation and model-unavailable paths have raw evidence.
 
-### F9: Wire the hosted Firestore entrypoints
+### F9b: Complete the hosted Firestore entrypoints (Part 2 of F9)
 
-- [ ] Acceptance: inject real Firestore at hosted startup and load the bounded
-  reviewed catalogue manifest, without a single-booking file fallback. Remove
-  the mandatory snapshot copy, close storage cleanly and keep production
-  emulator/credential/origin guards intact. Startup never seeds or imports data.
+- [ ] Acceptance: load the bounded reviewed catalogue manifest without a
+  single-booking file fallback for every route. Remove the mandatory snapshot
+  copy, close storage cleanly and keep production emulator/credential/origin
+  guards intact. Startup never seeds or imports data.
 - Verify: `node --test .\tests\quotation-cloud.test.mjs`; exercise the exact
   entrypoints with injected test dependencies and bounded missing-storage failure.
-- Depends on: F8. Medium, four files: `app\booking-cloud.mjs`,
+- Depends on: F8, F9a. Medium, four files: `app\booking-cloud.mjs`,
   `app\quotation-cloud.mjs`, `Dockerfile.booking`, `tests\quotation-cloud.test.mjs`.
 
-### F10: Export and verify the frozen curated runtime
+### F10b: Export and verify the frozen curated runtime (Part 2 of F10)
 
-- [ ] Acceptance: release preparation includes the new dependency closure and
+- [ ] Acceptance: release preparation includes the full dependency closure and
   reviewed code/version catalogue manifest, excluding credentials and private
   captures. Keep the exact-commit source/context lineage and static allowlists.
 - Verify: `node --test .\tests\public-demo-release.test.mjs`; exact-context
   Docker build, packaged emulator/test-harness success and bounded failure smoke.
   Public browsing, arming and confirming make zero Altovo/Gateway requests.
-- Depends on: F9. Small, two files: `scripts\prepare-booking-release.mjs`,
+- Depends on: F9b, F10a. Small, two files: `scripts\prepare-booking-release.mjs`,
   `tests\public-demo-release.test.mjs`.
 
-### F11: Record final acceptance and prepare the release bundle
+### F11b: Record final acceptance and prepare the release bundle (Part 2 of F11)
 
-- [ ] Acceptance: an emulator-only launcher seeds only explicit reviewed test
-  captures via the guarded importer. Record full regression/browser/restart
-  coverage and remaining content gaps, with exact build/start/import/rollback
-  commands. Prepare session TTL and preservation checks for later release review.
+- [ ] Acceptance: record full regression/browser/restart coverage and remaining
+  content gaps, with exact build/start/import/rollback commands. Prepare session
+  TTL and preservation checks for later release review.
 - Verify: `node .\tests\booking-firestore.browser.mjs`, `npm test`, packaged smoke
   and `git diff --check`. Run the existing booking browser regression where its
   historical single-snapshot contract still applies; label its evidence separately.
-- Depends on: F10. Medium, four files: `scripts\serve-booking-demo.mjs`,
-  `docs\public-demo-firestore-verification.md`,
-  `docs\public-demo-firestore-release.md`, `tasks\todo.md`.
+- Depends on: F10b, F11a. Medium, four files:
+  `docs\public-demo-firestore-verification.md` (Part 2 section),
+  `docs\public-demo-firestore-release.md`, `tasks\todo.md`,
+  `tests\booking-firestore.browser.mjs`.
 
-### Checkpoint F9-F11: Ready for a separate release decision
+### Checkpoint F9-F11 (Part 2): Ready for a separate release decision
 
-- [ ] Plan approval precedes coding; local checks and raw acceptance evidence are
-  complete. The full catalogue content matrix remains unchecked until supplied
-  and captured; storage mechanics alone do not complete it.
+- [ ] Plan approval (given 18 October 2026) precedes coding; local checks and raw
+  acceptance evidence are complete. The full catalogue content matrix (S0) remains
+  unchecked until supplied and captured; storage mechanics alone do not complete it.
 - [ ] Present exact production import, image/configuration, session TTL and rollback
   commands for approval. Preserve existing visitor/agency/watch data and private
   access boundaries; never commit `.local\` or merge the research branches.

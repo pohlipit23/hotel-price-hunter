@@ -1,8 +1,12 @@
 # Spec: RoomDrop curated booking demo and Firestore persistence
 
 Status: approved judge-flow decisions from `roomdrop-booking-setup-handoff.md`
-incorporated on 18 October 2026. The implementation plan still requires approval
-before coding. No persistence implementation or release is claimed by this spec.
+incorporated on 18 October 2026. The user approved the implementation plan on
+18 October 2026, with one modification: delivery is split into Part 1 (sample
+preparation and judge setup through Drop Watch armed) and Part 2 (the RoomDrop
+app after watch activation). See "Delivery split, seam and ownership" below.
+Live capture/import, deployment and access changes keep their separate approval
+boundaries. No persistence implementation or release is claimed by this spec.
 
 Terms follow `GLOSSARY.md`: Original Booking, Current Booking, Drop Watch and Drop.
 
@@ -215,6 +219,172 @@ stale mutations return `DROPS_CHANGED`; other catalogue choices remain isolated.
 Expired sessions cannot read or mutate state. A new session starts fresh; expiry
 does not delete the shared booking records or captured Drops.
 
+## Delivery split, seam and ownership
+
+Approved by the user on 18 October 2026 as a modification of the implementation
+plan. The split is a delivery and ownership boundary inside the single approved
+customer journey; it adds no customer step, delay or screen. Task-level
+redistribution is in `tasks\todo.md` (S0 and F0-F11, with `a`/`b` sub-tasks).
+
+### Part 1 - Sample preparation and judge setup through Drop Watch armed
+
+- Sample preparation as an explicit tracked task (S0): about six curated real
+  quotations in the unchanged air1 Altovo staging B2B app. The owner creates
+  missing quotations; inspect the two existing projections first. Creation,
+  sanitised projection capture, matching per-quotation Gateway Drop capture,
+  photo/scenario metadata and guarded Firestore import are tracked separately.
+  Plan approval grants no new live-call allowance.
+- Validated admin import and immutable shared Original Booking/Drop records.
+  Public judges open only the curated catalogue: no free-text booking lookup,
+  share-link intake or login.
+- Durable anonymous sessions and isolated `session.byCode[code]` choices,
+  preserving the 10.00 agency minimum in the booking currency.
+- Start-page card grid, then the Original Booking confirmation page with "Your
+  agency booked this", the visible staging/capture note and "Set up a drop".
+- Consent and minimum-saving screens, cannot-start states and actual-time
+  eligibility checks. Visible acceptance ends at a committed armed state.
+- The minimum shared backend/API, packaging and emulator/browser evidence needed
+  to prove setup survives restart and two judges do not overwrite one another.
+
+### Part 2 - RoomDrop app after watch activation
+
+- Present the immediate replay result with its original capture and replay
+  timestamps, including honest empty/unavailable states. Filtering and the atomic
+  replay remain governed by this spec and the seam below.
+- Connect the session's qualifying Drops to the existing Deals, Review and
+  Confirmed screens, preserving ranking, navigation and explicit acknowledgements.
+- Enforce current armed-watch/Drop membership, safe rearming, stale-version
+  rejection and idempotent selection receipts.
+- Durable Gemini context for the correct judge and catalogue code, injected
+  responses in local tests and no calls inside transactions.
+- Integrated restart/isolation/browser regressions and final frozen-image,
+  source/context, rollback and release evidence. Prepare a concrete release bundle
+  for separate approval; never deploy or import production data automatically.
+
+### The seam: the atomic arm operation and its receipt
+
+"Starts the watcher" means: valid consent and minimum saved, armed state
+committed. Part 1 ends at one atomic arm operation that, in a single committed
+session transaction for one session and code:
+
+1. validates the session, CSRF/Origin, consent, the minimum (at least 10.00 in
+   the booking currency, integer minor units), the current booking content
+   version and Drop-set version, and actual-time cancellation eligibility;
+2. runs the already approved immediate captured first-check replay (pure, over
+   that booking's valid captured Drop set, `isDisplayedDrop` plus the minimum);
+3. commits consent, minimum, watch revision, armed time and the completed replay
+   receipt under `session.byCode[code].watch`; and
+4. returns the committed receipt only after the commit.
+
+Never split this transaction, report a fake success or add another customer step
+or delay. Missing or malformed capture data fails without a commit (unavailable),
+which is distinct from a valid committed empty replay.
+
+Current code (memory-backed, unreviewed base-snapshot work, not Firestore):
+
+- Route: `POST /api/booking-demo/q/<code>/watch`, allowlisted in
+  `app\booking-demo-server.mjs` (`bookingApi`) and served by
+  `app\quotation-demo-server.mjs` as `/api/quotation-demo/q/<code>/watch`.
+  Bootstrap `GET /api/booking-demo/q/<code>` returns `watch` (the committed
+  receipt or `null`), `blocker`, `agencyMinimumSavingMinor` and `csrfToken`.
+- Request body (exact keys): `{ snapshotVersion, consent: true, minimumSavingMinor }`.
+- Success `200`: `{ watch: { armedAt, minimumSavingMinor, firstCheck: { replayed:
+  true, checkedAt, dropOptionIds } }, dropOptionIds }`. `checkedAt` is the
+  bundle's original capture time; `dropOptionIds` are the qualifying Drops.
+- Errors: `400 INVALID_WATCH`, `400 WATCH_CONSENT_REQUIRED`,
+  `400 MINIMUM_SAVING_INVALID`, `409 SNAPSHOT_CHANGED`,
+  `409 WATCH_CANNOT_START` with `reason` (`watchBlocker` codes such as
+  `NON_REFUNDABLE`, `NO_FREE_CANCELLATION`, `FREE_CANCELLATION_ENDED`,
+  `STAY_STARTED`, `CANCELLATION_FACTS_UNKNOWN`), `403 DEMO_SESSION_REQUIRED`,
+  `404 BOOKING_UNAVAILABLE`.
+
+Proposed Part 1 receipt (backward-compatible superset; Part 1 commits it in
+Firestore). Existing fields keep their names and meaning so current UI keeps working:
+
+```json
+{
+  "watch": {
+    "code": "AIRB000180",
+    "revision": 1,
+    "contentVersion": "<booking content version>",
+    "dropSetVersion": "<captured Drop-set version>",
+    "consent": { "version": "<consent wording version>", "acceptedAt": "<UTC>" },
+    "currency": "THB",
+    "minimumSavingMinor": 1000,
+    "armedAt": "<UTC commit time>",
+    "firstCheck": {
+      "mode": "captured-replay",
+      "replayed": true,
+      "status": "completed",
+      "replayedAt": "<UTC, equals armedAt>",
+      "checkedAt": "<earliest original capture time>",
+      "capturedAt": ["<UTC original capture time(s)>"],
+      "thresholdMinor": 1000,
+      "dropOptionIds": ["<qualifying Drop ids, existing ranking order>"]
+    }
+  },
+  "dropOptionIds": ["<same as watch.firstCheck.dropOptionIds>"]
+}
+```
+
+`snapshotVersion` in the request is the booking content version; Part 1 may add
+an optional `expectedRevision` (absent or `0` for a first arm) so a stale request
+cannot replace a newer setup (`409 WATCH_REVISION_STALE`). An identical retry of
+the committed request returns the same receipt with no new revision. Missing or
+malformed captures return `503 CAPTURE_UNAVAILABLE` with no commit. The receipt
+never contains raw captures, tokens, supplier references or another session's data.
+
+Part 2 consumes this receipt (`watch` from the arm response or bootstrap) as the
+only authority for qualifying Drops, replay labels and membership. Part 2 must not
+change the arm request, transaction, error codes or receipt fields without
+coordinating with Part 1 and recording the change here; it may add its own fields
+outside `watch` (for example confirmation and context under `byCode[code]`).
+
+### Ownership
+
+- Part 1: Claude, worktree `.local\roomdrop-part1`, branch
+  `claude/roomdrop-part1-armed`.
+- Part 2: Codex, worktree `.local\roomdrop-part2`, branch
+  `codex/roomdrop-part2-app`.
+- Both branch from `roomdrop/judge-flow-base`, a snapshot of pre-existing
+  uncommitted shared-checkout work authored by neither part. Neither part claims
+  that snapshot's code as its own implementation or as proof of completion.
+
+Primary file ownership (proposed names are not yet created):
+
+- Part 1: `app\domain\altovo-quotation.mjs`, `scripts\prepare-altovo-catalogue.mjs`,
+  `scripts\import-altovo-catalogue.mjs`, `app\booking-storage.mjs`,
+  `app\quotation-session-storage.mjs` (session core and `byCode[code].watch`),
+  `app\domain\booking-drop-watch.mjs` (arm and replay), `app\public\drop-watch.js`,
+  `app\public\booking-judge.js`, catalogue/booked/setup/checking sections of
+  `app\public\booking.html` and `app\public\booking.css`, `bookingApi` route
+  allowlist in `app\booking-demo-server.mjs`, the catalogue `GET` and `/watch`
+  branches of `app\quotation-demo-server.mjs`, `scripts\serve-booking-demo.mjs`
+  (emulator launcher), and tests `tests\altovo-quotation.test.mjs`,
+  `tests\altovo-catalogue.test.mjs`, `tests\booking-storage.test.mjs`,
+  `tests\quotation-session-storage.test.mjs`, `tests\booking-catalogue.test.mjs`,
+  `tests\booking-drop-watch.test.mjs`, `tests\booking-judge.browser.mjs`,
+  `tests\fixtures\`.
+- Part 2: `app\public\booking-live.js`, `app\public\booking-live-data.js`,
+  `app\public\stay-advice.js`, options/review/confirmed/advice sections of
+  `app\public\booking.html` and `app\public\booking.css`, the confirm/advice/chat
+  branches of `app\quotation-demo-server.mjs`, confirmation/context additions in
+  `app\quotation-session-storage.mjs`, `app\booking-cloud.mjs`,
+  `app\quotation-cloud.mjs`, `Dockerfile.booking` and
+  `scripts\prepare-booking-release.mjs` beyond Part 1's minimum, and tests
+  `tests\booking-live.test.mjs`, `tests\booking-live.browser.mjs`,
+  `tests\quotation-advice-server.test.mjs`, `tests\booking-advice.test.mjs`,
+  `tests\quotation-cloud.test.mjs`, `tests\public-demo-release.test.mjs`,
+  `tests\booking-firestore.browser.mjs`, `docs\public-demo-firestore-release.md`.
+- Shared, append-only in the part's own section: this spec (Part 1 owns the seam
+  subsection), `tasks\todo.md`, `tasks\plan.md` and
+  `docs\public-demo-firestore-verification.md`. Shared code files above
+  (`app\quotation-demo-server.mjs`, `app\booking-demo-server.mjs`,
+  `app\quotation-session-storage.mjs`, `booking.html`, `booking.css`,
+  `Dockerfile.booking`, `scripts\prepare-booking-release.mjs`) are edited only in
+  the owning part's branches/sections; a cross-part change is coordinated first.
+  `GLOSSARY.md` terms are not changed by either part without the user.
+
 ## Atomicity, Gemini, limits and failure behavior
 
 Use retry-safe Firestore transactions for session changes and create-only imports.
@@ -321,7 +491,8 @@ and is not evidence that this Cloud Run entrypoint works.
 - Always: curated air1 staging data only; admin capture/import separate from public
   runtime; explicit projections, session guards and transactions; preserve unrelated
   work and existing services/data; distinguish local from live evidence.
-- Ask first: obtain approval of the implementation plan before coding. Ask before
+- Ask first: the implementation plan was approved on 18 October 2026 (with the
+  Part 1/Part 2 split); do not ask for that approval again. Ask before
   new live quotation/Gateway captures, additional live Gemini checks, production
   Firestore imports, deployment, IAM/TTL changes or source publication. Present
   concrete reviewed commands/artifacts before a release decision.
@@ -339,7 +510,8 @@ from this local spec update. Exact field mapping, tenant provenance, catalogue
 coverage and the new screens must be verified during the proposed work.
 
 Owner-created additional quotations and their bounded captures are prerequisites
-for the full six-entry catalogue. Existing captures are not evidence of Gateway
+for the full six-entry catalogue and are tracked as Part 1 task S0 in
+`tasks\todo.md`; its live steps each need separate user approval. Existing captures are not evidence of Gateway
 results for every record. Verify these locally before requesting further calls.
 Before live release verify database, identity/configuration, reviewed import set,
 current scenario eligibility, rollback and preservation of unrelated data. Existing
