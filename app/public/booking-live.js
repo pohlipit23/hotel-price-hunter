@@ -14,7 +14,7 @@ export async function startBookingDemo(ui) {
   const adviser = createStayAdviser({ parent: $('comparison'), before: $('price-details'),
     overviewParent: $('deal-list').querySelector('.section-heading'), getData: () => data, chatUrl: () => api('chat') });
   const explanation = 'Estimated savings before final pricing and fees. Full cancellation terms and room matching still need verification.';
-  const judgeScreens = { start: 'catalogue-screen', booked: 'booked-screen', setup: 'setup-screen', checking: 'checking-screen' };
+  const judgeScreens = { start: 'catalogue-screen', booked: 'booked-screen', setup: 'setup-screen', checking: 'checking-screen', launch: 'launch-screen' };
   const stepIndex = catalogueMode ? { booked: 0, setup: 1, checking: 1, options: 2, review: 3, confirmed: 4 } : { options: 0, review: 1, confirmed: 2 };
   const routes = { start: 'start', booked: 'booked', setup: 'setup', options: 'drops', review: 'review', confirmed: 'confirmed' };
   const steps = screen => {
@@ -22,15 +22,17 @@ export async function startBookingDemo(ui) {
     for (const [name, id] of Object.entries(judgeScreens)) $(id).hidden = screen !== name;
     $('booking-summary').hidden = !existing || screen === 'review'; $('comparison').hidden = screen !== 'review';
     $('simulated-switch').hidden = screen !== 'confirmed'; $('current-ticket').hidden = screen === 'confirmed';
-    $('deal-list').hidden = screen === 'confirmed'; $('price-watch').hidden = catalogueMode || screen === 'confirmed';
+    $('deal-list').hidden = screen === 'confirmed' || screen === 'launch'; $('price-watch').hidden = catalogueMode || screen === 'confirmed';
     // From the Drops page on, the RoomDrop app has no demo strip or footer; only the judge header stays.
     $('armed-strip').hidden = true;
-    document.querySelector('footer').hidden = catalogueMode && existing;
+    document.querySelector('footer').hidden = catalogueMode && (existing || screen === 'launch');
     // Inside the app frame: the agency's site for the booking pages, RoomDrop from the Drops page on.
     if (catalogueMode) {
-      const site = screen === 'start' ? null : existing ? 'roomdrop' : 'agency';
-      $('app-frame').dataset.site = site ?? 'none';
-      document.querySelector('.site-header').hidden = !site;
+      const site = screen === 'start' ? null : existing || screen === 'launch' ? 'roomdrop' : 'agency';
+      $('app-frame').dataset.site = site ?? 'none'; shownSite = site;
+      // The launch splash carries its own logo, so the header waits until the Drops page.
+      document.querySelector('.site-header').hidden = !site || screen === 'launch';
+      $('judge-bar-text').textContent = site === 'roomdrop' ? 'Hackathon submission starts here' : 'How this demo works';
       document.querySelector('.brand').hidden = site !== 'roomdrop'; $('agency-brand').hidden = site !== 'agency';
     }
     $('customer-steps').hidden = catalogueMode || screen === 'start';
@@ -47,12 +49,26 @@ export async function startBookingDemo(ui) {
   };
   const hashFor = screen => catalogueMode ? '#' + routes[screen] + (screen !== 'start' && code ? '-' + code : '')
     : screen === 'review' ? '#comparison' : screen === 'confirmed' ? '#confirmed' : '#booking-summary';
+  // Entering RoomDrop from anywhere else (the agency pages, the start page or a fresh load) plays a short launch
+  // splash first; moving between RoomDrop pages does not. Focus requested meanwhile lands once the page shows.
+  let shownSite = null, launchTimer = null, pendingFocus = null;
+  const launchMs = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 1000 : 2500;
   const navigate = (screen, push = true) => {
     const state = { bookingScreen: screen, optionId: screen === 'review' ? selected?.offerId : null, code: screen === 'start' ? null : code };
     if (push) history.pushState(state, '', hashFor(screen));
-    steps(screen); window.scrollTo({ top: 0, behavior: 'instant' });
+    show(screen);
   };
-  const focusHeading = id => $(id).focus({ preventScroll: true });
+  const show = screen => {
+    clearTimeout(launchTimer); launchTimer = null; pendingFocus = null;
+    const reveal = () => { steps(screen); window.scrollTo({ top: 0, behavior: 'instant' }); };
+    if (!catalogueMode || !['options', 'review', 'confirmed'].includes(screen) || shownSite === 'roomdrop') return reveal();
+    steps('launch'); window.scrollTo({ top: 0, behavior: 'instant' }); $('launch-title').focus({ preventScroll: true });
+    launchTimer = setTimeout(() => {
+      launchTimer = null; reveal();
+      const target = pendingFocus; pendingFocus = null; target?.focus({ preventScroll: true });
+    }, launchMs());
+  };
+  const focusHeading = id => { if (launchTimer) pendingFocus = $(id); else $(id).focus({ preventScroll: true }); };
   const termText = offer => offer.option.freeCancellation === true ? 'Free cancellation flag · full terms to check'
     : offer.option.freeCancellation === false ? 'Non-refundable' : 'Cancellation terms to check';
   function photoContent(photo, onFallback = () => {}) {
@@ -148,6 +164,7 @@ export async function startBookingDemo(ui) {
   function overview(push = true) {
     if (busy) return;
     navigate('options', push);
+    if (launchTimer) { pendingFocus = $('changes-title'); return; }
     const target = lastTrigger?.isConnected && !lastTrigger.closest('[hidden]') ? lastTrigger : catalogueMode ? $('changes-title') : $('hotel');
     target.focus({ preventScroll: true }); target.scrollIntoView({ block: 'center', behavior: 'instant' });
   }
@@ -302,7 +319,7 @@ export async function startBookingDemo(ui) {
       history.pushState({ bookingScreen: 'options', code }, '', hashFor('options'));
       steps('checking'); window.scrollTo({ top: 0, behavior: 'instant' }); focusHeading('checking-title');
       busy = false;
-      if (await judge.playCheck(data, () => token === navigation)) { steps('options'); window.scrollTo({ top: 0, behavior: 'instant' }); focusHeading('changes-title'); }
+      if (await judge.playCheck(data, () => token === navigation)) { show('options'); focusHeading('changes-title'); }
     } catch (error) {
       $('setup-message').textContent = error.userMessage || 'Your Drop Watch could not be armed. Please try again.'; $('setup-message').classList.add('error');
     } finally { busy = false; $('arm-watch').disabled = false; $('arm-watch').removeAttribute('aria-busy'); if (pendingRoute) followLocation(); }

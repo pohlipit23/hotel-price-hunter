@@ -17,7 +17,7 @@
   <div class="postcard">
     <!-- Judge-only navigation; everything in .app-frame is what the product would show. -->
     <nav id="judge-bar" class="judge-bar" aria-label="Judge demo" hidden>
-      <p class="judge-bar-label"><span class="judge-bar-badge">Judge demo</span> How this demo works</p>
+      <p class="judge-bar-label"><span class="judge-bar-badge">Judge demo</span> <span id="judge-bar-text">How this demo works</span></p>
       <ol id="journey-strip" class="journey-strip" aria-label="How this demo works" hidden></ol>
     </nav>
     <div id="app-frame" class="app-frame">
@@ -35,6 +35,13 @@
           <li><span>3</span> Switch</li>
         </ol>
         <p id="switch-announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+
+        <section id="launch-screen" class="launch-screen" aria-labelledby="launch-title" hidden>
+          <span class="launch-logo"><img src="/assets/roomdrop-logo.png" alt="RoomDrop"></span>
+          <div class="launch-drop" aria-hidden="true"><span class="launch-droplet"></span><span class="launch-ripple"></span></div>
+          <p id="launch-title" class="launch-title" tabindex="-1">Opening your drops…</p>
+          <div class="launch-bar" aria-hidden="true"><span></span></div>
+        </section>
 
         <section id="catalogue-screen" class="judge-screen" aria-labelledby="catalogue-title" hidden>
           <div class="judge-intro">
