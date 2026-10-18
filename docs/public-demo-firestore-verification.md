@@ -1005,3 +1005,37 @@ No push, deploy, live call, IAM/TTL change, email or schedule ran.
 Reproduce the real browser gate in this worktree with the Part 2 emulator env:
 
 `node tests/booking-firestore.browser.mjs --existing --prefix=roomdropPart2PhotosV5 --catalogue=.local/integration/v5-catalogue.json`
+
+## Submission release preparation - guarded production importer
+
+User decision: engine recapture is cut; retain reviewed Gateway Drops and photos.
+Final Part 1 UI integration is pending, so no new final image is claimed.
+
+The production target requires the explicit production flag, exact hardcoded
+project plus matching confirmation, default database and canonical namespace.
+It rejects ambiguous/unknown flags, emulator/runtime targets, alternate projects
+and namespaces. No execute flag means offline validation with no Firestore client.
+Tests first failed for the missing production mode, then passed after the guard.
+The production execution test uses a transaction stand-in with only create/read
+methods: identical retries create nothing; changed booking facts block. This is
+local guard/transaction-boundary evidence, not a production write or credential test.
+
+Current regression: 423 total, 389 pass, zero fail, 34 skips. New guard file: 4/4.
+Actual Part 2 emulator storage checks: 6/6, zero skips, using only test-owned
+collections on 127.0.0.1:8281 / demo-roomdrop-part2. These cover second-client
+reads, reviewed photos, concurrent identical imports, conflicting multi-code
+atomicity, append-only Drop sets and unrelated-collection preservation. The
+hardcoded Part 1 importer integration test was excluded to preserve its emulator.
+Logs: `.local/integration/production-import-regression.log` and
+`production-import-storage-emulator.log`.
+
+An offline production-target dry run validates the exact six reviewed records,
+twelve Drops and images against all v5 content/drop-set pins. Current cloud
+describe/list/get-iam-policy snapshots confirm customer revision 00017-8td,
+agency IAP enabled, runtime datastore access, no TTL policies and no Scheduler
+jobs. Snapshots are in `.local/deploy-preflight/`; they do not prove production
+data contents or public acceptance. The shared ignored deployment plan contains
+31 parse-checked single-line PowerShell commands and the pinned traffic rollback.
+
+No registry push, deployment, production import, model/supplier call, IAM/TTL
+change, email, schedule or traffic mutation ran. Each live step awaits approval.

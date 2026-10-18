@@ -80,9 +80,9 @@ node tests\booking-firestore.browser.mjs --existing --prefix=roomdropPart2Photos
 ```
 
 The raw capture remains the first reviewed Gateway capture, not fresh availability.
-The planned EasyGDS engine recapture has not happened here. A new dropSetVersion
-requires a new manifest, watch/replay/browser checks and frozen bundle before
-release. Approved photo/card review does not replace that future data gate.
+The user cut engine recapture for the submission deadline: retain the Gateway
+Drops of record and reviewed images. Any later recapture is separate work and
+requires a new manifest, watch/replay/browser checks and frozen bundle.
 
 Manual ports remain booking 8294, quotation 8293 and simulation 8290 with
 APP_ORIGIN=http://127.0.0.1:8290. Browser harnesses allocate port 0. Never touch
@@ -96,9 +96,22 @@ Firestore shared/session/simulation data preservation; and Scheduler state.
 Record exact before-state hashes and retain the previous customer revision for
 rollback. Historical deployment notes are not a current cloud preflight.
 
-The Part 1 importer currently rejects production activation. There is no executable
-production import command approved or claimed here. Its owner must supply and
-verify the guarded production import path before that approval packet is complete.
+The importer now supports an owner-run production target only with `--production`,
+`--project=sincere-apex-511418-p0`, matching `--confirm-project`, and
+`--database=(default)`. It still defaults to offline validation; only `--execute`
+opens Firestore. It refuses emulator/runtime/mismatched targets and alternate
+namespaces. The shared storage transaction uses creates only; identical retries
+are unchanged and conflicting booking facts abort the transaction. No overwrite,
+delete, force, or runtime import endpoint is provided. Flags do not confer approval.
+
+The exact single-line PowerShell deployment plan is in the shared ignored
+`.local/roomdrop-deploy-plan.md`. Current read-only cloud snapshots are in this
+worktree's `.local/deploy-preflight/`. The plan waits for the final Part 1 UI
+commit, then freezes/builds/pushes the integrated source, imports the six reviewed
+records BEFORE startup-dependent deployment, creates a revision without traffic,
+checks preserved settings, and separately switches traffic. Each live mutation
+requires user approval. Rollback moves traffic to the captured previous revision;
+it never deletes imported records. No production import or deploy has run.
 The committed v2 session module stores `ttlAt` as a Firestore Timestamp, verified
 against the actual adapter on the Part 2 emulator. It keeps numeric `expiresAt`
 for application expiry and omits `ttlAt` from returned sessions. Propose TTL on
