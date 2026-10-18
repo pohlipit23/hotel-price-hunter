@@ -85,6 +85,9 @@ const assets = new Map([
   ['/assets/roomdrop-logo.png', ['assets/roomdrop-logo.png', 'image/png']],
   ['/assets/roomdrop-key-icon.png', ['assets/roomdrop-key-icon.png', 'image/png']],
   ['/assets/illustrative-stays.jpg', ['assets/illustrative-stays.jpg', 'image/jpeg']],
+  // Reviewed S0.5 catalogue photos, the same exact list as app/booking-demo-server.mjs.
+  ...['179-hotel', '180-hotel', '181-hotel', '181-room', '182-hotel', '182-room', '183-hotel', '184-hotel']
+    .map(name => [`/assets/roomdrop-airb000${name}.jpg`, [`assets/roomdrop-airb000${name}.jpg`, 'image/jpeg']]),
 ]);
 // `catalogue` is the private catalogue file shape: { schemaVersion: 1, entries: [{ code, bundle, capture? }] }.
 // `bookingStorage` serves the Firestore catalogue instead; local runs may pair it with memory sessions.

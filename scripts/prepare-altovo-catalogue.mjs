@@ -23,6 +23,42 @@ const PREFIXES = ['--gateway-credentials-file=', '--projections=', '--approved-c
 export const SEARCH_DEFAULTS = Object.freeze({ nationality: AGENCY_SEARCH_CONTEXT.nationality, countryResidence: AGENCY_SEARCH_CONTEXT.countryResidence,
   occupancy: AGENCY_SEARCH_CONTEXT.occupancy, source: AGENCY_SEARCH_CONTEXT.source });
 
+// Photo source URLs from the Gateway search, kept beside (never inside) the bundle. They are remote
+// supplier-CDN addresses for a later owner-reviewed download, not fields a page may render: only a
+// reviewed local asset (card.photo / Drop photo) ever reaches the judge.
+export const IMAGE_SOURCES_KIND = 'remote-source-urls-pending-review';
+const plainObject = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+export function httpsImageUrl(value) {
+  if (typeof value !== 'string' || value.length > 2048) return null;
+  let url; try { url = new URL(value); } catch { return null; }
+  return url.protocol === 'https:' && url.hostname && !url.username && !url.password ? url.href : null;
+}
+const sized = sizes => plainObject(sizes) ? ['md', 'lg', 'sm'].map(size => httpsImageUrl(sizes[size])).find(Boolean) ?? null : null;
+const caption = value => typeof value === 'string' && value.trim() && value.length <= 200 ? value.trim() : null;
+export function gatewayImageSources(response, bundle) {
+  const hotels = Array.isArray(response?.data) ? response.data.filter(plainObject) : [];
+  let hotel = null;
+  for (const source of hotels) {
+    const avatar = source.avatar; if (!plainObject(avatar)) continue;
+    const url = sized(avatar.urls) ?? sized(avatar);
+    if (url) { hotel = { url, caption: caption(avatar.caption) }; break; }
+  }
+  const drops = (bundle?.options ?? []).map(option => {
+    const rateDetail = bundle.privateReferences?.[option.optionId]?.rateDetail;
+    let image;
+    for (const room of hotels.flatMap(source => Array.isArray(source.rooms) ? source.rooms.filter(plainObject) : [])) {
+      const rate = (Array.isArray(room.rates) ? room.rates : []).find(candidate => plainObject(candidate) && candidate.rate_detail === rateDetail);
+      if (!rate) continue;
+      const images = Array.isArray(rate.images) && rate.images.length ? rate.images : room.images;
+      image = Array.isArray(images) ? images[0] : undefined; break;
+    }
+    const url = plainObject(image) ? sized(image.urls) : null;
+    return { optionId: option.optionId, url, caption: url ? caption(image.caption) : null };
+  });
+  return { kind: IMAGE_SOURCES_KIND, renderable: false, hotel, drops };
+}
+const imageSummary = sources => ({ hotel: Boolean(sources.hotel), drops: sources.drops.filter(drop => drop.url).length });
+
 // Hostname alone does not prove air1 tenancy, so every projection must be on the owner's list and vice versa.
 async function approvedBaselines(projectionDir, approved) {
   const files = (await readdir(projectionDir)).filter(name => /^[A-Z0-9]{4,20}\.projection\.json$/.test(name)).sort();
@@ -69,7 +105,7 @@ export async function main(args = process.argv.slice(2), { env = process.env, fe
     let gateway = null;
     const entries = [];
     for (const { baseline, blocker } of plan) {
-      let bundle; let capture;
+      let bundle; let capture; let imageSources = { kind: IMAGE_SOURCES_KIND, renderable: false, hotel: null, drops: [] };
       if (blocker) {
         capture = { status: 'not-searched', reason: blocker };
         const view = { schemaVersion: 1, transactionMode: 'selection-only', baseline, options: [], checkedAt: checkedAt.toISOString(),
@@ -89,21 +125,23 @@ export async function main(args = process.argv.slice(2), { env = process.env, fe
         const query = { ip: '127.0.0.1', price_comparison: false, checkin: b.stay.checkin, checkout: b.stay.checkout, package: false,
           ids: [b.hotel.id], supplier_ids: [], rooms: [{ idx: 1, adults: b.occupancy.adults, children: b.occupancy.childAges, infants: b.occupancy.infantAges }],
           session_id: randomUUID(), user_agent: 'RoomDrop-altovo-catalogue', nationality: b.searchContext.nationality, language_code: 'en-US', country_residence: b.searchContext.countryResidence };
-        const observation = normaliseGatewayRates(await gateway.searchById(query), { input: query, checkedAt: now().toISOString() });
+        const response = await gateway.searchById(query);
+        const observation = normaliseGatewayRates(response, { input: query, checkedAt: now().toISOString() });
         bundle = buildQuotationDemo(baseline, observation);
+        imageSources = gatewayImageSources(response, bundle);
         // A successful search with no offers is a valid empty capture, recorded as such; a failed
         // search never reaches this point, so it cannot be mistaken for an empty one.
         capture = { status: observation.offers.length ? 'observed' : 'observed-empty', checkedAt: observation.context.checkedAt,
           offerCount: observation.offers.length, optionCount: bundle.options.length, searchDefaults: SEARCH_DEFAULTS };
       }
-      entries.push({ code: baseline.quotationCode, blocker, capture, bundle });
+      entries.push({ code: baseline.quotationCode, blocker, capture, bundle, imageSources });
     }
     const directory = resolve(local, 'altovo-catalogue'); await mkdir(directory, { recursive: true });
     if (await realpath(directory) !== directory) throw Error();
     const path = resolve(directory, `catalogue-${randomUUID()}.json`);
     await writeFile(path, JSON.stringify({ schemaVersion: 1, preparedAt: checkedAt.toISOString(), entries }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
     Object.assign(report, { mode: 'altovo-quotation-catalogue', status: 'prepared', privateCatalogue: path,
-      entries: entries.map(entry => ({ code: entry.code, hotel: entry.bundle.baseline.hotel.name, blocker: entry.blocker, capture: entry.capture.status, optionCount: entry.bundle.options.length })) });
+      entries: entries.map(entry => ({ code: entry.code, hotel: entry.bundle.baseline.hotel.name, blocker: entry.blocker, capture: entry.capture.status, optionCount: entry.bundle.options.length, imageSources: imageSummary(entry.imageSources) })) });
   } catch (error) {
     report.status = 'blocked'; report.reason = typeof error.code === 'string' && /^[A-Z_]+$/.test(error.code) ? error.code : 'ALTOVO_CATALOGUE_PREPARATION_FAILED';
   }

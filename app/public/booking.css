@@ -496,6 +496,13 @@ footer p { margin: 0; }
 .booked-caption { display: grid; gap: 2px; padding: 15px 17px 17px; }
 .booked-caption h1 { margin: 0; overflow-wrap: anywhere; }
 .booked-caption > p.muted { margin: 0 0 8px; font-size: 14px; }
+/* The booked room's own photo: a small snapshot clipped to the ticket, labelled as the room. */
+.booked-room { display: flex; justify-self: start; max-width: 100%; align-items: center; gap: 13px; margin: 0 0 6px; border: 1.5px dashed #b8c7d7; border-radius: 14px; padding: 9px 20px 9px 10px; background: #fbf8f2; }
+.booked-room-photo { flex: 0 0 104px; height: 78px; border-radius: 6px; padding: 4px; background: var(--surface); box-shadow: 0 3px 8px rgba(32, 44, 59, .16); transform: rotate(-3deg); }
+.room-photo { display: block; width: 100%; height: 100%; border-radius: 3px; object-fit: cover; }
+.booked-room figcaption { display: grid; min-width: 0; gap: 2px; }
+.photo-kind { color: var(--blue); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.booked-room strong { font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
 .booked-facts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; margin: 4px 0 0; }
 .booked-fact { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 38px; border-bottom: 1px dashed #dfe6ed; padding: 7px 0; }
 .booked-fact dt { flex: 0 0 auto; color: var(--muted); font-size: 13px; }
@@ -556,6 +563,7 @@ footer p { margin: 0; }
   .booked-photo { height: 240px; }
   #booked-photo > .photo-fallback { padding-right: 16px; padding-left: 16px; align-items: center; }
   #booked-photo > .photo-fallback .fallback-city { font-size: 28px; text-align: center; }
+  .booked-room-photo { flex-basis: 136px; height: 98px; }
   .chip-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .armed-strip { grid-template-columns: 46px minmax(0, 1fr) auto; }
   .armed-strip .secondary { grid-column: auto; width: auto; }

@@ -12,6 +12,9 @@ const assets = new Map([
   ['/assets/roomdrop-logo.png', ['assets/roomdrop-logo.png', 'image/png']],
   ['/assets/roomdrop-key-icon.png', ['assets/roomdrop-key-icon.png', 'image/png']],
   ['/assets/illustrative-stays.jpg', ['assets/illustrative-stays.jpg', 'image/jpeg']],
+  // Reviewed S0.5 catalogue photos: hotel photos for every card, booked-room photos where one was approved.
+  ...['179-hotel', '180-hotel', '181-hotel', '181-room', '182-hotel', '182-room', '183-hotel', '184-hotel']
+    .map(name => [`/assets/roomdrop-airb000${name}.jpg`, [`assets/roomdrop-airb000${name}.jpg`, 'image/jpeg']]),
 ]);
 // Booking API paths map one to one onto the quotation API; query strings never match and stay unavailable.
 const bookingApi = /^\/api\/booking-demo(\/(?:confirm|advice|chat|catalogue|q\/[A-Z0-9]{4,20}(?:\/(?:watch|confirm|advice|chat))?))?$/;

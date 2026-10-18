@@ -2,7 +2,7 @@
 // These are the display rules in app/public/booking-judge.js; the browser walk is tests/booking-judge.browser.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { armRequestBody, armedDetail, cannotStart, capturedNote, cardFacts, cardPhoto, minimumOptions } from '../app/public/booking-judge.js';
+import { armRequestBody, armedDetail, cannotStart, capturedNote, cardFacts, cardPhoto, minimumOptions, roomPhoto } from '../app/public/booking-judge.js';
 
 const siam = {
   code: 'AIRB000180', blocker: null, tag: 'ready', hotel: { name: 'Siam Kempinski Hotel Bangkok', cityCode: 'BKK', countryCode: 'TH' },
@@ -18,6 +18,17 @@ test('a card without a reviewed photo gets the honest fallback, never a stand-in
   assert.deepEqual(cardPhoto(null), { kind: 'fallback', city: null });
   assert.deepEqual(cardPhoto({ ...siam.card, photo: { asset: '../secret.jpg', alt: 'x' } }), { kind: 'fallback', city: 'Bangkok' });
   assert.deepEqual(cardPhoto({ ...siam.card, photo: { asset: 'https://example.com/a.jpg', alt: 'x' } }), { kind: 'fallback', city: 'Bangkok' });
+});
+
+test('the Original Booking shows a reviewed booked-room photo only when the card has one', () => {
+  const pan = { ...siam.card, photo: { asset: 'assets/roomdrop-airb000181-hotel.jpg', alt: 'Pan Pacific Singapore at dusk' },
+    roomPhoto: { asset: 'assets/roomdrop-airb000181-room.jpg', alt: 'Executive Marina Bay Room with a city view' } };
+  assert.deepEqual(roomPhoto(pan), { src: '/assets/roomdrop-airb000181-room.jpg', alt: 'Executive Marina Bay Room with a city view' });
+  // No room photo, no room picture: never the hotel photo or a stand-in passed off as the room.
+  assert.equal(roomPhoto(siam.card), null);
+  assert.equal(roomPhoto(null), null);
+  assert.equal(roomPhoto({ ...pan, roomPhoto: { asset: 'https://example.com/room.jpg', alt: 'x' } }), null);
+  assert.equal(roomPhoto({ ...pan, roomPhoto: { asset: 'assets/room.jpg', alt: '' } }), null);
 });
 
 test('a start card shows city, curated scenario label and current eligibility', () => {

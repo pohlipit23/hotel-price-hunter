@@ -43,7 +43,7 @@
           <article class="ticket booked-ticket">
             <div class="ticket-photo booked-photo">
               <div id="booked-photo"></div>
-              <span id="booked-photo-tag" class="photo-tag">Illustrative photo</span>
+              <span id="booked-photo-tag" class="photo-tag">Hotel photo</span>
               <span class="booked-stamp" aria-hidden="true"><span>Agency</span><strong>Booked</strong></span>
             </div>
             <div class="ticket-tear" aria-hidden="true"></div>
@@ -51,6 +51,10 @@
               <p class="eyebrow">Your agency booked this</p>
               <h1 id="booked-title" tabindex="-1"></h1>
               <p id="booked-place" class="muted"></p>
+              <figure id="booked-room" class="booked-room" hidden>
+                <div id="booked-room-photo" class="booked-room-photo"></div>
+                <figcaption><span class="photo-kind">Room photo</span><strong id="booked-room-name"></strong></figcaption>
+              </figure>
               <dl id="booked-facts" class="booked-facts"></dl>
               <div class="booked-total"><span>Whole stay</span><strong id="booked-price"></strong></div>
             </div>

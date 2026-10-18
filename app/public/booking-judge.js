@@ -37,12 +37,14 @@ export function cancellationText(cancellation) {
   if (cancellation?.nonRefundable) return 'Non-refundable';
   return cancellation?.freeUntil ? 'Free cancellation until ' + formatInstant(cancellation.freeUntil) : 'No free cancellation';
 }
-// A reviewed photo, or the honest fallback: never a stand-in picture of some other hotel.
+const reviewedPhoto = photo => photo && PHOTO_ASSET.test(photo.asset ?? '') && typeof photo.alt === 'string' && photo.alt ? { src: '/' + photo.asset, alt: photo.alt } : null;
+// A reviewed hotel photo, or the honest fallback: never a stand-in picture of some other hotel.
 export function cardPhoto(card) {
-  const photo = card?.photo;
-  if (photo && PHOTO_ASSET.test(photo.asset ?? '') && typeof photo.alt === 'string' && photo.alt) return { kind: 'photo', src: '/' + photo.asset, alt: photo.alt };
-  return { kind: 'fallback', city: card?.cityName ?? null };
+  const photo = reviewedPhoto(card?.photo);
+  return photo ? { kind: 'photo', ...photo } : { kind: 'fallback', city: card?.cityName ?? null };
 }
+// The reviewed photo of the booked room, or null: the hotel photo never stands in for the room.
+export function roomPhoto(card) { return reviewedPhoto(card?.roomPhoto); }
 // The curated scenario label shows only while the booking can still start, so a card whose free
 // cancellation has since ended never advertises its old scenario; the tag gives the current state.
 export function cardFacts(entry) {
@@ -126,7 +128,10 @@ export function createJudgeScreens(ui) {
         const title = node('h2', entry.hotel.name); title.id = 'catalogue-hotel-' + entry.code;
         card.setAttribute('aria-labelledby', title.id);
         const photo = node('div', undefined, 'catalogue-photo');
-        photo.append(photoNode(entry.card), tagNode(entry));
+        // A supplied photo is labelled as the hotel's; the drawn fallback (or a failed load) has no label.
+        const photoTag = node('span', 'Hotel photo', 'photo-tag'); let supplied = true;
+        photo.append(photoNode(entry.card, () => { supplied = false; photoTag.remove(); }), tagNode(entry));
+        if (supplied) photo.append(photoTag);
         const body = node('div', undefined, 'catalogue-body');
         if (facts.scenario) body.append(node('p', facts.scenario, 'scenario-label scenario-' + (index % 3)));
         const price = node('p', undefined, 'catalogue-price');
@@ -146,6 +151,13 @@ export function createJudgeScreens(ui) {
       $('booked-place').textContent = [placeText(b.hotel, card?.cityName), b.hotel.star ? b.hotel.star + ' star' : null, 'Ref ' + b.quotationCode].filter(Boolean).join(' · ');
       $('booked-photo-tag').hidden = false;
       $('booked-photo').replaceChildren(photoNode(card, () => { $('booked-photo-tag').hidden = true; }));
+      // The booked room's own reviewed photo, labelled as the room; absent (or failing to load) shows nothing.
+      const room = roomPhoto(card); $('booked-room').hidden = !room; $('booked-room-photo').replaceChildren();
+      if (room) {
+        const image = node('img', undefined, 'room-photo'); image.src = room.src; image.alt = room.alt; image.decoding = 'async';
+        image.addEventListener('error', () => { $('booked-room').hidden = true; });
+        $('booked-room-photo').append(image); $('booked-room-name').textContent = b.room.name || 'Your room';
+      }
       const facts = [['Room', b.room.name || 'Room not named'], ['Meals', b.room.board || 'Not specified'], ['Dates', stayText(b)],
         ['Guests', guests(b.occupancy)], ['Cancellation', cancellationText(b.cancellation)]];
       $('booked-facts').replaceChildren(...facts.map(([label, value]) => {
