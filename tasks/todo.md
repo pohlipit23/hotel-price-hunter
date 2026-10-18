@@ -347,6 +347,39 @@ without coordinating.
 
 ### Checkpoint F9-F11 (Part 2): Ready for a separate release decision
 
+Part 2 implementation record (18 October, contract v1; acceptance remains open):
+
+- [x] F3b/F5b component slice: `quotation-session-actions.mjs` adds transactional
+  selection/context/allowance operations without writing `watch`. Tests include
+  commit failure, expiry, CSRF, revisions, concurrent idempotent receipts,
+  shared allowance and independent-client restart recovery on the 8281 emulator.
+- [x] F4b component slice: `quotation-post-watch.mjs` and
+  `quotation-durable-actions.test.mjs` verify injected contract-v1 HTTP guards,
+  immutable source reads, inference outside transactions and late-response rejection.
+- [x] F7b local slice: receipt-only membership, capture/replay times, empty versus
+  unavailable, Review/Confirmed refresh, rearm and two-judge/two-code isolation.
+  `booking-after-watch.browser.mjs` passes 320/768/1024/1440 px. This proof uses
+  the base memory-backed arm and does not complete integrated persistence.
+- [x] F8/F9b contract slice: bounded bootstrap projection and UI restoration,
+  durable action wiring and Firestore-only startup/shutdown tested with injected
+  storage factories. No real model call. Part 1 GET must include
+  `publicPostWatchState({ scope, bundle })` for conversation restoration.
+- [x] F10b preparation slice: manifest-only export, recursive dependency closure,
+  exact source hashes and explicitly marked test-source bundles. An incomplete
+  commit cannot silently package missing Part 1 dependencies.
+- [ ] F3b-F11b integrated acceptance: bring in Part 1 only after the user's
+  integration go-ahead, reconcile factory wiring, include the bootstrap projection,
+  and run `booking-firestore.browser.mjs` against the actual modules. Its current
+  result is `PART1_DEPENDENCIES_UNAVAILABLE`, not a pass.
+- [ ] F10b/F11b release candidate: freeze the combined exact commit with actual
+  reviewed code/version pins, build and smoke that image against the emulator,
+  then refresh cloud preservation/import/TTL/rollback evidence for approval.
+  Test-source images and the earlier memory image are not release candidates.
+
+No original acceptance checkbox above is closed by these component proofs.
+Evidence and commands: `docs\public-demo-firestore-verification.md` (Part 2) and
+`docs\public-demo-firestore-release.md`.
+
 - [ ] Plan approval (given 18 October 2026) precedes coding; local checks and raw
   acceptance evidence are complete. The full catalogue content matrix (S0) remains
   unchecked until supplied and captured; storage mechanics alone do not complete it.

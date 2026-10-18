@@ -261,6 +261,38 @@ redistribution is in `tasks\todo.md` (S0 and F0-F11, with `a`/`b` sub-tasks).
   source/context, rollback and release evidence. Prepare a concrete release bundle
   for separate approval; never deploy or import production data automatically.
 
+#### Part 2 implementation notes - storage interface v1
+
+The binding interface supplied in `.local\roomdrop-part1-interfaces.md` uses
+`sessionStorage.transact(cookieValue, fn)`: a synchronous callback mutates the
+session and returns an operation result, resolved only after commit. Part 2's
+`quotation-session-actions.mjs` adds confirmation, bounded conversation and
+session allowance fields through that interface. It never assigns `watch` or
+writes shared booking/Drop records. The separate helper avoids creating or
+replacing Part 1's session-core file while Part 1 is implementing it.
+
+Confirm/advice/chat accept `watchBinding` outside `watch`: key-sorted JSON of the
+committed receipt. It is required for revisioned receipts and checked when sent
+with legacy receipts. This rejects stale selections even when the selected Drop
+remains in a newer replay. The arm request and receipt are unchanged. Legacy
+requests without a binding remain supported only for non-revisioned receipts.
+
+Part 1's per-code bootstrap can spread
+`publicPostWatchState({ scope, bundle })` from `quotation-session-actions.mjs`.
+It returns only a current confirmation and
+`conversation: { watchBinding, chatHistory }`, with at most four allowlisted turns.
+The UI restores that conversation only for the matching code, snapshot and watch.
+This projection hookup and Part 1's durable GET/watch integration remain required
+before integrated acceptance; the base snapshot's GET/watch still use memory.
+
+The hosted entrypoints now require Firestore stores and
+`release/booking-catalogue-manifest.json`, containing only
+`{ schemaVersion: 1, entries: [{ code, contentVersion, dropSetVersion }] }`.
+Startup compares these reviewed pins to `loadHostedCatalogue(bookingStorage)`;
+there is no snapshot-file fallback or startup import. Source doubles are available
+only through explicit release-test injection, marked `test-injected`, assigned a
+`roomdrop-booking-test` image name and no registry destination.
+
 ### The seam: the atomic arm operation and its receipt
 
 "Starts the watcher" means: valid consent and minimum saved, armed state

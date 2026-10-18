@@ -113,6 +113,17 @@ Approved two-part delivery (18 October 2026). Mixed F tasks are split into `a`
   selection receipts; F7b replay presentation and Deals/Review/Confirmed; F8
   durable Gemini context; F9b complete hosted entrypoints; F10b frozen release
   export; F11b integrated acceptance and release bundle.
+  Implementation record: receipt/UI and contract-v1 action/startup wiring are
+  implemented on this branch. Real-emulator tests exercise Part 2 transactions
+  and HTTP restart recovery through injected contract adapters. Part 1 modules
+  are not integrated here, so whole-journey persistence and a production release
+  candidate remain open. See the Part 2 verification section.
+  File splits for isolated ownership: F3b uses `quotation-session-actions.mjs`
+  and its test instead of creating Part 1's session-core file; F4b uses
+  `quotation-post-watch.mjs` and `quotation-durable-actions.test.mjs` for its
+  bounded durable handler; F7b has a separate `booking-after-watch.browser.mjs`
+  for memory-receipt evidence. F11b's `booking-firestore.browser.mjs` refuses to
+  substitute those doubles for the actual Part 1 dependencies.
 - Both parts branch from `roomdrop/judge-flow-base`, a snapshot of pre-existing
   shared-checkout work authored by neither part. Part 2 may start against the
   current memory-backed `/watch` receipt and switches to the Firestore-backed
