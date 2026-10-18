@@ -700,3 +700,40 @@ browser or session; this worktree made none):
   recorded above; the second returned no image fields.
 - 9 image GETs for the approved downloads.
 - 2 failed Altovo probes, `hotels/details` and `image/list`, both 404 on air1.
+
+### S0.4 engine re-capture: offline preparation only (18 October 2026)
+
+User decision (18 October 2026, in chat): re-capture the Drops of record from the
+EasyGDS Core Engine availability API with the scraper repo's production engine
+credentials, for read-only availability calls only. **No live call has been made;
+nothing here is live evidence.** The owner runs the live command.
+
+- `app\domain\engine-availability.mjs`: `engineDropBundle` maps a rates response
+  (`{ id, offers[] }`) to the Gateway bundle/option shape. MYR total from
+  `price_info.total_amount`, offer refused unless `prices[0].currency_code` is MYR;
+  refundability from `non_refundable`/`is_non_refundable` (missing or conflicting =
+  unknown); free cancellation from a leading zero-amount tier in `cancellations[]`
+  (fallback `original_cancellations[]`), `utc_*` read as UTC because the guide
+  labels them UTC but prints no offset; https room image URL into `imageSources`.
+  Cheaper than the quotation (`isDisplayedDrop`), deduplicated, top 3 by saving.
+  `estimate.basis` is `engine-myr-total-before-final-pricing-and-fees` and
+  `sourcePrice` is the same MYR total (no FX). Capture adds
+  `provenance: { source: 'easygds-core-engine-production', host }` and engine search
+  defaults (one adult aged 30, `X-Territory: MY`, MYR, no nationality sent).
+- `app\booking-storage.mjs` accepts that capture shape; Gateway captures and their
+  records are unchanged. Engine Drops record the engine source and host.
+- `scripts\prepare-altovo-catalogue.mjs --source=engine --engine-credentials-file=PATH`:
+  reads only six `EASYGDS_*` keys, fixed IAM URL, `*.apps.easygds.com/api` host;
+  one sign-in, at most 4 identical availability posts 3 s apart, then one rates
+  call per hotel; no retry or re-login. Observed, observed-empty (0 of 0 confirmed
+  twice) and failed (named `failedCode`, nothing written) are distinct.
+- Engine hotel ids: the scraper's 10 raw rates captures have engine `id` equal to
+  the Expedia Rapid `property_id`, so each projection's `hotel.gatewayHotelId` is
+  used. Those four ids do not appear in the captures; the live report's
+  `engineHotelNameMatches` is the first check of that mapping.
+- Proof: `node --test .\tests\engine-availability.test.mjs`: tests 7, pass 7.
+  Emulator storage set (booking-storage, booking-catalogue, booking-drop-watch,
+  quotation-session-storage, engine-availability): tests 70, pass 70.
+  `npm test`: tests 400, pass 369, fail 0, skipped 31. The guarded owner wrapper
+  (session scratchpad, not tracked) passed its fake-fetch proof: typical 13 calls,
+  worst case 21 (1 auth, 16 availability posts, 4 rates), fifth post never sent.
