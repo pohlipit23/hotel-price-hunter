@@ -342,7 +342,8 @@ export async function startBookingDemo(ui) {
   try {
     const response = await fetch('/api/booking-demo/catalogue', { credentials: 'same-origin' }); if (!response.ok) throw Error();
     entries = (await response.json()).entries;
-    judge.renderCatalogue(entries, (next, trigger) => { lastTrigger = trigger; go('booked', next); });
+    // Judges only pick bookings a Drop Watch can start on; non-refundable ones stay in the data, off the picker.
+    judge.renderCatalogue(entries.filter(entry => entry.blocker !== 'NON_REFUNDABLE'), (next, trigger) => { lastTrigger = trigger; go('booked', next); });
     chrome(); $('content').hidden = false; status('');
     const parsed = /^#(booked|setup|drops|review|confirmed)-([A-Z0-9]{4,20})$/.exec(location.hash);
     const screen = parsed ? Object.keys(routes).find(key => routes[key] === parsed[1]) : 'start';

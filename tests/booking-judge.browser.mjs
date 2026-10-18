@@ -88,7 +88,7 @@ try {
     // F6 start grid: curated photo/city/dates/price/scenario cards, no code or link input.
     await page.goto(origin); await visible('catalogue-screen');
     assert.equal(new URL(page.url()).hash, '#start'); assert.equal(await page.locator('#customer-steps').isVisible(), false);
-    assert.equal(await page.locator('.catalogue-card').count(), 2);
+    assert.equal(await page.locator('.catalogue-card').count(), 1, 'non-refundable bookings are not offered to judges');
     assert.equal(await page.locator('#content input:visible, #content textarea:visible').count(), 0, 'no free-text code or share-link input');
     const siamCard = page.locator(`[data-code="${SIAM}"]`); const hyattCard = page.locator(`[data-code="${HYATT}"]`);
     assert.match(await siamCard.locator('.watch-tag').innerText(), /Drop Watch ready/);
@@ -98,10 +98,7 @@ try {
     assert.equal(await siamCard.locator('img.card-photo').getAttribute('alt'), SIAM_ALT);
     await page.waitForFunction(code => document.querySelector(`[data-code="${code}"] img.card-photo`)?.naturalWidth > 0, SIAM);
     assert.equal(await siamCard.locator('.photo-tag').innerText(), 'Hotel photo');
-    assert.match(await hyattCard.locator('.watch-tag').innerText(), /Cannot start: non-refundable/);
-    assert.equal(await hyattCard.locator('.scenario-label').count(), 0);
-    assert.equal(await hyattCard.locator('.photo-fallback').getAttribute('aria-label'), 'No photo yet · Kuala Lumpur');
-    assert.equal(await hyattCard.locator('.photo-tag').count(), 0);
+    assert.equal(await hyattCard.count(), 0);
     assert.equal(await page.locator('#journey-strip li').count(), 3); await step(1); await site('none');
     // The journey strip lives in the judge-only bar, outside the product frame.
     assert.deepEqual([await page.locator('#judge-bar').isVisible(), await page.locator('#judge-bar #journey-strip').count(),
@@ -245,7 +242,8 @@ try {
 
     // Cannot start: the reason, with the setup action shown but disabled; direct setup links fall back.
     await page.locator('.brand').click(); await visible('catalogue-screen'); await focused('catalogue-title');
-    await hyattCard.locator('.catalogue-open').click(); await visible('booked-screen'); await visible('booked-blocked');
+    // Not on the picker, but a direct link still shows why it cannot start.
+    await page.evaluate(code => { location.hash = '#booked-' + code; }, HYATT); await visible('booked-screen'); await visible('booked-blocked');
     assert.equal(await page.locator('#setup-drop').isDisabled(), true);
     assert.equal(await page.locator('#setup-drop').getAttribute('aria-describedby'), 'blocked-title');
     assert.match(await page.locator('#booked-blocked').innerText(), /non-refundable/i);
@@ -270,9 +268,9 @@ try {
   const card = page.locator(`[data-code="${SIAM}"]`);
   assert.match(await card.locator('.watch-tag').innerText(), /Cannot start: free cancellation ended/);
   assert.equal(await card.locator('.scenario-label').count(), 0, 'an ended scenario is not advertised');
-  // A supplied photo still renders after the window closes; the other card keeps the fallback.
+  // A supplied photo still renders after the window closes; the non-refundable booking stays off the picker.
   assert.equal(await card.locator('img.card-photo').getAttribute('alt'), SIAM_ALT);
-  assert.equal(await page.locator(`[data-code="${HYATT}"] .photo-fallback`).count(), 1);
+  assert.equal(await page.locator(`[data-code="${HYATT}"]`).count(), 0);
   await page.screenshot({ path: join(output, 'ended-start-768.png'), fullPage: true }); report.screenshots.push(join(output, 'ended-start-768.png'));
   await page.goto(late.origin + '/#setup-' + SIAM); await page.locator('#booked-blocked').waitFor({ state: 'visible' });
   assert.match(await page.locator('#blocked-title').innerText(), /Free cancellation has ended/);
