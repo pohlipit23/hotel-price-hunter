@@ -176,7 +176,7 @@ test('importer reads a reviewed image manifest file and refuses photos that are 
   const root = await mkdtemp(join(tmpdir(), 'roomdrop-images-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(join(root, 'app', 'public', 'assets'), { recursive: true });
-  for (const name of ['illustrative-stays.jpg', 'roomdrop-airb000180-drop-1.jpg']) await writeFile(join(root, 'app', 'public', 'assets', name), 'reviewed');
+  for (const name of ['roomdrop-airb000180-hotel.jpg', 'roomdrop-airb000180-drop-1.jpg']) await writeFile(join(root, 'app', 'public', 'assets', name), 'reviewed');
   const catalogue = fixture(); catalogue.entries.forEach(entry => { entry.imageSources = remoteSources(entry); });
   await writeFile(join(root, 'catalogue.json'), JSON.stringify(catalogue));
   const manifest = async images => { await writeFile(join(root, 'images.json'), JSON.stringify({ schemaVersion: 1, images })); return '--images=images.json'; };
@@ -265,7 +265,7 @@ test('Firestore: a reviewed Drop photo and filled card photo are read back; remo
   const drops = (await b.getDrops(SIAM)).drops;
   assert.deepEqual(drops.map(drop => drop.photo ?? null), [suitePhoto, null, null]);
   assert.deepEqual((await b.getBooking(SIAM)).bundle.options.map(option => option.photo ?? null), [suitePhoto, null, null]);
-  assert.deepEqual((await b.listCatalogue()).map(entry => entry.card.photo?.asset), ['assets/illustrative-stays.jpg', 'assets/roomdrop-airb000179-hotel.jpg']);
+  assert.deepEqual((await b.listCatalogue()).map(entry => entry.card.photo?.asset), ['assets/roomdrop-airb000180-hotel.jpg', 'assets/roomdrop-airb000179-hotel.jpg']);
   const stored = JSON.stringify((await first.collectionGroup('drops').get()).docs.concat((await first.collection(`${prefix}BookingsV1`).get()).docs)
     .filter(document => document.ref.path.startsWith(prefix)).map(document => document.data()));
   assert.doesNotMatch(stored, /https:|img\.example|imageSources/);

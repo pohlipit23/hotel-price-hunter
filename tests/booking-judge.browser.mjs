@@ -16,10 +16,10 @@ let playwright; try { playwright = await import('playwright'); } catch { playwri
 const cache = join(process.env.LOCALAPPDATA || join(homedir(), 'AppData/Local'), 'ms-playwright');
 const builds = (await readdir(cache)).filter(name => /^chromium-\d+$/.test(name)).sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]));
 const browser = await playwright.chromium.launch({ headless: true, executablePath: join(cache, builds[0], 'chrome-win64/chrome.exe') });
-// The real six cards have no reviewed photo yet, so the main walk shows the honest fallback on every card;
-// the fixture's illustrative photo is checked on the later-clock server.
-const noPhotos = () => { const input = curated(); for (const card of input.cards) card.photo = null; return input; };
-const start = async (now, input = noPhotos()) => {
+// The fixture's Siam card has its reviewed S0.5 hotel photo; the Hyatt card has none and keeps the honest fallback.
+// Neither has a booked-room photo (the emulator walk, tests/booking-emulator.browser.mjs, covers one).
+const SIAM_ALT = 'Siam Kempinski Hotel Bangkok and its pool gardens';
+const start = async (now, input = curated()) => {
   const server = createBookingDemoServer({ bookingStorage: plannedBookings(input), sessionStorage: createMemorySessionStorage({ now }), now });
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   return { server, origin: 'http://127.0.0.1:' + server.address().port };
@@ -72,10 +72,14 @@ try {
     assert.match(await siamCard.locator('.watch-tag').innerText(), /Drop Watch ready/);
     assert.equal(await siamCard.locator('.scenario-label').innerText(), 'Free cancellation');
     assert.match(await siamCard.innerText(), /Bangkok, Thailand[\s\S]*17 Feb - 18 Feb · 1 night[\s\S]*MYR 2,335\.52/);
-    assert.equal(await siamCard.locator('.photo-fallback').getAttribute('aria-label'), 'No photo yet · Bangkok');
+    // A reviewed photo loads and is labelled as the hotel's; no photo means the drawn fallback and no label.
+    assert.equal(await siamCard.locator('img.card-photo').getAttribute('alt'), SIAM_ALT);
+    await page.waitForFunction(code => document.querySelector(`[data-code="${code}"] img.card-photo`)?.naturalWidth > 0, SIAM);
+    assert.equal(await siamCard.locator('.photo-tag').innerText(), 'Hotel photo');
     assert.match(await hyattCard.locator('.watch-tag').innerText(), /Cannot start: non-refundable/);
     assert.equal(await hyattCard.locator('.scenario-label').count(), 0);
     assert.equal(await hyattCard.locator('.photo-fallback').getAttribute('aria-label'), 'No photo yet · Kuala Lumpur');
+    assert.equal(await hyattCard.locator('.photo-tag').count(), 0);
     await shot('start');
 
     // F6 Original Booking, opened by keyboard; refresh keeps the page.
@@ -88,7 +92,11 @@ try {
     assert.match(booked, /Free cancellation until 14 Feb 2027, 16:58 UTC/); assert.match(booked, /MYR 2,335\.52/); assert.match(booked, /1 guest/);
     assert.equal(await page.locator('#booked-screen button.primary:visible').count(), 1, 'one primary action');
     assert.equal(await page.locator('#setup-drop').innerText(), 'Set up a drop');
+    assert.equal(await page.locator('#booked-photo img.card-photo').getAttribute('alt'), SIAM_ALT);
+    assert.equal(await page.locator('#booked-photo-tag').innerText(), 'Hotel photo');
+    assert.equal(await page.locator('#booked-room').isVisible(), false, 'no room photo without a reviewed one');
     if (width === 768) { await page.reload(); await visible('booked-screen'); }
+    await page.waitForFunction(() => document.querySelector('#booked-photo img')?.naturalWidth > 0);
     await shot('booked');
 
     // F7a setup by keyboard: consent is required, then a failed arm stays retryable and never shows armed.
@@ -161,6 +169,7 @@ try {
     assert.match(await page.locator('#booked-blocked').innerText(), /non-refundable/i);
     assert.match(await page.locator('#booked-screen').innerText(), /Non-refundable/);
     assert.equal(await page.locator('#booked-photo-tag').isVisible(), false, 'no photo tag on the fallback');
+    assert.equal(await page.locator('#booked-room').isVisible(), false);
     await shot('cannot-start');
     await page.goto(origin + '/#setup-' + HYATT); await visible('booked-blocked');
     await page.locator('#pick-another').click(); await visible('catalogue-screen');
@@ -171,7 +180,7 @@ try {
   }
 
   // Eligibility is evaluated at the actual time: once free cancellation ends the card and the page say so.
-  const late = servers[servers.push(await start(() => new Date('2027-02-15T00:00:00Z'), curated())) - 1];
+  const late = servers[servers.push(await start(() => new Date('2027-02-15T00:00:00Z'))) - 1];
   const context = await browser.newContext({ viewport: { width: 768, height: 900 }, reducedMotion: 'reduce' });
   await context.route('**/*', route => new URL(route.request().url()).origin === late.origin ? route.continue() : (report.external.push(route.request().url()), route.abort()));
   const page = await context.newPage(); page.on('pageerror', e => report.errors.push(e.message));
@@ -179,8 +188,8 @@ try {
   const card = page.locator(`[data-code="${SIAM}"]`);
   assert.match(await card.locator('.watch-tag').innerText(), /Cannot start: free cancellation ended/);
   assert.equal(await card.locator('.scenario-label').count(), 0, 'an ended scenario is not advertised');
-  // A supplied photo renders as an image with its reviewed alt text; the other card keeps the fallback.
-  assert.equal(await card.locator('img.card-photo').getAttribute('alt'), 'Illustrative hotel stay (not this hotel)');
+  // A supplied photo still renders after the window closes; the other card keeps the fallback.
+  assert.equal(await card.locator('img.card-photo').getAttribute('alt'), SIAM_ALT);
   assert.equal(await page.locator(`[data-code="${HYATT}"] .photo-fallback`).count(), 1);
   await page.screenshot({ path: join(output, 'ended-start-768.png'), fullPage: true }); report.screenshots.push(join(output, 'ended-start-768.png'));
   await page.goto(late.origin + '/#setup-' + SIAM); await page.locator('#booked-blocked').waitFor({ state: 'visible' });
