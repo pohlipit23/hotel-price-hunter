@@ -60,7 +60,7 @@ async function judgePage(width) {
 const visible = (page, id) => page.locator('#' + id).waitFor({ state: 'visible' });
 const loaded = (page, selector) => page.waitForFunction(s => [...document.querySelectorAll(s)].every(image => image.complete && image.naturalWidth > 0), selector);
 async function shot(page, stage, width) {
-  assert.doesNotMatch(await page.locator('body').innerText(), /fictional|AirBorneo|[–—]/i, stage);
+  assert.doesNotMatch(await page.locator('body').innerText(), /fictional|AirBorneo|[\u2013\u2014]/i, stage);
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), stage + ' overflow at ' + width);
   const path = join(output, `${stage}-${width}.png`); await page.screenshot({ path, fullPage: true }); report.screenshots.push(path);
 }
