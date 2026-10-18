@@ -6,7 +6,7 @@ import { authenticateGateway, createGateway } from '../app/gateway.mjs';
 import { normaliseGatewayRates } from '../app/domain/gateway-rates.mjs';
 import { buildQuotationDemo } from '../app/domain/quotation-demo.mjs';
 import { AGENCY_SEARCH_CONTEXT, altovoBaseline, watchBlocker } from '../app/domain/altovo-quotation.mjs';
-import { captureEngineDrops, ENGINE_SEARCH_DEFAULTS, loginEngine, parseEngineCredentials } from '../app/domain/engine-availability.mjs';
+import { captureEngineDrops, ENGINE_PROFILES, ENGINE_SEARCH_DEFAULTS, loginEngine, parseEngineCredentials } from '../app/domain/engine-availability.mjs';
 
 // Builds the judge catalogue: one selection-only bundle per captured Altovo quotation.
 // Without --execute this is a dry run: it validates the local projections against the owner's
@@ -20,11 +20,11 @@ async function credentialText(path) {
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const blocked = code => Object.assign(Error(), { code });
 const CODE = /^[A-Z0-9]{4,20}$/;
-const PREFIXES = ['--gateway-credentials-file=', '--projections=', '--approved-codes=', '--source=', '--engine-credentials-file='];
+const PREFIXES = ['--gateway-credentials-file=', '--projections=', '--approved-codes=', '--source=', '--engine-credentials-file=', '--engine-profile='];
 const sleepFor = ms => new Promise(done => setTimeout(done, ms));
-// Loose, display-only check that the engine returned the hotel the quotation names.
+// Loose, display-only check that the engine returned the hotel the quotation names; null when the engine named none.
 const sameHotelName = (a, b) => { const words = value => String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  return Boolean(a && b) && (words(a).includes(words(b)) || words(b).includes(words(a))); };
+  return a && b ? words(a).includes(words(b)) || words(b).includes(words(a)) : null; };
 export const SEARCH_DEFAULTS = Object.freeze({ nationality: AGENCY_SEARCH_CONTEXT.nationality, countryResidence: AGENCY_SEARCH_CONTEXT.countryResidence,
   occupancy: AGENCY_SEARCH_CONTEXT.occupancy, source: AGENCY_SEARCH_CONTEXT.source });
 
@@ -90,9 +90,12 @@ export async function main(args = process.argv.slice(2), { env = process.env, fe
     const value = prefix => args.find(arg => arg.startsWith(prefix))?.slice(prefix.length);
     // Drops of record come from the Gateway (default) or, by owner decision, the EasyGDS Core Engine.
     const source = value(PREFIXES[3]) ?? 'gateway';
-    if (!['gateway', 'engine'].includes(source) || value(PREFIXES[source === 'engine' ? 0 : 4]) !== undefined) throw Error();
+    if (!['gateway', 'engine'].includes(source) || (source === 'engine' ? [0] : [4, 5]).some(index => value(PREFIXES[index]) !== undefined)) throw Error();
     const engineSource = source === 'engine';
-    if (engineSource) report.source = 'engine';
+    // The engine profile defaults to the user's choice, the air1 staging engine, whose host is pinned in code.
+    const engineProfile = engineSource ? value(PREFIXES[5]) ?? 'staging-air1' : null;
+    if (engineSource && !Object.hasOwn(ENGINE_PROFILES, engineProfile)) throw blocked('ENGINE_PROFILE_INVALID');
+    if (engineSource) Object.assign(report, { source: 'engine', engineProfile, ...(ENGINE_PROFILES[engineProfile].apiUrl ? { engineHost: new URL(ENGINE_PROFILES[engineProfile].apiUrl).hostname } : {}) });
     const approvedText = value(PREFIXES[2]);
     if (approvedText === undefined) {
       report.requirements = ['Owner-approved air1 code list (--approved-codes=CODE,CODE)', 'Allowlisted Altovo projections in .local/altovo-sample',
@@ -121,7 +124,7 @@ export async function main(args = process.argv.slice(2), { env = process.env, fe
       const engineFile = value(PREFIXES[4]);
       if (!engineFile) throw blocked('ENGINE_CREDENTIALS_REQUIRED');
       let raw; try { raw = await credentialText(resolve(root, engineFile)); } catch { throw blocked('ENGINE_CREDENTIALS_REQUIRED'); }
-      engine = parseEngineCredentials(raw);
+      engine = parseEngineCredentials(raw, engineProfile);
       report.engineHost = new URL(engine.apiUrl).hostname;
     }
     const entries = [];
@@ -136,8 +139,8 @@ export async function main(args = process.argv.slice(2), { env = process.env, fe
         bundle = { ...view, snapshotVersion: hash(view), privateReferences: {} };
       } else if (engineSource) {
         // One sign-in for the whole run; a rejected call is never retried or re-signed.
-        engine.token ??= await loginEngine({ credentials: engine.credentials, fetchImpl });
-        const captured = await captureEngineDrops({ baseline, apiUrl: engine.apiUrl, token: engine.token, fetchImpl, now, sleep });
+        engine.token ??= await loginEngine({ credentials: engine.credentials, iamUrl: engine.iamUrl, fetchImpl });
+        const captured = await captureEngineDrops({ baseline, source: engine.source, apiUrl: engine.apiUrl, token: engine.token, fetchImpl, now, sleep });
         ({ bundle, capture, imageSources } = captured);
         engineFacts.set(baseline.quotationCode, { engineHotelId: baseline.hotel.id, engineHotelNameMatches: sameHotelName(captured.hotelName, baseline.hotel.name),
           searchPosts: captured.searchPosts });

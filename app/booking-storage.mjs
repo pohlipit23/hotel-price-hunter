@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { AGENCY_SEARCH_CONTEXT } from './domain/altovo-quotation.mjs';
-import { ENGINE_BASIS, ENGINE_HOST, ENGINE_SEARCH_DEFAULTS, ENGINE_SOURCE } from './domain/engine-availability.mjs';
+import { ENGINE_BASIS, ENGINE_SEARCH_DEFAULTS, engineHostAllowed } from './domain/engine-availability.mjs';
 import { decimalMoney } from './domain/live-comparison.mjs';
 
 // Shared, immutable curated catalogue records in Firestore:
@@ -123,10 +123,10 @@ function validCapture(entry) {
     || !Number.isSafeInteger(capture.offerCount) || capture.offerCount < 0 || capture.optionCount !== bundle.options.length
     || (capture.status === 'observed-empty') !== (capture.offerCount === 0) || (capture.status === 'observed-empty' && bundle.options.length)
     || canonicalJson(capture.searchDefaults) !== canonicalJson(engine ? ENGINE_SEARCH_DEFAULTS : SEARCH_DEFAULTS)
-    || (engine && (!exactKeys(capture.provenance, ['source', 'host']) || capture.provenance.source !== ENGINE_SOURCE || !ENGINE_HOST.test(capture.provenance.host ?? '')))
+    || (engine && (!exactKeys(capture.provenance, ['source', 'host']) || !engineHostAllowed(capture.provenance.source, capture.provenance.host)))
     || bundle.options.some(option => (option.estimate.basis === ENGINE_BASIS) !== engine)) fail('CAPTURE_MISMATCH');
   if (engine) return { status: capture.status, reason: null, capturedAt: capture.checkedAt, offerCount: capture.offerCount,
-    searchDefaults: { ...ENGINE_SEARCH_DEFAULTS }, provenance: { source: ENGINE_SOURCE, host: capture.provenance.host } };
+    searchDefaults: { ...ENGINE_SEARCH_DEFAULTS }, provenance: { source: capture.provenance.source, host: capture.provenance.host } };
   return { status: capture.status, reason: null, capturedAt: capture.checkedAt, offerCount: capture.offerCount, searchDefaults: { ...SEARCH_DEFAULTS } };
 }
 const dropProvenance = capture => capture.provenance

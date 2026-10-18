@@ -6,11 +6,24 @@ import { isDisplayedDrop } from '../public/drop-eligibility.js';
 // one hotel's rates for the quotation's own dates and adults, mapped to the same bundle/option shape
 // the Gateway capture produces. Engine totals are already in MYR, so no FX estimate is involved; they
 // stay indicative because availability prices precede final pricing and fees.
-export const ENGINE_SOURCE = 'easygds-core-engine-production';
 export const ENGINE_BASIS = 'engine-myr-total-before-final-pricing-and-fees';
-export const ENGINE_IAM_URL = 'https://iam.services.easygds.com/api';
-export const ENGINE_API_URL = /^https:\/\/[a-z0-9-]{1,40}\.apps\.easygds\.com\/api$/;
-export const ENGINE_HOST = /^[a-z0-9-]{1,40}\.apps\.easygds\.com$/;
+// Two engine profiles. The user chose the air1 staging engine (18 October 2026); its app host is pinned
+// here, never read from a credentials file. The production profile stays available but unused.
+export const ENGINE_PROFILES = Object.freeze({
+  'staging-air1': Object.freeze({ source: 'easygds-core-engine-staging-air1', iamUrl: 'https://iam.stg-services.easygds.com/api',
+    apiUrl: 'https://air1.stg-apps.easygds.com/api', hosts: /^air1\.stg-apps\.easygds\.com$/,
+    keys: { email: 'EASYGDS_STG_EMAIL', secret: 'EASYGDS_STG_SECRET_KEY', scope: 'EASYGDS_STG_SCOPE_TYPE', flow: 'EASYGDS_STG_FLOW_TYPE', iam: 'EASYGDS_STG_IAM_URL' } }),
+  production: Object.freeze({ source: 'easygds-core-engine-production', iamUrl: 'https://iam.services.easygds.com/api',
+    apiUrl: null, hosts: /^[a-z0-9-]{1,40}\.apps\.easygds\.com$/,
+    keys: { email: 'EASYGDS_EMAIL', secret: 'EASYGDS_PASSWORD', scope: 'EASYGDS_SCOPE_TYPE', flow: 'EASYGDS_FLOW_TYPE', iam: 'EASYGDS_IAM_URL', api: 'EASYGDS_API_URL' } }),
+});
+const profileFor = source => Object.values(ENGINE_PROFILES).find(profile => profile.source === source) ?? null;
+// True when `host` is an allowed app host for the engine `source` (used by the importer too).
+export const engineHostAllowed = (source, host) => Boolean(profileFor(source)?.hosts.test(host ?? ''));
+const apiUrlAllowed = (source, apiUrl) => {
+  let url; try { url = new URL(apiUrl); } catch { return false; }
+  return url.protocol === 'https:' && url.pathname === '/api' && !url.port && !url.search && !url.username && `${url.origin}/api` === apiUrl && engineHostAllowed(source, url.hostname);
+};
 const IMAGE_SOURCES_KIND = 'remote-source-urls-pending-review';
 const CURRENCY = 'MYR';
 const ADULT_AGE = 30;
@@ -55,23 +68,26 @@ function cancellationFacts(offer, checkedAt) {
     ? { freeCancellation: true, cancellationDeadline: first.toUtc } : { freeCancellation: false, cancellationDeadline: null };
 }
 
-// Reads only the EASYGDS_* keys this capture needs from an owner-selected .env text. Missing values
-// are refused: no default account, scope or fallback credential is ever supplied.
-const CREDENTIAL_KEYS = ['EASYGDS_API_URL', 'EASYGDS_IAM_URL', 'EASYGDS_EMAIL', 'EASYGDS_PASSWORD', 'EASYGDS_SCOPE_TYPE', 'EASYGDS_FLOW_TYPE'];
-export function parseEngineCredentials(raw) {
+// Reads only the keys the chosen profile needs from an owner-selected .env text (EASYGDS_STG_* for
+// staging-air1, EASYGDS_* for production); every other line, including EASYGDS_STG_APP_URL, is ignored.
+// Missing values are refused: no default account, scope or fallback credential is ever supplied.
+export function parseEngineCredentials(raw, profileName = 'staging-air1') {
+  if (!Object.hasOwn(ENGINE_PROFILES, profileName)) fail('ENGINE_PROFILE_INVALID');
+  const profile = ENGINE_PROFILES[profileName]; const names = Object.values(profile.keys);
   const values = {};
   for (const line of String(raw).split(/\r?\n/)) {
     const match = line.trim().match(/^([A-Z0-9_]+)\s*=(.*)$/);
-    if (!match || !CREDENTIAL_KEYS.includes(match[1])) continue;
+    if (!match || !names.includes(match[1])) continue;
     if (Object.hasOwn(values, match[1])) fail('ENGINE_CREDENTIALS_INVALID');
     const value = match[2].trim(); values[match[1]] = /^(["']).*\1$/.test(value) ? value.slice(1, -1) : value;
   }
-  if (CREDENTIAL_KEYS.some(key => !values[key])) fail('ENGINE_CREDENTIALS_REQUIRED');
-  if (!ENGINE_API_URL.test(values.EASYGDS_API_URL)) fail('ENGINE_HOST_NOT_ALLOWED');
-  if (values.EASYGDS_IAM_URL !== ENGINE_IAM_URL || !values.EASYGDS_EMAIL.includes('@') || !['System', 'Agent'].includes(values.EASYGDS_SCOPE_TYPE)
-    || values.EASYGDS_FLOW_TYPE !== 'Basic') fail('ENGINE_CREDENTIALS_INVALID');
-  return { apiUrl: values.EASYGDS_API_URL, credentials: { email: values.EASYGDS_EMAIL, secret_key: values.EASYGDS_PASSWORD,
-    scope_type: values.EASYGDS_SCOPE_TYPE, flow_type: values.EASYGDS_FLOW_TYPE } };
+  const get = key => values[profile.keys[key]];
+  if (names.some(name => !values[name])) fail('ENGINE_CREDENTIALS_REQUIRED');
+  const apiUrl = profile.apiUrl ?? get('api');
+  if (!apiUrlAllowed(profile.source, apiUrl)) fail('ENGINE_HOST_NOT_ALLOWED');
+  if (get('iam') !== profile.iamUrl || !get('email').includes('@') || !['System', 'Agent'].includes(get('scope')) || get('flow') !== 'Basic') fail('ENGINE_CREDENTIALS_INVALID');
+  return { profile: profileName, source: profile.source, iamUrl: profile.iamUrl, apiUrl,
+    credentials: { email: get('email'), secret_key: get('secret'), scope_type: get('scope'), flow_type: get('flow') } };
 }
 
 // One bounded JSON POST: no redirects, no retries, fixed failure codes and never a response body in errors.
@@ -95,8 +111,9 @@ async function postJson(fetchImpl, url, headers, body, httpCode) {
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return fail('ENGINE_INVALID_RESPONSE'); }
 }
 
-export async function loginEngine({ credentials, fetchImpl }) {
-  const data = await postJson(fetchImpl, `${ENGINE_IAM_URL}/auth`, { 'Content-Type': 'application/json', Accept: 'application/json' }, credentials, 'ENGINE_AUTH_FAILED');
+export async function loginEngine({ credentials, iamUrl, fetchImpl }) {
+  if (!Object.values(ENGINE_PROFILES).some(profile => profile.iamUrl === iamUrl)) fail('ENGINE_CREDENTIALS_INVALID');
+  const data = await postJson(fetchImpl, `${iamUrl}/auth`, { 'Content-Type': 'application/json', Accept: 'application/json' }, credentials, 'ENGINE_AUTH_FAILED');
   if (typeof data?.access_token !== 'string' || !/^[\x21-\x7e]{1,16384}$/.test(data.access_token)) fail('ENGINE_AUTH_FAILED');
   return data.access_token;
 }
@@ -105,8 +122,8 @@ export const SEARCH_POSTS = 4;
 export const SEARCH_INTERVAL_MS = 3000;
 // The same search body is re-posted (idempotent, results accumulate) until this hotel is in and every
 // hotel the engine counted has arrived; 0 of 0 counts as empty only once confirmed by a second post.
-export async function captureEngineDrops({ baseline, apiUrl, token, fetchImpl, now = () => new Date(), sleep }) {
-  if (!ENGINE_API_URL.test(apiUrl ?? '')) fail('ENGINE_HOST_NOT_ALLOWED');
+export async function captureEngineDrops({ baseline, source, apiUrl, token, fetchImpl, now = () => new Date(), sleep }) {
+  if (!apiUrlAllowed(source, apiUrl)) fail('ENGINE_HOST_NOT_ALLOWED');
   const hotelId = baseline.hotel.id; const host = new URL(apiUrl).hostname;
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json;charset=UTF-8', Accept: 'application/json', 'X-Territory': TERRITORY };
   const body = { checkin_date: baseline.stay.checkin, checkout_date: baseline.stay.checkout, currency_code: CURRENCY, language_code: 'en-US',
@@ -121,20 +138,20 @@ export async function captureEngineDrops({ baseline, apiUrl, token, fetchImpl, n
     searchId = data.search_id;
     if (data.hotels.length && data.hotels.length >= data.total) { found = data.hotels[0]; break; }
     if (!data.hotels.length && data.total === 0 && posts >= 2) {
-      return { ...engineDropBundle(baseline, { id: hotelId, offers: [] }, { checkedAt: now().toISOString(), host }), searchPosts: posts, hotelName: null };
+      return { ...engineDropBundle(baseline, { id: hotelId, offers: [] }, { checkedAt: now().toISOString(), source, host }), searchPosts: posts, hotelName: null };
     }
   }
   if (!found) fail('ENGINE_SEARCH_INCOMPLETE');
   const rates = await postJson(fetchImpl, `${apiUrl}/v2/products/hotels/availabilities/rates`, headers, { search_id: searchId, hotel_id: hotelId }, 'ENGINE_HTTP_FAILED');
-  return { ...engineDropBundle(baseline, rates, { checkedAt: now().toISOString(), host }), searchPosts: posts, hotelName: text(found.name) };
+  return { ...engineDropBundle(baseline, rates, { checkedAt: now().toISOString(), source, host }), searchPosts: posts, hotelName: text(found.name) };
 }
 
 // rates: the engine's `{ id, offers[] }` for this hotel. Returns the bundle, its photo source URLs
 // (kept beside the bundle, never renderable) and the capture record.
-export function engineDropBundle(baseline, rates, { checkedAt, host } = {}) {
+export function engineDropBundle(baseline, rates, { checkedAt, source, host } = {}) {
   if (!plain(rates) || !Array.isArray(rates.offers) || rates.offers.length > 5000) fail('ENGINE_RATES_INVALID');
   if (rates.id !== undefined && String(rates.id) !== baseline.hotel.id) fail('ENGINE_HOTEL_MAPPING_UNVERIFIED');
-  if (!Number.isFinite(Date.parse(checkedAt)) || !ENGINE_HOST.test(host ?? '') || baseline.quotedRetail.currency !== CURRENCY) fail('ENGINE_CONTEXT_INVALID');
+  if (!Number.isFinite(Date.parse(checkedAt)) || !engineHostAllowed(source, host) || baseline.quotedRetail.currency !== CURRENCY) fail('ENGINE_CONTEXT_INVALID');
   const candidates = [];
   for (const offer of rates.offers) {
     if (!plain(offer) || !Array.isArray(offer.rooms) || offer.rooms.length !== 1 || !plain(offer.rooms[0])) continue;
@@ -165,6 +182,6 @@ export function engineDropBundle(baseline, rates, { checkedAt, host } = {}) {
     imageSources: { kind: IMAGE_SOURCES_KIND, renderable: false, hotel: null,
       drops: chosen.map(candidate => ({ optionId: candidate.option.optionId, url: candidate.url, caption: null })) },
     capture: { status: rates.offers.length ? 'observed' : 'observed-empty', checkedAt, offerCount: rates.offers.length, optionCount: options.length,
-      searchDefaults: ENGINE_SEARCH_DEFAULTS, provenance: { source: ENGINE_SOURCE, host } },
+      searchDefaults: ENGINE_SEARCH_DEFAULTS, provenance: { source, host } },
   };
 }

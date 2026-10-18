@@ -737,3 +737,25 @@ nothing here is live evidence.** The owner runs the live command.
   `npm test`: tests 400, pass 369, fail 0, skipped 31. The guarded owner wrapper
   (session scratchpad, not tracked) passed its fake-fetch proof: typical 13 calls,
   worst case 21 (1 auth, 16 availability posts, 4 rates), fifth post never sent.
+
+Superseded the same day (user decision): use the **air1 staging engine**, not
+production mh1. `--engine-profile=staging-air1` is the engine default: it reads
+only `EASYGDS_STG_EMAIL`, `EASYGDS_STG_SECRET_KEY`, `EASYGDS_STG_SCOPE_TYPE`,
+`EASYGDS_STG_FLOW_TYPE` and `EASYGDS_STG_IAM_URL` (must be
+`https://iam.stg-services.easygds.com/api`), and pins the app host
+`https://air1.stg-apps.easygds.com/api` in code. `EASYGDS_STG_APP_URL` is never
+read. Provenance source is `easygds-core-engine-staging-air1`; the importer
+accepts each engine source only with its own host. `--engine-profile=production`
+keeps the earlier path working but unused. Hotel ids stay the share-link
+`easygds_id` (= `gatewayHotelId`); the air1 `hotel_id` values are never tried, and
+the report's per-hotel `engineHotelNameMatches` (true, false, or null when the
+engine named no hotel) makes a mismatch visible. Still no live call.
+
+- `node --test .\tests\engine-availability.test.mjs`: tests 9, pass 9.
+- Emulator set (booking-storage, booking-catalogue, engine-availability,
+  altovo-catalogue): tests 58, pass 58.
+- `npm test`: tests 407, pass 375, fail 0, skipped 32 (includes another
+  session's concurrent uncommitted work in this worktree).
+- Wrapper fake-fetch proof: only the staging IAM and air1 origins reached,
+  typical 13 calls, worst case 21; real dry run: 0 calls, profile staging-air1,
+  host air1.stg-apps.easygds.com, 4 planned searches.
