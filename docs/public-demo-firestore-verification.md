@@ -278,3 +278,109 @@ Still open:
 - S0.6 needs real reviewed captures, so only the synthetic fixture has been
   imported;
 - nothing is wired into the HTTP server yet (F4a, F5a).
+
+### S0.2 to S0.4: Owner-created quotations and live captures (18 October 2026)
+
+These were LIVE steps, each separately approved by the user and run by the owner
+or under the owner's session on 18 October 2026. This worktree made no live call;
+it records what was reported and re-checks local file hashes only.
+
+- S0.2: the owner created air1 staging quotations AIRB000181 to AIRB000184
+  (`status='quote'`). Approved air1 code list (tenant provenance):
+  AIRB000179, AIRB000180, AIRB000181, AIRB000182, AIRB000183, AIRB000184.
+- S0.3: sanitised projections for AIRB000181 to AIRB000184 were captured in the
+  owner's logged-in browser (share-token route, then `v2/bookings/json`), with
+  allowlisting done in the page. Tokens and raw bodies never left the page. Four
+  seven-day share tokens were minted; none is stored anywhere. AIRB000182's room
+  name contained an en dash, replaced with an ASCII hyphen in the projection.
+- S0.4: one preparation run made 5 live calls (1 Gateway login, 4 search-by-id),
+  all HTTP 200, no retries. AIRB000180 to AIRB000183 are `observed` with 3 Drops
+  each. Estimates use the quotation FX rate and the `my`/`my` adults-only agency
+  defaults (`searchContextSource: agency-default`). AIRB000179 and AIRB000184 are
+  `NON_REFUNDABLE` and `not-searched`, with no search.
+
+SHA-256 recomputed in this worktree (files in the shared checkout's ignored
+`.local\`, never tracked):
+
+| File | Bytes | SHA-256 |
+| --- | --- | --- |
+| `altovo-sample\AIRB000179.projection.json` | 1851 | `1edc7b2832737a689047b13607a148fef97546a5ed0fe1ab7dc78ad689b74264` |
+| `altovo-sample\AIRB000180.projection.json` | 2149 | `8eb6e0d8caf0a46b852cac57d133653c8b17e75f674512d9be18dd855d6f73eb` |
+| `altovo-sample\AIRB000181.projection.json` | 2232 | `f01dbd557d73390745871e31eb79d8e72a2d46ad75dedbc1a9fdd7711b5032e4` |
+| `altovo-sample\AIRB000182.projection.json` | 2294 | `b6c0544f15936dec09eadda4cc1a8ce9fbbe1ca99440013ca4038014ef43fe70` |
+| `altovo-sample\AIRB000183.projection.json` | 2267 | `e4d66a76efbd73746c5f994cdb8e2fec16dfa1a5aeb79e1c08b0ddd32e0f4499` |
+| `altovo-sample\AIRB000184.projection.json` | 2068 | `559cadb85f84a2ef6759603d236c6b983c04640c9a757d28bd480560f4fb563f` |
+| `altovo-catalogue\catalogue-87ab61f1-25f5-4b18-a98d-7c57a0d34f91.json` | 32515 | `d3df4e16f9e33e2d17ce884b3e92af352b0d837449cc5709e7cf469f9d192039` |
+
+Scenario coverage from the prepared catalogue (no private payload copied):
+
+| Code | City | Board | Cancellation (UTC) | Capture |
+| --- | --- | --- | --- | --- |
+| AIRB000179 | Kuala Lumpur | Breakfast | non-refundable | not-searched |
+| AIRB000180 | Bangkok | Breakfast | free until 2027-02-14T16:58:59Z | observed, 512 offers, 3 Drops |
+| AIRB000181 | Singapore | Breakfast | free until 2027-02-21T05:59:59Z | observed, 908 offers, 3 Drops |
+| AIRB000182 | Singapore | Room only | free until 2027-02-01T15:58:59Z | observed, 349 offers, 3 Drops |
+| AIRB000183 | Hong Kong | Room only | free until 2026-12-06T15:58:59Z | observed, 273 offers, 3 Drops |
+| AIRB000184 | Kuala Lumpur | Breakfast | non-refundable | not-searched |
+
+All six are MYR, one night and one adult. Filled slots: refundable/armable
+(180 to 183), non-refundable/cannot-start (179, 184), city variety (four cities)
+and board variety (two room-only baselines). AIRB000181's two best Drops are room
+only against a breakfast baseline, so they are not like-for-like. Still missing:
+
+- closing soon within days: AIRB000183 has the nearest deadline, 49 days after
+  18 October, and only becomes closing-soon (14-day rule) from 2026-11-22;
+- a non-MYR booking currency;
+- more than one night;
+- more than one adult.
+
+### S0.5: Provisional card metadata (pending the owner)
+
+The owner has not yet decided card photos or labels. A clearly marked
+provisional draft exists only in this worktree's ignored
+`.local\cards-draft.json` (SHA-256
+`ffe03a7d6f0377cf2f56320d9a35cdb7fa95190a8316c08da6b44fef1e5080c7`):
+
+- labels: 180 "Big drop", 181 "Drop, but room only", 182 "Small drop",
+  183 "Closest cancellation deadline", 179 and 184 "Can't watch - non-refundable";
+- city names from each projection's `hotel.cityCode` (KUL, BKK, SIN, HKG),
+  corroborated by the hotel name in the same projection;
+- provisional order 180, 181, 182, 183, 179, 184;
+- `photo: null` for every card. No bundle carries a reviewed image, so the UI
+  must use its honest image fallback.
+
+S0.5 stays open until the owner reviews photos, labels and order. A reviewed
+change of label or order is a content change and gives `BOOKING_CHANGED` against
+the emulator import below; re-import into a fresh prefix or emulator then.
+
+### S0.6: Guarded emulator import of the six real captures (18 October 2026)
+
+Input: `.local\s0.6\catalogue-import.json` in this worktree (ignored, SHA-256
+`d996d05477ed524ea5f7ddd2170d2ab9e4e138005872cdd0330c6fba5d5ab81e`). It is the
+prepared catalogue's six entries with `privateReferences` removed, plus the
+provisional cards. `git check-ignore -v` matches `.gitignore:9:.local/`.
+
+1. Dry run, `node .\scripts\import-altovo-catalogue.mjs --catalogue=.local/s0.6/catalogue-import.json`:
+   `status: validated`. 179 and 184 `not-searched` with 0 Drops; 180 to 183
+   `observed` with 3 Drops each.
+2. Before execution the emulator (127.0.0.1:8181, `demo-roomdrop-part1`) had no
+   root collections.
+3. `... --execute --project=demo-roomdrop-part1 --database=(default) --emulator=127.0.0.1:8181`:
+   `mode: emulator-import`, `status: imported`, all six `created`.
+4. Read-back with a new client, using `loadHostedCatalogue`, `listCatalogue` and
+   `getDrops(code, { dropSetVersion })`:
+   - order and cards as drafted;
+   - every `bundle.snapshotVersion` equals its `contentVersion`;
+   - baselines and Drop options equal the input;
+   - no bundle has `privateReferences`;
+   - 180 to 183 give `observed`, 3 Drops, at their capture times
+     (12:08:20.739Z to 12:08:34.799Z);
+   - 179 and 184 throw `CAPTURE_UNAVAILABLE`, never an empty search.
+5. The emulator then held 24 documents: 6 bookings, 6 Drop sets and 12 Drops.
+   No stored key is private or visitor state.
+6. An identical second `--execute` returned `unchanged` for all six.
+
+Content versions (first 12 hex characters): 179 `1e490d803265`,
+180 `d7572d0b5c89`, 181 `98132d9fd3ff`, 182 `830d59ea02e1`,
+183 `7d5b74b1aff6`, 184 `d77e996890f5`. This is local emulator evidence only.
+A production import remains a separate LIVE step that needs its own approval.

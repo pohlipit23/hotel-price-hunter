@@ -49,21 +49,36 @@ confirm-quote, create supplier bookings or commit `.local\`.
   Done 18 Oct: AIRB000180 fills refundable/armable (Drops still missing),
   AIRB000179 fills non-refundable/cannot-start; closing-soon and currency/board
   variety remain gaps. Needs for S0.2 recorded in the verification doc, Part 1 S0.1.
-- [ ] S0.2 Quotation creation by the owner (OWNER, LIVE staging UI): the owner
+- [x] S0.2 Quotation creation by the owner (OWNER, LIVE staging UI): the owner
   creates the missing air1 quotations to fill the recorded gaps; quotations stay
   `status='quote'`. Record the approved air1 code list as tenant provenance.
-- [ ] S0.3 Sanitised projection capture (LIVE, separate approval): owner-run,
+  Done 18 Oct (user-approved): AIRB000181 to AIRB000184 created; approved code
+  list AIRB000179 to AIRB000184. Verification doc, Part 1 S0.2 to S0.4.
+- [x] S0.3 Sanitised projection capture (LIVE, separate approval): owner-run,
   dry-run by default, through `scripts\prepare-altovo-catalogue.mjs`; keep only
   allowlisted fields, never tokens or raw responses. Evidence stays in `.local\`.
-- [ ] S0.4 Matching per-quotation Gateway Drop capture (LIVE, separate approval):
+  Done 18 Oct: projections for 181 to 184 captured in the owner's browser with
+  in-page allowlisting; no token or raw body left the page. Hashes recorded.
+- [x] S0.4 Matching per-quotation Gateway Drop capture (LIVE, separate approval):
   one bounded Gateway search per refundable quotation with a baseline built from
   its projection and `my`/`my` adults-only agency defaults recorded as such.
   Distinguish a valid zero-result capture from a missing/failed one.
+  Done 18 Oct: one run, 5 calls (login + 4 searches, all 200, no retries);
+  180 to 183 observed with 3 Drops each; 179 and 184 not-searched
+  (NON_REFUNDABLE). Still missing: closing soon within days, a non-MYR currency,
+  more than one night, more than one adult. 181's best Drops are room only
+  against a breakfast baseline.
 - [ ] S0.5 Photo/scenario metadata: reviewed local photo assets, card ordering,
   city and scenario labels supplied as curated facts, not invented metadata.
-- [ ] S0.6 Guarded Firestore import: emulator import through the F2 importer
+  Pending the owner. Only a provisional draft exists (ignored
+  `.local\cards-draft.json`, `photo: null`, labels and order unreviewed).
+- [x] S0.6 Guarded Firestore import: emulator import through the F2 importer
   (local, test-owned data); a production Firestore import is a separate LIVE step
   requiring explicit approval and is not part of Part 1 acceptance.
+  Done 18 Oct: all six real captures, with the provisional cards, imported into
+  the Part 1 emulator (dry run, then execute, then an identical retry that
+  returned `unchanged`). Read back with `loadHostedCatalogue` and `getDrops`.
+  The import must be redone if the S0.5 review changes a card.
 - Verify: per-code bundle validation via F1/F2, coverage matrix of scenario slots
   versus captured evidence, `.local\` ignore checks. Two samples prove mechanics
   only; the six-entry matrix stays open until supplied and captured.
@@ -126,8 +141,10 @@ write shared booking/Drop records.
   supplier references and `.local\` captures are absent from tracked fixtures.
   (18 Oct: 41/41 pass against the emulator; the fixtures hold only synthetic
   placeholder references.)
-- [ ] Coverage reports distinguish two source projections, actual captured Drops
+- [x] Coverage reports distinguish two source projections, actual captured Drops
   and remaining owner-created catalogue entries. No additional live calls implied.
+  (18 Oct: verification doc, Part 1 S0.2 to S0.4 coverage table: six projections,
+  Drops captured for 180 to 183, and the scenario slots still missing.)
 
 ### F3a: Persist isolated sessions and the per-code watch entry (Part 1 of F3)
 
