@@ -12,10 +12,11 @@ async function app(t, advisor) {
   const origin = `http://127.0.0.1:${server.address().port}`;
   const response = await fetch(origin + '/api/booking-demo/q/' + code);
   const cookie = response.headers.get('set-cookie').split(';')[0]; const data = await response.json();
+  let watch = null;
   const post = (action, body) => fetch(origin + '/api/booking-demo/q/' + code + '/' + action, { method: 'POST',
     headers: { Origin: origin, Cookie: cookie, 'X-CSRF-Token': data.csrfToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ snapshotVersion: data.snapshotVersion, ...body }) });
-  const arm = async minimumSavingMinor => (await (await post('watch', { consent: true, minimumSavingMinor })).json()).watch;
+    body: JSON.stringify({ snapshotVersion: data.snapshotVersion, ...(action === 'watch' ? { expectedRevision: watch?.revision ?? 0 } : watch ? { watchBinding: JSON.stringify(watch) } : {}), ...body }) });
+  const arm = async minimumSavingMinor => (watch = (await (await post('watch', { consent: true, minimumSavingMinor })).json()).watch);
   return { post, arm, setTime: at => { clock = new Date(at); } };
 }
 const selection = { optionId: 'option-fixture-flex-premier', acceptedDemoOnly: true };

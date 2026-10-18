@@ -6,9 +6,14 @@ import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createBookingDemoServer } from '../app/booking-demo-server.mjs';
+import { watchBlocker } from '../app/domain/altovo-quotation.mjs';
+import { agencyMinimumSavingMinor } from '../app/public/drop-watch.js';
 
-const output = resolve('.local/part2-firestore-browser'); await mkdir(output, { recursive: true });
-const report = { status: 'started', proof: 'actual-Part-1-and-Part-2', checks: [], screenshots: [], errors: [], external: [] };
+const args = process.argv.slice(2), existing = args.includes('--existing');
+const inputPath = args.find(arg => arg.startsWith('--catalogue='))?.slice(12);
+assert.ok(args.every(arg => arg === '--existing' || arg.startsWith('--catalogue=')) && existing === Boolean(inputPath));
+const output = resolve(existing ? '.local/part2-firestore-real-browser' : '.local/part2-firestore-browser'); await mkdir(output, { recursive: true });
+const report = { status: 'started', proof: 'actual-Part-1-and-Part-2', catalogue: existing ? 'reviewed-real-capture-emulator-only' : 'synthetic-fixture', clock: existing ? 'actual-UTC' : 'injected-test-clock', checks: [], screenshots: [], errors: [], external: [] };
 let browser, firestore, server, prefix;
 const closeServer = async () => { if (server) { const value = server; server = null; await new Promise(resolve => { value.closeAllConnections(); value.close(resolve); }); } };
 try {
@@ -19,7 +24,7 @@ try {
   try {
     [bookingModule, sessionModule, input] = await Promise.all([
       import('../app/booking-storage.mjs'), import('../app/quotation-session-storage.mjs'),
-      readFile(new URL('./fixtures/curated-bookings.json', import.meta.url), 'utf8').then(JSON.parse),
+      readFile(inputPath ? resolve(inputPath) : new URL('./fixtures/curated-bookings.json', import.meta.url), 'utf8').then(JSON.parse),
     ]);
   } catch (failure) {
     if (['ERR_MODULE_NOT_FOUND', 'ENOENT'].includes(failure.code)) throw Object.assign(Error('Part 1 dependencies are not integrated into this worktree.'), { code: 'PART1_DEPENDENCIES_UNAVAILABLE' });
@@ -28,14 +33,16 @@ try {
   const { Firestore } = await import('@google-cloud/firestore');
   firestore = new Firestore({ projectId: 'demo-roomdrop-part2', host: '127.0.0.1:8281', ssl: false });
   prefix = 'roomdropPart2Browser' + randomBytes(8).toString('hex');
-  const now = () => new Date('2026-10-20T00:00:00Z');
-  const bookingStorage = bookingModule.createBookingStorage({ firestore, prefix });
+  const now = existing ? () => new Date() : () => new Date('2026-10-20T00:00:00Z');
+  const bookingStorage = bookingModule.createBookingStorage({ firestore, prefix: existing ? 'roomdrop' : prefix });
+  if (!existing) {
   const otherCode = 'PART2002', extra = structuredClone(input.entries[0]);
   extra.code = otherCode; extra.bundle.baseline.quotationCode = otherCode;
   const { schemaVersion, transactionMode, baseline, options, checkedAt, completeness, customerRefund, reservationCreated } = extra.bundle;
   extra.bundle.snapshotVersion = createHash('sha256').update(JSON.stringify({ schemaVersion, transactionMode, baseline, options, checkedAt, completeness, customerRefund, reservationCreated })).digest('hex');
   input.entries.push(extra); input.cards.push({ ...input.cards[0], code: otherCode, order: 3 });
   await bookingStorage.importBundle(input, { execute: true, now });
+  }
   const loaded = await bookingModule.loadHostedCatalogue(bookingStorage);
   const sessionStorage = sessionModule.createFirestoreSessionStorage({ firestore, prefix, now, catalogueCodes: loaded.entries.map(entry => entry.code) });
   const originals = JSON.stringify(await Promise.all(loaded.entries.map(entry => bookingStorage.getBooking(entry.code))));
@@ -51,7 +58,11 @@ try {
   const cache = join(process.env.LOCALAPPDATA, 'ms-playwright');
   const builds = (await readdir(cache)).filter(name => /^chromium-\d+$/.test(name)).sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]));
   browser = await playwright.chromium.launch({ headless: true, executablePath: join(cache, builds[0], 'chrome-win64/chrome.exe') });
-  const code = input.entries[0].code;
+  const eligible = loaded.entries.filter(entry => watchBlocker(entry.bundle.baseline, now()) === null && entry.bundle.options.length);
+  assert.ok(eligible.length >= 2, 'Two currently eligible captured bookings are required');
+  const code = eligible[0].code, otherCode = existing ? eligible[1].code : 'PART2002';
+  const minimum = agencyMinimumSavingMinor(eligible[0].bundle.baseline.quotedRetail.currency);
+  const otherMinimum = agencyMinimumSavingMinor(loaded.entries.find(entry => entry.code === otherCode).bundle.baseline.quotedRetail.currency);
   for (const width of [320, 768, 1024, 1440]) {
     const judge = await browser.newContext({ viewport: { width, height: 1000 }, reducedMotion: 'reduce' });
     const second = await browser.newContext();
@@ -68,7 +79,21 @@ try {
       await page.locator(`input[name="minimum-saving"][value="${minimum}"]`).check();
       await page.locator('#arm-watch').click(); await visible('armed-strip');
     };
-    await arm(code, 1000); await shot('drops');
+    if (existing && width === 320) {
+      const listing = await (await judge.request.get(origin + '/api/booking-demo/catalogue')).json();
+      assert.equal(listing.entries.length, loaded.entries.length); report.catalogueChecks = [];
+      for (const entry of listing.entries) {
+        const data = await (await judge.request.get(origin + '/api/booking-demo/q/' + entry.code)).json();
+        const response = await judge.request.post(origin + '/api/booking-demo/q/' + entry.code + '/watch', {
+          headers: { Origin: origin, 'X-CSRF-Token': data.csrfToken }, data: { snapshotVersion: data.snapshotVersion, consent: true,
+            minimumSavingMinor: data.agencyMinimumSavingMinor, expectedRevision: data.watch?.revision ?? 0 } });
+        const result = await response.json();
+        if (data.blocker) { assert.equal(response.status(), 409); assert.equal(result.error.reason, data.blocker); }
+        else { assert.equal(response.status(), 200); assert.equal(result.watch.firstCheck.captureStatus, data.capture.status); }
+        report.catalogueChecks.push({ code: entry.code, blocker: data.blocker, status: response.status(), captureStatus: data.capture.status });
+      }
+    }
+    await arm(code, minimum); await shot('drops');
     assert.match(await page.locator('#armed-detail').innerText(), /Replayed .*Captured .*not live/);
     await page.locator('#offers .offer-action').first().focus(); await page.keyboard.press('Enter'); await visible('comparison');
     if (await page.locator('#flexibility-warning').isVisible()) await page.locator('#accept-reduced-flexibility').check();
@@ -80,14 +105,27 @@ try {
     assert.equal(mine.confirmation.reservationCreated, false); assert.equal(mine.confirmation.quoteModified, false); assert.equal(mine.confirmation.customerRefund, null);
     const theirs = await (await second.request.get(origin + '/api/booking-demo/q/' + code)).json();
     assert.equal(theirs.watch, null); assert.equal(theirs.confirmation, null);
+    const theirArm = await second.request.post(origin + '/api/booking-demo/q/' + code + '/watch', { headers: { Origin: origin, 'X-CSRF-Token': theirs.csrfToken },
+      data: { snapshotVersion: theirs.snapshotVersion, consent: true, minimumSavingMinor: minimum * 5, expectedRevision: 0 } });
+    assert.equal(theirArm.status(), 200);
+    const unchanged = await (await judge.request.get(origin + '/api/booking-demo/q/' + code)).json();
+    assert.deepEqual(unchanged.watch, mine.watch); assert.deepEqual(unchanged.confirmation, mine.confirmation);
     await closeServer(); await start(port); // Same cookie/origin, independent server state, same Firestore.
     await page.reload(); await visible('simulated-switch');
     const restored = await (await judge.request.get(origin + '/api/booking-demo/q/' + code)).json();
     assert.deepEqual(restored.watch, mine.watch); assert.deepEqual(restored.confirmation, mine.confirmation);
+    assert.equal((await (await second.request.get(origin + '/api/booking-demo/q/' + code)).json()).watch.minimumSavingMinor, minimum * 5);
     assert.ok(restored.conversation?.chatHistory.length, 'Durable conversation missing from bootstrap projection');
-    await arm(otherCode, 5000);
+    await arm(otherCode, otherMinimum);
     assert.deepEqual((await (await judge.request.get(origin + '/api/booking-demo/q/' + code)).json()).confirmation, mine.confirmation);
-    await arm(code, 25000); assert.equal(await page.locator('#offers .offer-ticket').count(), 0);
+    const beforeRearm = await (await judge.request.get(origin + '/api/booking-demo/q/' + code)).json();
+    const emptyMinimum = Math.max(25000, ...beforeRearm.options.map(option => option.indicativeDifferenceMinor + minimum));
+    const armed = await judge.request.post(origin + '/api/booking-demo/q/' + code + '/watch', { headers: { Origin: origin, 'X-CSRF-Token': beforeRearm.csrfToken },
+      data: { snapshotVersion: beforeRearm.snapshotVersion, consent: true, minimumSavingMinor: emptyMinimum, expectedRevision: beforeRearm.watch.revision } });
+    assert.equal(armed.status(), 200);
+    assert.deepEqual((await armed.json()).dropOptionIds, []);
+    await page.goto(origin + '/#drops-' + code); await page.reload(); await visible('armed-strip');
+    assert.equal(await page.locator('#offers .offer-ticket').count(), 0);
     const rearmed = await (await judge.request.get(origin + '/api/booking-demo/q/' + code)).json();
     assert.equal(rearmed.confirmation, null); await shot('empty');
     report.checks.push({ width, arm: 'passed', qualifyingDrops: 'passed', confirm: 'passed', restart: 'passed', context: 'passed', isolation: 'passed', rearm: 'passed' });

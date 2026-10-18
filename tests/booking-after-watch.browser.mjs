@@ -25,20 +25,13 @@ const advisor = { available: true, status: 'test-injected', chat: async request 
 const server = createBookingDemoServer({ catalogue, advisor, now: () => new Date('2026-10-20T00:00:00Z') });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const origin = 'http://127.0.0.1:' + server.address().port;
-const report = { status: 'started', storage: 'memory-receipt-seam', integratedFirestoreBrowser: 'blocked-awaiting-Part-1',
-  armRequestAdapter: 'test-only: removes expectedRevision for the legacy non-revisioned base server; v3 revision checks have separate proof',
+const report = { status: 'started', storage: 'test-memory-session-with-actual-v3-arm', integratedFirestoreBrowser: 'separate-gate',
   checks: [], errors: [], external: [], screenshots: [] };
 try {
   for (const width of [320, 768, 1024, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 1000 }, reducedMotion: 'reduce' });
     await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue()
       : (report.external.push(route.request().url()), route.abort()));
-    // The owned UI now sends the v3 field; the untouched Part 1 base branch predates it.
-    await context.route('**/api/booking-demo/q/*/watch', route => {
-      const { expectedRevision, ...legacyBody } = route.request().postDataJSON();
-      assert.equal(expectedRevision, 0); // These legacy receipts have no revision.
-      return route.continue({ postData: JSON.stringify(legacyBody) });
-    });
     const page = await context.newPage();
     page.on('pageerror', error => report.errors.push(error.message));
     const visible = id => page.locator('#' + id).waitFor({ state: 'visible' });

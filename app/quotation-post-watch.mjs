@@ -18,12 +18,13 @@ function validateAdvice(body, chat) {
       || (body.pageContext === 'drop-detail' && typeof body.optionId !== 'string')))) throw actionError('INVALID_ADVICE', 400);
 }
 // Owns only confirm/advice/chat. GET and the atomic arm continue to belong to Part 1.
-export function createPostWatchHandler({ sessionStorage, bookingStorage, bundles, now, advisor }) {
+export function createPostWatchHandler({ sessionStorage, bookingStorage, bundles, loadBinding, now, advisor }) {
   const actions = createSessionActions({ sessionStorage, now });
   let adviceWindow = 0, adviceCount = 0, pending = 0;
   return async ({ req, res, code, action, cookie, origin, json, error }) => {
     try {
-      if (!bundles.has(code)) return error(404, 'BOOKING_UNAVAILABLE');
+      const loaded = loadBinding ? await loadBinding(code) : bundles.get(code);
+      if (!loaded) return error(404, 'BOOKING_UNAVAILABLE');
       if (!cookie || req.headers.origin !== origin || req.headers['sec-fetch-site'] === 'cross-site') return error(403, 'DEMO_SESSION_REQUIRED');
       const session = await sessionStorage.get(cookie);
       if (!session || session.expiresAt <= now().getTime() || req.headers['x-csrf-token'] !== session.csrfToken) return error(403, 'DEMO_SESSION_REQUIRED');
@@ -33,13 +34,16 @@ export function createPostWatchHandler({ sessionStorage, bookingStorage, bundles
       let body;
       try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return error(400, 'INVALID_SELECTION'); }
       if (!body || Array.isArray(body) || typeof body !== 'object') return error(400, 'INVALID_SELECTION');
+      if (!session.byCode?.[code]?.watch) return error(409, 'WATCH_NOT_ARMED');
       const readBundle = async () => {
         const record = await bookingStorage.getBooking(code);
-        const loaded = bundles.get(code);
         const expectedContent = loaded.contentVersion ?? loaded.snapshotVersion;
         if (!record || record.contentVersion !== expectedContent
           || (loaded.dropSetVersion !== undefined && record.dropSetVersion !== loaded.dropSetVersion)) throw actionError('DROPS_CHANGED');
-        const captured = await bookingStorage.getDrops(code, { dropSetVersion: record.dropSetVersion });
+        const captured = typeof bookingStorage.getDrops === 'function'
+          ? await bookingStorage.getDrops(code, { dropSetVersion: record.dropSetVersion })
+          : { dropSetVersion: record.dropSetVersion, captureStatus: record.capture?.status,
+            capturedAt: record.capture?.capturedAt, drops: record.bundle.options };
         if (!['observed', 'observed-empty'].includes(captured.captureStatus) || !Array.isArray(captured.drops)) throw actionError('CAPTURE_UNAVAILABLE', 503);
         if (captured.dropSetVersion !== record.dropSetVersion) throw actionError('DROPS_CHANGED');
         return { ...record.bundle, options: captured.drops, contentVersion: record.contentVersion, dropSetVersion: record.dropSetVersion };

@@ -1,0 +1,297 @@
+{
+  "description": "Synthetic, sanitised test fixture. Booking facts copy the allowlisted display facts of AIRB000179/AIRB000180; the three Drops, their option ids and every privateReferences value are invented test data, not captures.",
+  "schemaVersion": 1,
+  "preparedAt": "2026-10-18T12:10:00.000Z",
+  "entries": [
+    {
+      "code": "AIRB000180",
+      "blocker": null,
+      "capture": {
+        "status": "observed",
+        "checkedAt": "2026-10-18T12:10:00.000Z",
+        "offerCount": 3,
+        "optionCount": 3,
+        "searchDefaults": {
+          "nationality": "my",
+          "countryResidence": "my",
+          "occupancy": "agency-default-adults-only",
+          "source": "agency-default"
+        }
+      },
+      "bundle": {
+        "schemaVersion": 1,
+        "transactionMode": "selection-only",
+        "baseline": {
+          "sourceType": "quotation",
+          "quotationCode": "AIRB000180",
+          "source": {
+            "system": "altovo-staging",
+            "tenantHost": "air1.app.altovostaging.com",
+            "readAt": "2026-10-18"
+          },
+          "hotel": {
+            "id": "3135840",
+            "name": "Siam Kempinski Hotel Bangkok",
+            "star": 5,
+            "cityCode": "BKK",
+            "countryCode": "TH"
+          },
+          "stay": {
+            "checkin": "2027-02-17",
+            "checkout": "2027-02-18"
+          },
+          "occupancy": {
+            "adults": 1,
+            "childAges": [],
+            "infantAges": []
+          },
+          "occupancySource": "agency-default-adults-only",
+          "room": {
+            "name": "Executive Suite",
+            "board": "Breakfast"
+          },
+          "notSupplied": [
+            "nationality",
+            "countryResidence",
+            "childAges",
+            "adultChildSplit"
+          ],
+          "quotedRetail": {
+            "totalMinor": 233552,
+            "currency": "MYR"
+          },
+          "quotedSource": {
+            "totalMinor": 57381,
+            "currency": "USD"
+          },
+          "fx": {
+            "from": "USD",
+            "to": "MYR",
+            "rate": "4.0702006077",
+            "source": "quotation"
+          },
+          "searchContext": {
+            "nationality": "my",
+            "countryResidence": "my"
+          },
+          "searchContextSource": "agency-default",
+          "freeCancellation": true,
+          "cancellationDeadline": "2027-02-14T16:58:59.000Z",
+          "cancellation": {
+            "status": "known",
+            "nonRefundable": false,
+            "freeUntil": "2027-02-14T16:58:59.000Z",
+            "currency": "MYR",
+            "schedule": [
+              {
+                "fromUtc": "2026-10-18T11:03:18.256Z",
+                "toUtc": "2027-02-14T16:58:59.000Z",
+                "penaltyMinor": 0
+              },
+              {
+                "fromUtc": "2027-02-14T16:58:59.000Z",
+                "toUtc": "2027-02-17T16:59:59.000Z",
+                "penaltyMinor": 233552
+              }
+            ]
+          }
+        },
+        "options": [
+          {
+            "optionId": "option-fixture-flex-suite",
+            "roomName": "Executive Suite (fixture rate)",
+            "board": "Breakfast",
+            "freeCancellation": true,
+            "cancellationDeadline": "2027-02-14T16:58:59Z",
+            "termsVerified": false,
+            "sourcePrice": {
+              "amount": "562.75",
+              "currency": "USD"
+            },
+            "estimate": {
+              "totalMinor": 229051,
+              "currency": "MYR",
+              "isEstimate": true,
+              "basis": "quotation-fx-before-final-pricing-and-fees"
+            },
+            "indicativeDifferenceMinor": 4501
+          },
+          {
+            "optionId": "option-fixture-final-deluxe",
+            "roomName": "Deluxe Room (fixture rate)",
+            "board": "Breakfast",
+            "freeCancellation": false,
+            "cancellationDeadline": null,
+            "termsVerified": false,
+            "sourcePrice": {
+              "amount": "544.00",
+              "currency": "USD"
+            },
+            "estimate": {
+              "totalMinor": 221419,
+              "currency": "MYR",
+              "isEstimate": true,
+              "basis": "quotation-fx-before-final-pricing-and-fees"
+            },
+            "indicativeDifferenceMinor": 12133
+          },
+          {
+            "optionId": "option-fixture-flex-premier",
+            "roomName": "Premier Room (fixture rate)",
+            "board": "Room only",
+            "freeCancellation": true,
+            "cancellationDeadline": "2027-02-10T16:59:59Z",
+            "termsVerified": false,
+            "sourcePrice": {
+              "amount": "517.00",
+              "currency": "USD"
+            },
+            "estimate": {
+              "totalMinor": 210429,
+              "currency": "MYR",
+              "isEstimate": true,
+              "basis": "quotation-fx-before-final-pricing-and-fees"
+            },
+            "indicativeDifferenceMinor": 23123
+          }
+        ],
+        "checkedAt": "2026-10-18T12:10:00.000Z",
+        "completeness": "observed-options-only",
+        "customerRefund": null,
+        "reservationCreated": false,
+        "snapshotVersion": "33a59973344f5deedb1bac2b19b30858904a18c9251e251f31190560ccc94915",
+        "privateReferences": {
+          "option-fixture-flex-suite": {
+            "gatewayRequestId": "fixture-request",
+            "rateDetail": "FIXTURE-PRIVATE-option-fixture-flex-suite",
+            "sourceId": "fixture-source",
+            "supplierCode": "FIXTURE",
+            "contractId": "fixture-contract"
+          },
+          "option-fixture-final-deluxe": {
+            "gatewayRequestId": "fixture-request",
+            "rateDetail": "FIXTURE-PRIVATE-option-fixture-final-deluxe",
+            "sourceId": "fixture-source",
+            "supplierCode": "FIXTURE",
+            "contractId": "fixture-contract"
+          },
+          "option-fixture-flex-premier": {
+            "gatewayRequestId": "fixture-request",
+            "rateDetail": "FIXTURE-PRIVATE-option-fixture-flex-premier",
+            "sourceId": "fixture-source",
+            "supplierCode": "FIXTURE",
+            "contractId": "fixture-contract"
+          }
+        }
+      }
+    },
+    {
+      "code": "AIRB000179",
+      "blocker": "NON_REFUNDABLE",
+      "capture": {
+        "status": "not-searched",
+        "reason": "NON_REFUNDABLE"
+      },
+      "bundle": {
+        "schemaVersion": 1,
+        "transactionMode": "selection-only",
+        "baseline": {
+          "sourceType": "quotation",
+          "quotationCode": "AIRB000179",
+          "source": {
+            "system": "altovo-staging",
+            "tenantHost": "air1.app.altovostaging.com",
+            "readAt": "2026-10-18"
+          },
+          "hotel": {
+            "id": "5232813",
+            "name": "Grand Hyatt Kuala Lumpur",
+            "star": 5,
+            "cityCode": "KUL",
+            "countryCode": "MY"
+          },
+          "stay": {
+            "checkin": "2026-11-18",
+            "checkout": "2026-11-19"
+          },
+          "occupancy": {
+            "adults": 1,
+            "childAges": [],
+            "infantAges": []
+          },
+          "occupancySource": "agency-default-adults-only",
+          "room": {
+            "name": "Azri Room",
+            "board": "Breakfast"
+          },
+          "notSupplied": [
+            "nationality",
+            "countryResidence",
+            "childAges",
+            "adultChildSplit"
+          ],
+          "quotedRetail": {
+            "totalMinor": 32305,
+            "currency": "MYR"
+          },
+          "quotedSource": {
+            "totalMinor": 7937,
+            "currency": "USD"
+          },
+          "fx": {
+            "from": "USD",
+            "to": "MYR",
+            "rate": "4.0702006077",
+            "source": "quotation"
+          },
+          "searchContext": {
+            "nationality": "my",
+            "countryResidence": "my"
+          },
+          "searchContextSource": "agency-default",
+          "freeCancellation": false,
+          "cancellationDeadline": null,
+          "cancellation": {
+            "status": "known",
+            "nonRefundable": true,
+            "freeUntil": null,
+            "currency": "MYR",
+            "schedule": [
+              {
+                "fromUtc": "2026-10-18T00:00:00.000Z",
+                "toUtc": "2026-11-18T23:59:59.000Z",
+                "penaltyMinor": 32305
+              }
+            ]
+          }
+        },
+        "options": [],
+        "checkedAt": "2026-10-18T12:10:00.000Z",
+        "completeness": "no-search-watch-cannot-start",
+        "customerRefund": null,
+        "reservationCreated": false,
+        "snapshotVersion": "0cbda293460e3b2836c48f0f9e934cf0a814eafee408e88fac26d3b444f11459",
+        "privateReferences": {}
+      }
+    }
+  ],
+  "cards": [
+    {
+      "code": "AIRB000180",
+      "order": 1,
+      "cityName": "Bangkok",
+      "scenarioLabel": "Free cancellation",
+      "photo": {
+        "asset": "assets/illustrative-stays.jpg",
+        "alt": "Illustrative hotel stay (not this hotel)"
+      }
+    },
+    {
+      "code": "AIRB000179",
+      "order": 2,
+      "cityName": "Kuala Lumpur",
+      "scenarioLabel": "Non-refundable",
+      "photo": null
+    }
+  ]
+}

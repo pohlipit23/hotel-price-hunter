@@ -30,11 +30,9 @@ test('test-injected booking context closes all runtime imports and packages only
   const input = resolve(root, '.local', `part2-package-${randomUUID()}.json`);
   const pins = { schemaVersion: 1, entries: [{ code: 'AIRB000180', contentVersion: altovoCatalogueFixture().entries[0].bundle.snapshotVersion, dropSetVersion: 'capture-v1' }] };
   await mkdir(dirname(input), { recursive: true }); await writeFile(input, JSON.stringify(pins));
-  // Only test artifacts get source doubles, explicitly marked and excluded from registry tags.
-  const doubles = { 'app/booking-storage.mjs': 'export async function createRoomdropFirestore() { throw Error("Test source double"); } export function createBookingStorage() { throw Error("Test source double"); }',
-    'app/quotation-session-storage.mjs': 'export function createFirestoreSessionStorage() { throw Error("Test source double"); }' };
+  // This explicit working-tree source injection is test-only and has no registry tag.
   const result = await main(['--prepare', `--source=${source}`, `--manifest=${input}`], {
-    readSource: async name => Object.hasOwn(doubles, name) ? doubles[name] : readFile(resolve(root, name)),
+    readSource: name => readFile(resolve(root, name)),
   });
   assert.equal(result.status, 'test-prepared-offline');
   const manifest = JSON.parse(await readFile(result.manifestPath, 'utf8'));
@@ -69,7 +67,8 @@ test('test-injected booking context closes all runtime imports and packages only
   const post = (action, body) => fetch(origin + '/api/booking-demo/q/AIRB000180/' + action, { method: 'POST', headers, body: JSON.stringify(body) });
   const watch = await post('watch', { snapshotVersion: data.snapshotVersion, consent: true, minimumSavingMinor: 1000 });
   assert.equal(watch.status, 200);
-  const confirmation = await post('confirm', { snapshotVersion: data.snapshotVersion, optionId: 'option-fixture-flex-premier', acceptedDemoOnly: true });
+  const committed = await watch.json();
+  const confirmation = await post('confirm', { snapshotVersion: data.snapshotVersion, watchBinding: JSON.stringify(committed.watch), optionId: 'option-fixture-flex-premier', acceptedDemoOnly: true });
   assert.equal(confirmation.status, 200); assert.equal((await confirmation.json()).confirmation.reservationCreated, false);
   for (const asset of ['/booking-live.js', '/booking-live-data.js', '/stay-advice.js']) assert.equal((await fetch(origin + asset)).status, 200);
   assert.equal((await fetch(origin + '/api/import')).status, 404);

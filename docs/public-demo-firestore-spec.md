@@ -312,6 +312,13 @@ not a branch merge or acceptance of the unfinished GET/watch integration.
 
 #### Part 2 contract v3 follow-up
 
+Integration authority update: the user authorised merging Part 1 at `d14f70f`
+into the Part 2 worktree, preserving its storage modules and atomic arm unchanged.
+F9a/F10a now belong to Codex. Claude retains F6/F7a setup screens and F11a
+evidence, with further integration requiring another go-ahead. The reviewed real
+catalogue may be imported only into `demo-roomdrop-part2` at `127.0.0.1:8281`.
+No push, deployment, production import or upstream live call is authorised.
+
 The arm body now sends `expectedRevision: data.watch?.revision ?? 0`, as requested
 by Part 1. A stale response preserves the committed receipt and asks the judge to
 reload the latest setup; catalogue/runtime unavailability stays on setup without
@@ -353,7 +360,8 @@ Never split this transaction, report a fake success or add another customer step
 or delay. Missing or malformed capture data fails without a commit (unavailable),
 which is distinct from a valid committed empty replay.
 
-Current code (memory-backed, unreviewed base-snapshot work, not Firestore):
+Base-snapshot code before F4a/F5a (memory-backed, superseded; see "Arm route as
+implemented" below):
 
 - Route: `POST /api/booking-demo/q/<code>/watch`, allowlisted in
   `app\booking-demo-server.mjs` (`bookingApi`) and served by
@@ -412,6 +420,138 @@ only authority for qualifying Drops, replay labels and membership. Part 2 must n
 change the arm request, transaction, error codes or receipt fields without
 coordinating with Part 1 and recording the change here; it may add its own fields
 outside `watch` (for example confirmation and context under `byCode[code]`).
+
+#### Storage seam (F2 and F3a, implemented 18 October 2026)
+
+These signatures implement the orchestrator contract
+`.local\roomdrop-part1-interfaces.md` draft v1. Error `.code` values are binding.
+
+`app\booking-storage.mjs` holds the shared, create-only catalogue records. Part 2
+only reads them.
+
+```js
+createBookingStorage({ firestore, prefix = 'roomdrop' })
+// Collections: `${prefix}BookingsV1/{code}`, `.../dropSets/{000001..}`, `.../drops/{dropId}`.
+listCatalogue()
+// -> [{ code, order, contentVersion, dropSetVersion, card: { order, cityName, scenarioLabel, photo } }]
+//    ordered by card.order, at most 20 entries.
+getBooking(code)
+// -> { code, contentVersion, dropSetVersion, bundle, capture: { status, capturedAt } } | null
+//    null for a malformed or unknown code; no lookup runs for a malformed code.
+//    bundle = { schemaVersion: 1, snapshotVersion: contentVersion, transactionMode: 'selection-only',
+//    baseline, options (the current Drop set, ranked), checkedAt, completeness, customerRefund: null,
+//    reservationCreated: false }. It has no privateReferences; hosted mode wraps it as selection-only.
+//    capture.status is 'observed' | 'observed-empty' | 'not-searched'.
+getDrops(code, { dropSetVersion } = {})
+// -> { dropSetVersion, captureStatus: 'observed' | 'observed-empty', capturedAt, drops: [option facts] }
+//    throws CAPTURE_UNAVAILABLE (not-searched, or a missing/mismatched Drop document),
+//    DROP_SET_CHANGED (a given dropSetVersion is not the current one),
+//    BOOKING_UNAVAILABLE (malformed or unknown code; an addition to contract v1).
+importBundle(input, { execute = false, now } = {})
+// Admin/importer only. input = { schemaVersion: 1, entries: [{ code, blocker, capture, bundle }], cards: [...] }.
+// -> { mode: 'dry-run' | 'executed', importedAt?, entries: [{ code, contentVersion, dropSetVersion,
+//      captureStatus, dropCount, result: 'validated' | 'created' | 'unchanged' | 'drop-set-added' }] }
+// One transaction for the whole input. Error codes: BOOKING_CHANGED, DROP_CONFLICT, DROP_DUPLICATE,
+// CAPTURE_MISSING, CAPTURE_MISMATCH, BUNDLE_INTEGRITY_FAILED, BUNDLE_INVALID, CARD_INVALID,
+// CATALOGUE_INVALID, PRIVATE_FIELD_REJECTED, VISITOR_STATE_REJECTED, DROP_SET_LIMIT, STORAGE_UNAVAILABLE.
+loadHostedCatalogue(bookingStorage)
+// -> { entries: [{ code, contentVersion, dropSetVersion, bundle }] }; throws CATALOGUE_UNAVAILABLE.
+createRoomdropFirestore(environment = process.env)
+// Server client with the app/storage.mjs guards: Firestore only, and the emulator only on loopback
+// outside Cloud Run/production.
+```
+
+`contentVersion` is the SHA-256 of the key-sorted booking record (code, baseline,
+card). A changed card label is therefore also `BOOKING_CHANGED`. `dropSetVersion`
+hashes the capture record, the Drop facts in rank order, and the content version.
+Import timestamps are excluded from both. A later capture adds the next
+`dropSets` sequence. Earlier Drop and Drop-set documents are never rewritten, and
+the current set is the highest sequence. `snapshotVersion` in the arm request is
+compared with `contentVersion`. The session entry also binds `dropSetVersion`.
+
+`app\quotation-session-storage.mjs` holds the judges' private sessions:
+
+```js
+createFirestoreSessionStorage({ firestore, now, prefix = 'roomdrop', maxSessions = 64, ttlMs = 3_600_000, catalogueCodes = null })
+createMemorySessionStorage({ now, maxSessions, ttlMs, catalogueCodes, environment = process.env })
+// The memory adapter is for tests and loopback runs only. It throws under NODE_ENV=production,
+// K_SERVICE or CLOUD_RUN_JOB.
+// Both return { mode, create(), get(cookieValue), transact(cookieValue, fn) }:
+create()               // -> { cookieValue, session }; throws SESSION_CAPACITY, STORAGE_UNAVAILABLE
+get(cookieValue)       // -> session | null (malformed, unknown or expired); throws STORAGE_UNAVAILABLE
+transact(cookieValue, fn)
+// One transaction. fn(session) mutates a private copy in place, synchronously, and returns a result.
+// The result resolves only after the commit. Firestore may run fn more than once on retry, so fn
+// must be pure: no network, Gemini or Firestore calls. Errors thrown by fn propagate unchanged and
+// commit nothing. Throws DEMO_SESSION_REQUIRED (malformed, missing or expired), STORAGE_UNAVAILABLE,
+// BOOKING_UNAVAILABLE (a byCode key outside catalogueCodes), and SESSION_STATE_INVALID (csrfToken or
+// expiresAt changed, more than 20 codes, an entry without 64-hex versions, an async fn, or over 200 kB).
+codeScope(session, code, { contentVersion, dropSetVersion })
+// -> session.byCode[code], created as { contentVersion, dropSetVersion, watch: null } if absent.
+// If the stored versions differ, it rebinds them and resets only `watch`. Throws BOOKING_UNAVAILABLE
+// for a malformed code and SESSION_STATE_INVALID for malformed versions.
+```
+
+A session is `{ csrfToken, expiresAt (epoch ms), byCode }`, stored at
+`${prefix}PublicSessionsV1/{sha256(cookieValue)}`. The document also holds a
+hidden `ttlAt` timestamp for a TTL policy that needs separate approval. The raw
+cookie value is never stored. Capacity is counted in one shared document,
+`${prefix}PublicSessionsV1Capacity/live`, inside the create transaction.
+Expired sessions listed there are deleted in that same transaction. Values must
+be JSON data. Every write keeps fields Part 1 does not own. Part 2 (F3b) adds its
+fields through `transact`, using its own helper next to `codeScope`, and never
+writes `watch`.
+
+#### Arm route as implemented (F4a and F5a, 18 October 2026)
+
+Server factories take injected storage: `createBookingDemoServer`,
+`createQuotationDemoServer` and `createHostedQuotationDemoServer` accept
+`{ bookingStorage, sessionStorage }` in place of `bundle`/`snapshot`/`catalogue`.
+Hosted mode requires `sessionStorage.mode === 'firestore'`. Locally a missing
+`sessionStorage` defaults to the memory adapter. A file catalogue still works
+through the same read interface, with memory sessions. The packaged hosted file
+catalogue keeps its existing process-local sessions until F9a.
+
+- The manifest (`listCatalogue`) is read on first use and retried after a
+  failure. A code outside it is `404 BOOKING_UNAVAILABLE` without any lookup.
+  Each request then re-reads `getBooking(code)`, so a new Drop set is seen at once.
+- `GET /api/booking-demo/catalogue`: entries as before, plus
+  `card: { order, cityName, scenarioLabel, photo } | null`.
+- `GET /api/booking-demo/q/<code>`: as before, plus `dropSetVersion` and
+  `capture: { status, capturedAt }`. `watch` is this session's committed receipt
+  only while it is bound to the current content and Drop-set versions, else `null`.
+- `POST /api/booking-demo/q/<code>/watch`: body keys `snapshotVersion`, `consent`,
+  `minimumSavingMinor` and optional `expectedRevision`. A missing
+  `expectedRevision` means 0 (a first arm): a re-arm must send the current
+  `watch.revision`. The booking is read before the transaction, then
+  `armDropWatch` (`app\domain\booking-drop-watch.mjs`) runs inside one
+  `sessionStorage.transact`, in this order:
+  1. snapshot check;
+  2. identical retry;
+  3. revision staleness;
+  4. eligibility at the request time;
+  5. capture validity;
+  6. replay and commit.
+
+  The receipt is sent only after the commit.
+- An identical retry is the same minimum with `expectedRevision` equal to the
+  committed revision or the one before it. It returns the committed receipt
+  unchanged. A new minimum on the current revision creates revision + 1. A new
+  Drop set or content version resets the watch, and the revision then starts at 1.
+- Receipt: exactly the proposed shape above, plus one additive field,
+  `watch.firstCheck.captureStatus` (`observed` or `observed-empty`). It tells an
+  empty search apart from offers that did not qualify.
+  `watch.consent.version` is `roomdrop-drop-watch-consent-2026-10-18`.
+- Errors as listed above, plus `503 CATALOGUE_UNAVAILABLE` (manifest or catalogue
+  unreadable) and `503 DEMO_UNAVAILABLE` (any other storage failure, no SDK
+  detail). A capture that is missing, `not-searched` on an armable booking, or
+  malformed is `503 CAPTURE_UNAVAILABLE` with no commit. Malformed includes a
+  Drop not priced in the booking currency, a missing capture time and an empty
+  capture that holds Drops. A valid `observed` or `observed-empty` capture with no
+  qualifying Drop commits a completed replay with `dropOptionIds: []`.
+- The confirm, advice and chat branches read the armed watch from the durable
+  session. Their own confirmation, history and rate-limit state stays
+  process-local until Part 2 (F4b) moves it into `transact`.
 
 ### Ownership
 

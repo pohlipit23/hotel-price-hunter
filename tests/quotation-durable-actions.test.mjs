@@ -14,7 +14,7 @@ async function app(t, { advisor, retry = false } = {}) {
   const sessions = new Map([[cookie, { csrfToken: 'durable-csrf', expiresAt: at.getTime() + 3600000,
     byCode: { [code]: { contentVersion: bundle.snapshotVersion, dropSetVersion: watch.dropSetVersion, watch } } }]]);
   let unavailable = false, inTransaction = false;
-  const sessionStorage = { get: async id => { if (unavailable) throw Error('PRIVATE-storage'); return structuredClone(sessions.get(id)); },
+  const sessionStorage = { create: async () => assert.fail('Seeded action test must not allocate sessions'), get: async id => { if (unavailable) throw Error('PRIVATE-storage'); return structuredClone(sessions.get(id)); },
     transact: async (id, fn) => {
       if (unavailable) throw Error('PRIVATE-storage');
       inTransaction = true;
@@ -23,7 +23,7 @@ async function app(t, { advisor, retry = false } = {}) {
       } finally { inTransaction = false; }
     } };
   const record = { code, contentVersion: bundle.snapshotVersion, dropSetVersion: watch.dropSetVersion, bundle };
-  const bookingStorage = { getBooking: async () => record,
+  const bookingStorage = { listCatalogue: async () => [{ code }], getBooking: async () => record,
     getDrops: async () => ({ dropSetVersion: record.dropSetVersion, captureStatus: 'observed', capturedAt: bundle.checkedAt, drops: bundle.options }) };
   const server = createBookingDemoServer({ reviewedCatalogue: { entries: [{ ...entry, contentVersion: record.contentVersion, dropSetVersion: record.dropSetVersion }] }, sessionStorage, bookingStorage,
     advisor, now: () => new Date(at) });
@@ -100,14 +100,14 @@ test('Firestore durable HTTP: independent instances recover receipts/context wit
   const run = async db => {
     const docs = db.collection(collection);
     // Contract-v1 adapter double: real Firestore authority, test-owned documents, no allocation or arm implementation.
-    const sessionStorage = { get: async cookie => { const doc = await docs.doc(hash(cookie)).get(); return doc.exists ? doc.data() : null; },
+    const sessionStorage = { create: async () => assert.fail('Seeded action test must not allocate sessions'), get: async cookie => { const doc = await docs.doc(hash(cookie)).get(); return doc.exists ? doc.data() : null; },
       transact: (cookie, fn) => db.runTransaction(async transaction => {
         const ref = docs.doc(hash(cookie)), snapshot = await transaction.get(ref);
         const value = snapshot.exists ? snapshot.data() : null;
         if (!value || value.expiresAt <= at.getTime()) throw Object.assign(Error('Expired'), { code: 'DEMO_SESSION_REQUIRED' });
         const result = fn(value); assert.equal(result instanceof Promise, false); transaction.set(ref, value); return result;
       }) };
-    const bookingStorage = { getBooking: async () => (await docs.doc('booking').get()).data(), getDrops: async () => (await docs.doc('drops').get()).data() };
+    const bookingStorage = { listCatalogue: async () => [{ code }], getBooking: async () => (await docs.doc('booking').get()).data(), getDrops: async () => (await docs.doc('drops').get()).data() };
     const advisor = { available: true, status: 'test-injected', chat: async input => { requests.push(input); return { reply: 'Injected durable comparison' }; } };
     const server = createBookingDemoServer({ reviewedCatalogue: { entries: [{ code, bundle, contentVersion: record.contentVersion, dropSetVersion: record.dropSetVersion }] }, sessionStorage, bookingStorage, advisor, now: () => new Date(at) });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); servers.push(server);

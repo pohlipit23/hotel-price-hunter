@@ -42,25 +42,43 @@ grants no new live-call allowance; each step marked LIVE needs separate explicit
 user approval before it runs. Never change Altovo code/settings, call
 confirm-quote, create supplier bookings or commit `.local\`.
 
-- [ ] S0.1 Inspect the two existing projections first (AIRB000179, AIRB000180
+- [x] S0.1 Inspect the two existing projections first (AIRB000179, AIRB000180
   under ignored `.local\altovo-sample\`): allowlisted keys, cancellation schedule,
   provenance and which scenario slots they fill. Record the remaining scenario
   gaps before requesting any creation or capture. Local only, no live call.
-- [ ] S0.2 Quotation creation by the owner (OWNER, LIVE staging UI): the owner
+  Done 18 Oct: AIRB000180 fills refundable/armable (Drops still missing),
+  AIRB000179 fills non-refundable/cannot-start; closing-soon and currency/board
+  variety remain gaps. Needs for S0.2 recorded in the verification doc, Part 1 S0.1.
+- [x] S0.2 Quotation creation by the owner (OWNER, LIVE staging UI): the owner
   creates the missing air1 quotations to fill the recorded gaps; quotations stay
   `status='quote'`. Record the approved air1 code list as tenant provenance.
-- [ ] S0.3 Sanitised projection capture (LIVE, separate approval): owner-run,
+  Done 18 Oct (user-approved): AIRB000181 to AIRB000184 created; approved code
+  list AIRB000179 to AIRB000184. Verification doc, Part 1 S0.2 to S0.4.
+- [x] S0.3 Sanitised projection capture (LIVE, separate approval): owner-run,
   dry-run by default, through `scripts\prepare-altovo-catalogue.mjs`; keep only
   allowlisted fields, never tokens or raw responses. Evidence stays in `.local\`.
-- [ ] S0.4 Matching per-quotation Gateway Drop capture (LIVE, separate approval):
+  Done 18 Oct: projections for 181 to 184 captured in the owner's browser with
+  in-page allowlisting; no token or raw body left the page. Hashes recorded.
+- [x] S0.4 Matching per-quotation Gateway Drop capture (LIVE, separate approval):
   one bounded Gateway search per refundable quotation with a baseline built from
   its projection and `my`/`my` adults-only agency defaults recorded as such.
   Distinguish a valid zero-result capture from a missing/failed one.
+  Done 18 Oct: one run, 5 calls (login + 4 searches, all 200, no retries);
+  180 to 183 observed with 3 Drops each; 179 and 184 not-searched
+  (NON_REFUNDABLE). Still missing: closing soon within days, a non-MYR currency,
+  more than one night, more than one adult. 181's best Drops are room only
+  against a breakfast baseline.
 - [ ] S0.5 Photo/scenario metadata: reviewed local photo assets, card ordering,
   city and scenario labels supplied as curated facts, not invented metadata.
-- [ ] S0.6 Guarded Firestore import: emulator import through the F2 importer
+  Pending the owner. Only a provisional draft exists (ignored
+  `.local\cards-draft.json`, `photo: null`, labels and order unreviewed).
+- [x] S0.6 Guarded Firestore import: emulator import through the F2 importer
   (local, test-owned data); a production Firestore import is a separate LIVE step
   requiring explicit approval and is not part of Part 1 acceptance.
+  Done 18 Oct: all six real captures, with the provisional cards, imported into
+  the Part 1 emulator (dry run, then execute, then an identical retry that
+  returned `unchanged`). Read back with `loadHostedCatalogue` and `getDrops`.
+  The import must be redone if the S0.5 review changes a card.
 - Verify: per-code bundle validation via F1/F2, coverage matrix of scenario slots
   versus captured evidence, `.local\` ignore checks. Two samples prove mechanics
   only; the six-entry matrix stays open until supplied and captured.
@@ -68,24 +86,30 @@ confirm-quote, create supplier bookings or commit `.local\`.
 
 ### F0: Audit available captures and existing scaffolding
 
-- [ ] Acceptance: inventory the two ignored air1 projections, any captured Gateway
+- [x] Acceptance: inventory the two ignored air1 projections, any captured Gateway
   results, concurrent catalogue/runtime/UI changes and their ownership, and the remaining
   six-card scenario needs. Record source/tenant provenance and missing evidence
   without printing private payloads or changing current application behavior.
 - Verify: local schema/key/provenance inspection, `.local\` ignore checks and
   capture integrity hashes. No live call or Firestore write.
+- Evidence: verification doc, Part 1 F0 (18 Oct): key/provenance inventory,
+  SHA-256 of both projections and the unrelated 16 Oct Gateway files, ignore
+  checks, scaffolding gaps; no Gateway capture exists for either curated code.
 - Depends on: plan approval (given 18 October 2026). Small, two documentation files:
   `docs\public-demo-firestore-verification.md`, `tasks\todo.md`.
 
 ### F1: Validate the Altovo catalogue adapter and capture preparation
 
-- [ ] Acceptance: review/extend existing scaffolding for the actual projection
+- [x] Acceptance: review/extend existing scaffolding for the actual projection
   shape, UTC cancellation schedules and explicit agency search defaults. Prepare
   display-safe per-code bundles/card metadata; private supplier/raw fields remain
   private. Dry-run performs no upstream calls; live capture remains separately gated.
 - Verify: `node --test .\tests\altovo-catalogue.test.mjs` with sanitised fixtures
   and injected Gateway responses, covering sentinel/naive/conflicting deadlines,
   missing facts, money/currency bindings, cannot-start and valid-empty captures.
+- Evidence: commit 4393134; 15 tests in the new file pass (28 with the adapter
+  and catalogue suites). Preparation now needs `--approved-codes`, dry-runs by
+  default with no upstream call or write, and records per-code capture status.
 - Depends on: F0. Medium, three files: `app\domain\altovo-quotation.mjs`,
   `scripts\prepare-altovo-catalogue.mjs`, `tests\altovo-catalogue.test.mjs`.
 
@@ -94,11 +118,15 @@ confirm-quote, create supplier bookings or commit `.local\`.
 Shared storage foundation: Part 2 reads Drops through this module and does not
 write shared booking/Drop records.
 
-- [ ] Acceptance: default-dry-run importer creates reviewed air1 booking records
+- [x] Acceptance: default-dry-run importer creates reviewed air1 booking records
   and captured Drops, with explicit manifest/card metadata. Identical concurrent
   import replays safely; changed facts return `BOOKING_CHANGED`. Publish no partial
   bundle, duplicate Drop or missing-capture-as-empty result. No visitor choices
   appear on shared records; no other data is changed.
+- Evidence: commit a9f42d9; verification doc, Part 1 F2. 11 tests in the new file
+  pass against the emulator with two clients. The read API is documented in the
+  spec seam section. Only the synthetic fixture has been imported so far; real
+  reviewed captures stay with S0.3 to S0.6.
 - Verify: `node --test .\tests\booking-storage.test.mjs` against two emulator
   clients; include private-field rejection, interrupted import, conflict, content
   versions and code/capture mismatch. Confirm only test-owned documents change.
@@ -109,19 +137,26 @@ write shared booking/Drop records.
 
 ### Checkpoint F0-F2: Validated catalogue storage
 
-- [ ] Adapter/import tests pass with the emulator. Raw responses, source tokens,
+- [x] Adapter/import tests pass with the emulator. Raw responses, source tokens,
   supplier references and `.local\` captures are absent from tracked fixtures.
-- [ ] Coverage reports distinguish two source projections, actual captured Drops
+  (18 Oct: 41/41 pass against the emulator; the fixtures hold only synthetic
+  placeholder references.)
+- [x] Coverage reports distinguish two source projections, actual captured Drops
   and remaining owner-created catalogue entries. No additional live calls implied.
+  (18 Oct: verification doc, Part 1 S0.2 to S0.4 coverage table: six projections,
+  Drops captured for 180 to 183, and the scenario slots still missing.)
 
 ### F3a: Persist isolated sessions and the per-code watch entry (Part 1 of F3)
 
-- [ ] Acceptance: hashed cookie-keyed sessions retain one-hour expiry, CSRF and
+- [x] Acceptance: hashed cookie-keyed sessions retain one-hour expiry, CSRF and
   `byCode[code].watch` (setup and replay receipt). Two judges sharing a code and
   one judge visiting two codes remain isolated. Maintain the transactional
   64-session cap; no code outside the bounded catalogue may allocate state.
   Shared storage foundation for Part 2: the module exposes a transaction helper
   that F3b extends with confirmation/context fields.
+- Evidence: commit 5535935; verification doc, Part 1 F3a. 15 tests pass against
+  the emulator. `transact` and `codeScope` are documented in the spec seam
+  section. The HTTP server still uses its in-process Map until F4a and F5a.
 - Verify: `node --test .\tests\quotation-session-storage.test.mjs` using separate
   emulator clients; cover restart, expiry, capacity contention, per-code version
   invalidation of the watch entry, failed writes and no production memory fallback.
@@ -130,11 +165,15 @@ write shared booking/Drop records.
 
 ### F4a: Serve catalogue and per-code bootstrap APIs (Part 1 of F4)
 
-- [ ] Acceptance: expose bounded path-based catalogue/per-code reads backed by
+- [x] Acceptance: expose bounded path-based catalogue/per-code reads backed by
   Firestore and the reviewed manifest, returning shared facts plus only this
   session's `byCode[code].watch`. Create/restore private sessions; preserve
   canonical Host/Origin/CSRF and query rejection. No public import/share-link input,
   arbitrary-code lookup, capture-file access or Altovo/Gateway call exists.
+- Evidence: commit 70f9547; verification doc, Part 1 F4a and F5a. Injected
+  `bookingStorage`/`sessionStorage`; codes outside the manifest never reach
+  storage. Bootstrap adds `dropSetVersion` and `capture`, catalogue entries add
+  `card` (additive). The emulator suites pass 74/74.
 - Verify: `node --test .\tests\booking-catalogue.test.mjs` (existing base-snapshot
   test, or the proposed `booking-catalogue-server.test.mjs`) and
   `.\tests\quotation-demo-server.test.mjs`; test unknown/encoded/malformed codes,
@@ -148,13 +187,18 @@ write shared booking/Drop records.
 
 This is the Part 1/Part 2 seam.
 
-- [ ] Acceptance: validate actual-time cancellation eligibility, explicit consent
+- [x] Acceptance: validate actual-time cancellation eligibility, explicit consent
   and a minimum of 10.00 in the booking currency. Commit one armed setup/replay
   filtered by `isDisplayedDrop` and the threshold in one transaction, and return
   the spec's receipt only after commit. Identical retries preserve the receipt;
   a stale arm request cannot replace a newer revision; a deliberate new minimum
   creates a new revision for that session/code only. Missing or malformed captures
   fail without commit; a valid empty replay commits honestly.
+- Evidence: commits 9f57104 and 7e9373c; verification doc, Part 1 F4a and F5a.
+  The receipt is the spec shape plus `firstCheck.captureStatus`. A missing
+  `expectedRevision` means 0, so a re-arm must send the current revision.
+  `app\public\booking-live.js` (Part 2) does not send it yet, so the browser
+  re-arm step fails until that coordinated change lands (F7a).
 - Verify: `node --test .\tests\booking-drop-watch.test.mjs` with emulator races,
   lost acknowledgements, raised minima, mixed currency, changing cancellation
   windows, missing versus empty captures and changed Drop sets; zero upstream calls.
@@ -235,6 +279,13 @@ This is the Part 1/Part 2 seam.
 Owner: Codex. Append Part 2 notes and evidence only within this section. Part 2
 consumes the Part 1 arm receipt and must not change the arm transaction contract
 without coordinating.
+
+Ownership update authorised by the user on 18 October: Codex now also owns F9a
+(hosted Firestore wiring) and F10a (packaging), alongside F9b/F10b. The Part 1
+sections above remain historical task records. Claude retains F6/F7a (setup UI,
+`booking-judge.js`, `drop-watch.js`, catalogue/booked/setup HTML/CSS) and F11a
+evidence. Only pinned `d14f70f` is authorised for this merge; later work requires
+another go-ahead. No push, deploy, production import or live upstream call.
 
 ### F3b: Session confirmation and context fields (Part 2 of F3)
 

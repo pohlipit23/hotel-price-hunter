@@ -108,6 +108,10 @@ Approved two-part delivery (18 October 2026). Mixed F tasks are split into `a`
   F10a minimum packaging closure; F11a Part 1 emulator/browser/restart evidence.
   Part 1 ends at the committed arm receipt.
 - Part 2 (Codex, `.local\roomdrop-part2`, branch `codex/roomdrop-part2-app`):
+  Ownership update on 18 October: the user transferred F9a hosted wiring and F10a
+  packaging to Codex, and authorised merging pinned Part 1 `d14f70f` plus import
+  of the reviewed six-code catalogue into Part 2's 8281/demo emulator only.
+  Claude retains F6/F7a and F11a; later commits are not included in this approval.
   F3b confirmation/context session fields; F4b confirm/advice/chat routes on
   durable sessions; F5b membership, safe rearming, stale rejection and idempotent
   selection receipts; F7b replay presentation and Deals/Review/Confirmed; F8
