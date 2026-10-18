@@ -16,7 +16,7 @@ const LOOPBACK = /^(?:localhost|127\.0\.0\.1):\d{1,5}$/;
 
 const plain = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-// The reviewed image manifest ({ schemaVersion: 1, images: { [code]: { hotel?, drops? } } }) maps
+// The reviewed image manifest ({ schemaVersion: 1, images: { [code]: { hotel?, room?, drops? } } }) maps
 // codes and Drop ids to local assets only; remote source URLs never reach the importer's records.
 async function readImages(workspace, path) {
   if (!resolve(workspace, path).startsWith(workspace + sep)) throw blocked('IMAGE_MANIFEST_PATH_OUTSIDE_WORKSPACE');
@@ -50,12 +50,15 @@ async function readInput(root, path, imagesPath) {
     images = await readImages(workspace, imagesPath);
   }
   for (const card of Array.isArray(input?.cards) ? input.cards : []) {
-    if (typeof card?.photo?.asset !== 'string') continue;
-    const asset = await stat(resolve(workspace, 'app', 'public', card.photo.asset)).catch(() => null);
-    if (!asset?.isFile()) throw blocked('CARD_PHOTO_MISSING');
+    for (const photo of [card?.photo, card?.roomPhoto]) {
+      if (typeof photo?.asset !== 'string') continue;
+      const asset = await stat(resolve(workspace, 'app', 'public', photo.asset)).catch(() => null);
+      if (!asset?.isFile()) throw blocked('CARD_PHOTO_MISSING');
+    }
   }
   for (const reviewed of plain(images) ? Object.values(images) : []) {
     await requireAsset(workspace, reviewed?.hotel, 'CARD_PHOTO_MISSING');
+    await requireAsset(workspace, reviewed?.room, 'CARD_PHOTO_MISSING');
     for (const photo of plain(reviewed?.drops) ? Object.values(reviewed.drops) : []) await requireAsset(workspace, photo, 'DROP_PHOTO_MISSING');
   }
   return { schemaVersion: input?.schemaVersion, entries: input?.entries, cards: input?.cards, ...(images === undefined ? {} : { images }) };

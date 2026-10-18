@@ -86,6 +86,31 @@ test('a reviewed image manifest attaches local Drop photos and fills an empty ca
   assert.deepEqual(planCatalogueImport({ ...fixture(), images: {} }), plain);
 });
 
+test('a reviewed booked-room photo becomes the card\'s optional roomPhoto; without one the card has no such key', () => {
+  const plain = planCatalogueImport(fixture());
+  const roomPhoto = { asset: 'assets/roomdrop-airb000180-room.jpg', alt: 'Deluxe Room with a garden view' };
+  const input = fixture(); input.images = { [SIAM]: { room: roomPhoto } };
+  const [siam, hyatt] = planCatalogueImport(input);
+  assert.deepEqual(siam.booking.card.roomPhoto, roomPhoto);
+  assert.deepEqual(siam.booking.card.photo, fixture().cards[0].photo, 'the hotel photo is unchanged');
+  assert.notEqual(siam.contentVersion, plain[0].contentVersion, 'a room photo is card content');
+  assert.equal(Object.hasOwn(hyatt.booking.card, 'roomPhoto'), false);
+  assert.equal(hyatt.contentVersion, plain[1].contentVersion);
+  // A card may carry its reviewed room photo itself; the manifest may repeat it but not replace it.
+  const carried = fixture(); carried.cards[0].roomPhoto = roomPhoto;
+  assert.equal(planCatalogueImport(carried)[0].contentVersion, siam.contentVersion);
+  carried.images = { [SIAM]: { room: roomPhoto } };
+  assert.equal(planCatalogueImport(carried)[0].contentVersion, siam.contentVersion);
+  carried.images = { [SIAM]: { room: { ...roomPhoto, alt: 'Another room' } } };
+  assert.throws(() => planCatalogueImport(carried), { code: 'IMAGE_MANIFEST_CONFLICT' });
+  for (const room of [{ asset: 'https://img.example.test/a.jpg', alt: 'x' }, { ...roomPhoto, url: 'https://img.example.test/a.jpg' }, 'assets/x.jpg']) {
+    const bad = fixture(); bad.images = { [SIAM]: { room } };
+    assert.throws(() => planCatalogueImport(bad), { code: 'IMAGE_MANIFEST_INVALID' }, JSON.stringify(room));
+  }
+  const badCard = fixture(); badCard.cards[0].roomPhoto = { asset: '../secrets.jpg', alt: 'x' };
+  assert.throws(() => planCatalogueImport(badCard), { code: 'CARD_INVALID' });
+});
+
 test('image manifests and remote sources are refused when they are not reviewed local assets for known Drops', () => {
   const cases = [
     ['IMAGE_MANIFEST_INVALID', input => { input.images = { AIRB000999: { drops: {} } }; }],
@@ -165,6 +190,7 @@ test('importer reads a reviewed image manifest file and refuses photos that are 
   const refusals = [
     [{ [SIAM]: { drops: { [SUITE]: { ...suitePhoto, asset: 'assets/roomdrop-airb000180-drop-2.jpg' } } } }, 'DROP_PHOTO_MISSING'],
     [{ [HYATT]: { hotel: { asset: 'assets/roomdrop-airb000179-hotel.jpg', alt: 'Grand Hyatt' } } }, 'CARD_PHOTO_MISSING'],
+    [{ [SIAM]: { room: { asset: 'assets/roomdrop-airb000180-room.jpg', alt: 'Deluxe Room' } } }, 'CARD_PHOTO_MISSING'],
     [{ [SIAM]: { drops: { [SUITE]: { asset: 'https://img.example.test/a.jpg', alt: 'x' } } } }, 'IMAGE_MANIFEST_INVALID'],
   ];
   for (const [images, reason] of refusals) assert.deepEqual([(await run(['--catalogue=catalogue.json', await manifest(images)])).reason], [reason], reason);
