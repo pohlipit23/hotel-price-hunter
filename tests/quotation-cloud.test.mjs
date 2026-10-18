@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import { EventEmitter } from 'node:events';
 import { startHostedDemo, createHostedStores } from '../app/booking-cloud.mjs';
+import { startHostedQuotationDemo } from '../app/quotation-cloud.mjs';
+import { createMemorySessionStorage } from '../app/quotation-session-storage.mjs';
+import { plannedBookings, NOW } from './fixtures/roomdrop-harness.mjs';
 import { createHostedQuotationDemoServer, validateCloudQuotationMode, deploymentQuotationSnapshot } from '../app/quotation-demo-server.mjs';
 
 const origin = 'https://hotel-price-hunter-2qbcpylngq-as.a.run.app';
@@ -109,4 +112,21 @@ test('contract v2 hosted factories use the guarded client and constrain sessions
   });
   assert.equal(stores.bookingStorage, bookingStorage); assert.equal(stores.sessionStorage, sessionStorage);
   await stores.close(); assert.deepEqual(calls, ['client', 'close']);
+});
+test('quotation hosted entrypoint serves the curated RoomDrop page with durable store injection', async () => {
+  const storage = plannedBookings(), listed = await storage.listCatalogue();
+  const catalogue = { entries: await Promise.all(listed.map(async pin => ({ ...pin, ...(await storage.getBooking(pin.code)) }))) };
+  const sessionStorage = createMemorySessionStorage({ environment: {}, now: NOW });
+  sessionStorage.mode = 'firestore'; // Explicit HTTP wiring double; real persistence is covered by the emulator gate.
+  const signals = new EventEmitter();
+  const app = await startHostedQuotationDemo({ environment: environment(), signals,
+    storesFactory: async () => ({ bookingStorage: storage, sessionStorage, close: async () => {} }),
+    catalogueLoader: async () => catalogue, advisorFactory: async () => ({ available: false, status: 'unconfigured' }),
+    listen: server => new Promise(resolve => server.listen(0, '127.0.0.1', resolve)), log: () => {} });
+  try {
+    const local = 'http://127.0.0.1:' + app.server.address().port, host = new URL(origin).host;
+    const page = await wire(local + '/', { headers: { Host: host } }); assert.equal(page.status, 200);
+    const response = await wire(local + '/api/booking-demo/catalogue', { headers: { Host: host } });
+    assert.equal(response.status, 200); assert.equal((await response.json()).entries.length, 2);
+  } finally { await app.stop(); }
 });
