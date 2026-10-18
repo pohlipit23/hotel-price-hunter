@@ -1,8 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bookingView } from '../app/public/booking-live-data.js';
+import { bookingView, comparisonLabels } from '../app/public/booking-live-data.js';
 import { createBookingDemoServer } from '../app/booking-demo-server.mjs';
 const bundle=()=>({schemaVersion:1,transactionMode:'selection-only',snapshotVersion:'a'.repeat(64),baseline:{sourceType:'quotation',quotationCode:'DEMO-1',hotel:{id:'h',name:'Hotel'},stay:{checkin:'2027-01-21',checkout:'2027-01-22'},occupancy:{adults:2,childAges:[],infantAges:[]},room:{name:'Original room',board:'Breakfast'},quotedRetail:{totalMinor:50000,currency:'AED'},fx:{from:'USD',to:'AED',rate:'3.67'}},options:[{optionId:'option-1',roomName:'Twin',board:'Breakfast',freeCancellation:true,estimate:{totalMinor:45000,currency:'AED',isEstimate:true},indicativeDifferenceMinor:5000},{optionId:'option-2',roomName:'Twin 2',board:'Breakfast',freeCancellation:false,estimate:{totalMinor:30000,currency:'AED',isEstimate:true},indicativeDifferenceMinor:20000}],privateReferences:{'option-1':{rateDetail:'SECRET'},'option-2':{rateDetail:'SECRET'}}});
+
+test('comparison badges compare the displayed room, meals and cancellation flag against the starting option',()=>{
+ const baseline={room:{name:'Superior Twin',board:'Breakfast'},freeCancellation:true};
+ assert.deepEqual(comparisonLabels(baseline,{roomName:'Superior Twin Plus',board:'Breakfast',freeCancellation:false}),
+  {room:'Different',meals:'Same',cancellation:'Different'});
+ assert.deepEqual(comparisonLabels(baseline,{roomName:' superior twin ',board:' breakfast ',freeCancellation:true}),
+  {room:'Same',meals:'Same',cancellation:'Same'});
+ assert.deepEqual(comparisonLabels(baseline,{roomName:'Superior Twin',board:'Room only',freeCancellation:null}),
+  {room:'Same',meals:'Different',cancellation:'Different'});
+});
 test('live data populates real drop cards without inventing verified refunds or room equivalence',()=>{
  const view=bookingView(bundle());assert.equal(view.booking.hotel.name,'Hotel');assert.equal(view.offers[0].displaySaving.minor,5000);assert.equal(view.offers[0].displaySaving.isEstimate,true);assert.equal(view.offers[0].equivalence,'unverified');assert.equal(view.offers[0].refundQuote,undefined);assert.equal(view.highlights[0].offer.offerId,'option-2');assert.equal(view.highlights[1].offer.offerId,'option-1');
  const unknown=bundle();unknown.options[0].estimate.currency='USD';assert.throws(()=>bookingView(unknown));

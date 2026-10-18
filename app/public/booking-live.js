@@ -1,4 +1,4 @@
-import { bookingView } from './booking-live-data.js';
+import { bookingView, comparisonLabels } from './booking-live-data.js';
 import { createStayAdviser } from './stay-advice.js';
 
 /** Use the existing booking screens and shared cards; confirmation is selection-only. */
@@ -6,11 +6,6 @@ export async function startBookingDemo(ui) {
   const { $, node, money, savingLabel, addStamp, setActionContent, factTile, stayText, guestText, stayPhoto, offerPhotoIndex } = ui;
   let data, view, selected, busy = false, lastTrigger;
   const adviser = createStayAdviser({ parent: $('comparison'), before: $('price-details'), getData: () => data });
-  const barObserver = new ResizeObserver(entries => {
-    const height = entries[0].target.getBoundingClientRect().height;
-    document.documentElement.style.setProperty('--review-bar-height', height + 'px');
-  });
-  barObserver.observe(document.querySelector('.review-actions'));
   const explanation = 'Estimated savings before final pricing and fees. Full cancellation terms and room matching still need verification.';
   const steps = screen => {
     $('booking-summary').hidden = screen === 'review'; $('comparison').hidden = screen !== 'review';
@@ -52,11 +47,14 @@ export async function startBookingDemo(ui) {
     $('review-saving').textContent = savingLabel(offer.displaySaving.minor);
     addStamp($('comparison-saving-stamp'), offer.displaySaving.minor, view.currency.code, 'Estimated drop', 'review-stamp');
     $('saving-caption').textContent = explanation;
-    $('change-facts-grid').replaceChildren(factTile('Hotel', offer.hotel.name, 'hotel', 'Same hotel', 'fact-same fact-hotel'),
-      factTile('Room', offer.room.name, 'room', 'Review details', 'fact-change fact-room'),
-      factTile('Meals', offer.option.board, 'meals', 'Review details', 'fact-change fact-meals'),
-      factTile('Cancellation', termText(offer), 'cancellation', 'Check full terms', 'fact-warning fact-cancellation'));
-    $('cancellation-summary').textContent = 'A source cancellation flag does not verify the full penalty schedule or its timezone.';
+    const labels = comparisonLabels(data.baseline, offer.option);
+    const changeTile = (label, value, kind, cue) => factTile(label, value, kind, cue,
+      (cue === 'Same' ? 'fact-same' : kind === 'cancellation' ? 'fact-warning' : 'fact-change') + ' fact-' + kind);
+    $('change-facts-grid').replaceChildren(changeTile('Hotel', offer.hotel.name, 'hotel', 'Same'),
+      changeTile('Room', offer.room.name, 'room', labels.room),
+      changeTile('Meals', offer.option.board, 'meals', labels.meals),
+      changeTile('Cancellation', termText(offer), 'cancellation', labels.cancellation));
+    $('cancellation-summary').textContent = 'Room matching and full cancellation terms still need checking.';
     const details = [['Current room', view.booking.room.name], ['Selected room', offer.room.name],
       ['Meals', offer.option.board], ['Exchange rate', `1 ${data.baseline.fx.from} = ${data.baseline.fx.rate} ${data.baseline.fx.to}`],
       ['Pricing', explanation], ['Cancellation', termText(offer)]];
@@ -137,9 +135,7 @@ export async function startBookingDemo(ui) {
     $('customer-steps').lastElementChild.innerHTML = '<span>3</span> Confirmed';
     $('receipt-lines').querySelector('dt').textContent = 'Current booking';
     document.querySelector('.review-total span').textContent = 'Estimated drop';
-    document.querySelector('.approval-explainer h2').textContent = 'Confirm your room choice';
-    document.querySelector('.approval-explainer ol').replaceChildren(node('li', 'Review the room and its cancellation terms'), node('li', 'Confirm your choice'));
-    document.querySelector('.approval-explainer p').textContent = 'This demo stops at confirmation. Your current booking remains unchanged.';
+    document.querySelector('.approval-explainer').remove();
     $('watch-title').textContent = 'Price watch'; $('watch-status').textContent = 'Automatic checks are not running for this demo.';
     $('watch-consent').hidden = true; $('watch-details').hidden = true; $('watch-button').disabled = true;
     $('watch-button').textContent = 'Automatic checks coming next'; $('notification-previews-details').hidden = true;

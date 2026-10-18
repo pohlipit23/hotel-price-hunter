@@ -12,8 +12,9 @@
 .stay-chat-privacy { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .stay-advice-prompts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .stay-chat-prompt { min-height: 44px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--muted); font: 400 12px/1.4 var(--body); }
-.gemini-launcher { position: fixed; z-index: 6; right: 24px; bottom: 24px; display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 12px 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); box-shadow: 0 4px 16px rgba(32, 44, 59, .12); font: 500 14px/1.4 var(--body); }
-.gemini-star { color: var(--blue); font-size: 24px; line-height: 1; }
+.gemini-launcher { position: fixed; z-index: 6; right: 24px; bottom: 24px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: max-content; max-width: calc(100vw - 32px); min-height: 48px; padding: 12px 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); box-shadow: 0 4px 16px rgba(32, 44, 59, .12); font: 500 14px/1.4 var(--body); white-space: nowrap; }
+.gemini-star { display: block; flex: 0 0 24px; width: 24px; color: var(--blue); font-size: 24px; line-height: 1; }
+.gemini-label { display: block; flex: 0 0 auto; white-space: nowrap; line-height: 1.4; }
 .gemini-launcher:hover, .stay-chat-prompt:hover { background: #f5f8fc; }
 .gemini-dialog { position: fixed; inset: auto 24px 24px auto; width: 420px; height: min(680px, calc(100dvh - 48px)); max-width: calc(100vw - 48px); max-height: calc(100dvh - 48px); margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--ink); box-shadow: 0 12px 48px rgba(32, 44, 59, .18); }
 .gemini-dialog[open] { display: flex; flex-direction: column; }
@@ -36,10 +37,12 @@ html:has(.gemini-dialog[open]), body:has(.gemini-dialog[open]) { overflow: hidde
 .stay-chat-status { flex: 0 0 auto; margin: 0; padding: 0 18px max(12px, env(safe-area-inset-bottom)); color: var(--muted); font-size: 11px; }
 .stay-chat-status:empty { padding-bottom: 8px; }
 .stay-adviser :focus-visible, .gemini-dialog :focus-visible, .gemini-launcher:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+body[data-live-booking] .postcard { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+body[data-live-booking] .has-review { padding-bottom: 0; }
+body[data-live-booking] .review-actions { position: static; inset: auto; z-index: auto; border: 0; padding: 16px 0 0; background: transparent; box-shadow: none; }
 @media (max-width: 639px) {
-  body[data-live-booking] .has-review { padding-bottom: calc(var(--review-bar-height, 148px) + 80px + env(safe-area-inset-bottom)); }
+  body[data-live-booking] .review-actions { grid-template-columns: minmax(0, 1fr); }
   .gemini-launcher { right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); }
-  body:has(.has-review) .gemini-launcher { bottom: calc(var(--review-bar-height, 148px) + 12px); }
   .gemini-dialog { inset: 0; width: 100%; max-width: 100%; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; }
   .gemini-header { padding-top: max(12px, env(safe-area-inset-top)); }
   .gemini-dialog .stay-chat-form { padding-bottom: 8px; }

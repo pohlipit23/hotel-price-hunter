@@ -23,7 +23,7 @@ export function createStayAdviser({ parent, before, getData }) {
   launcher.type = 'button'; launcher.id = 'gemini-launcher'; launcher.hidden = true;
   launcher.setAttribute('aria-haspopup', 'dialog'); launcher.setAttribute('aria-controls', 'gemini-dialog');
   const star = el('span', '✦', 'gemini-star'); star.setAttribute('aria-hidden', 'true');
-  launcher.append(star, el('span', 'Ask Gemini'));
+  launcher.append(star, el('span', 'Ask Gemini', 'gemini-label'));
 
   const dialog = el('dialog', null, 'gemini-dialog'); dialog.id = 'gemini-dialog';
   dialog.setAttribute('aria-labelledby', 'gemini-title');

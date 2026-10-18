@@ -1,5 +1,14 @@
 /** Display adapter only. Estimates never become execution or refund authority. */
 import { isDisplayedDrop } from './drop-eligibility.js';
+export function comparisonLabels(baseline, option) {
+  const label = value => String(value ?? '').trim().toLowerCase();
+  const flag = value => value === true ? true : value === false ? false : null;
+  return {
+    room: label(baseline.room.name) === label(option.roomName) ? 'Same' : 'Different',
+    meals: label(baseline.room.board) === label(option.board) ? 'Same' : 'Different',
+    cancellation: flag(baseline.freeCancellation) === flag(option.freeCancellation) ? 'Same' : 'Different',
+  };
+}
 export function bookingView(snapshot) {
   const b = snapshot.baseline;
   const currency = b.quotedRetail.currency;
