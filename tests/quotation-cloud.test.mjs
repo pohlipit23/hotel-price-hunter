@@ -85,3 +85,13 @@ test('curated startup fails closed before model/listen when storage/catalogue is
   await assert.rejects(startHostedDemo({ ...deps, environment: { ...environment(), FIRESTORE_EMULATOR_HOST: '127.0.0.1:8281' } }));
   assert.equal(reads, 1);
 });
+test('curated shutdown handles a storage-close failure with a bounded signal diagnostic', async () => {
+  const signals = new EventEmitter(), server = new EventEmitter(), logs = [];
+  server.close = callback => callback(); server.closeAllConnections = () => {};
+  const app = await startHostedDemo({ environment: environment(), signals,
+    storesFactory: async () => ({ bookingStorage: {}, sessionStorage: {}, close: async () => { throw Error('PRIVATE-storage'); } }),
+    catalogueLoader: async () => ({ entries: [{}] }), serverFactory: () => server, listen: async () => {},
+    advisorFactory: async () => ({ available: false }), log: message => logs.push(message) });
+  signals.emit('SIGTERM'); await assert.rejects(app.stop(), /PRIVATE-storage/);
+  assert.equal(signals.listenerCount('SIGTERM'), 0); assert.doesNotMatch(logs.join(' '), /PRIVATE/);
+});

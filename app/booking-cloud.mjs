@@ -20,8 +20,10 @@ async function createStores(environment) {
     import('@google-cloud/firestore'), import('./booking-storage.mjs'), import('./quotation-session-storage.mjs'),
   ]);
   const firestore = new Firestore({ projectId: environment.GOOGLE_CLOUD_PROJECT });
-  return { bookingStorage: createBookingStorage({ firestore }), sessionStorage: createFirestoreSessionStorage({ firestore }),
-    close: () => firestore.terminate() };
+  try {
+    return { bookingStorage: createBookingStorage({ firestore }), sessionStorage: createFirestoreSessionStorage({ firestore }),
+      close: () => firestore.terminate() };
+  } catch (failure) { await firestore.terminate(); throw failure; }
 }
 async function loadCatalogue(bookingStorage) {
   const { loadHostedCatalogue } = await import('./booking-storage.mjs');
@@ -46,11 +48,12 @@ export async function startHostedDemo({ environment = process.env, signals = pro
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw Error('INVALID_PORT');
   let stores, server, stopping;
   const stop = () => stopping ??= (async () => {
-    signals.removeListener('SIGTERM', stop); signals.removeListener('SIGINT', stop);
+    signals.removeListener('SIGTERM', onSignal); signals.removeListener('SIGINT', onSignal);
     try {
       if (server) await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
     } finally { await stores?.close(); }
   })();
+  const onSignal = () => { void stop().catch(() => log('RoomDrop shutdown: storage unavailable.')); };
   try {
     stores = await storesFactory(environment);
     if (!stores?.bookingStorage || !stores.sessionStorage || typeof stores.close !== 'function') throw Error('DURABLE_STORAGE_REQUIRED');
@@ -59,8 +62,8 @@ export async function startHostedDemo({ environment = process.env, signals = pro
     const advisor = await advisorFactory({ environment });
     server = serverFactory({ catalogue, sessionStorage: stores.sessionStorage, bookingStorage: stores.bookingStorage, environment, advisor });
     await listen(server, port);
-    server.on('error', () => { log('RoomDrop runtime stopped: service unavailable.'); void stop(); });
-    signals.once('SIGTERM', stop); signals.once('SIGINT', stop);
+    server.on('error', () => { log('RoomDrop runtime stopped: service unavailable.'); onSignal(); });
+    signals.once('SIGTERM', onSignal); signals.once('SIGINT', onSignal);
     log('RoomDrop ready; captured replay and selection only.');
     return { server, stop };
   } catch (failure) { await stop(); throw failure; }

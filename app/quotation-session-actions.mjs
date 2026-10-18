@@ -10,9 +10,11 @@ export function actionError(code, status = 409, extra = {}) {
 export function publicPostWatchState({ scope, bundle }) {
   const snapshot = { ...bundle, code: bundle.baseline.quotationCode, watch: scope?.watch, confirmation: scope?.confirmation };
   const binding = watchBinding(scope?.watch);
-  const current = ['completed', 'empty'].includes(replayResult(snapshot).status);
+  const current = ['completed', 'empty'].includes(replayResult(snapshot).status)
+    && (scope?.contentVersion === undefined || scope.contentVersion === (bundle.contentVersion ?? bundle.snapshotVersion))
+    && (scope?.dropSetVersion === undefined || bundle.dropSetVersion === undefined || scope.dropSetVersion === bundle.dropSetVersion);
   const history = current && scope.contextBinding === binding ? (scope.chatHistory ?? []).slice(-4) : [];
-  return { confirmation: currentConfirmation(snapshot), conversation: { watchBinding: current ? binding : null,
+  return { confirmation: current ? currentConfirmation(snapshot) : null, conversation: { watchBinding: current ? binding : null,
     chatHistory: history.map(({ pageContext, optionId, snapshotVersion, question, reply }) => ({ pageContext, optionId, snapshotVersion, question, reply })) } };
 }
 export function requireCurrentWatch({ scope, bundle, body, at }) {
