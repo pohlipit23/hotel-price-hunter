@@ -195,10 +195,10 @@ This is the Part 1/Part 2 seam.
   creates a new revision for that session/code only. Missing or malformed captures
   fail without commit; a valid empty replay commits honestly.
 - Evidence: commits 9f57104 and 7e9373c; verification doc, Part 1 F4a and F5a.
-  The receipt is the spec shape plus `firstCheck.captureStatus`. A missing
-  `expectedRevision` means 0, so a re-arm must send the current revision.
-  `app\public\booking-live.js` (Part 2) does not send it yet, so the browser
-  re-arm step fails until that coordinated change lands (F7a).
+  The receipt is the spec shape plus `firstCheck.captureStatus`. Commit 5a85d4a
+  makes `expectedRevision` optional as in contract v3: absent skips the stale
+  check; present and not current is `409 WATCH_REVISION_STALE`. The browser
+  re-arm step passes again.
 - Verify: `node --test .\tests\booking-drop-watch.test.mjs` with emulator races,
   lost acknowledgements, raised minima, mixed currency, changing cancellation
   windows, missing versus empty captures and changed Drop sets; zero upstream calls.
@@ -208,10 +208,14 @@ This is the Part 1/Part 2 seam.
 
 ### F6: Build the start grid and Original Booking confirmation page
 
-- [ ] Acceptance: use the Ticket and Stamp design for curated photo/city/dates/
+- [x] Acceptance: use the Ticket and Stamp design for curated photo/city/dates/
   price/scenario cards, then "Your agency booked this" and one "Set up a drop"
   action. Show staging quotation/capture-date note, cannot-start reason and honest
   image fallbacks. No Altovo/AirBorneo branding, arbitrary code or share-link input.
+- Evidence: commits 8390e8e and 0694b94; verification doc, Part 1 F6 and F7a.
+  Every real card has `photo: null` until S0.5, so judges see the drawn fallback.
+  A reviewed photo also needs its exact `/assets/...` route in
+  `app\booking-demo-server.mjs` when S0.5 supplies it.
 - Verify: `node --test .\tests\booking-setup-ui.test.mjs` and
   `node .\tests\booking-judge.browser.mjs` (existing base-snapshot harness; the
   proposed `booking-firestore.browser.mjs` is Part 2's integrated harness); inspect
@@ -223,10 +227,14 @@ This is the Part 1/Part 2 seam.
 
 ### F7a: Consent, minimum saving, cannot-start and armed state (Part 1 of F7)
 
-- [ ] Acceptance: explicit consent/minimum setup screens with the 10.00 floor,
+- [x] Acceptance: explicit consent/minimum setup screens with the 10.00 floor,
   cannot-start states from actual-time eligibility, and a visible committed armed
   state driven only by the arm receipt. No extra customer step or delay; a failed
   arm shows a retryable error and never a fake armed state.
+- Evidence: commits 8390e8e and 0694b94; verification doc, Part 1 F6 and F7a.
+  Open for Part 2: the arm `fetch` lives in `app\public\booking-live.js`, which
+  still sends no `expectedRevision`. It should send `judge.armRequestBody(data,
+  minimum)`, a one-line change, so a stale tab gets 409 instead of overwriting.
 - Verify: `node .\tests\booking-judge.browser.mjs` reaching armed on mobile and
   desktop with keyboard; reload after arming shows the same committed receipt.
 - Depends on: F6. Small, three files: `app\public\booking-judge.js`,

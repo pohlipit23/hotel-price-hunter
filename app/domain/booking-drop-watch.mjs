@@ -17,13 +17,14 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const receipt = watch => ({ watch: clone(watch), dropOptionIds: [...watch.firstCheck.dropOptionIds] });
 
 // Validates the arm request body. The minimum is in the booking currency's minor units, at
-// least the agency's 10.00. A missing expectedRevision means a first arm (revision 0).
+// least the agency's 10.00. expectedRevision is optional: absent (null here) skips the stale check;
+// present, it must name the session's current revision (0 for a first arm).
 export function armRequest(body, currency) {
   if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => !REQUEST_KEYS.includes(key))
     || (Object.hasOwn(body, 'expectedRevision') && (!Number.isSafeInteger(body.expectedRevision) || body.expectedRevision < 0))) fail('INVALID_WATCH');
   if (body.consent !== true) fail('WATCH_CONSENT_REQUIRED');
   if (!Number.isSafeInteger(body.minimumSavingMinor) || body.minimumSavingMinor < agencyMinimumSavingMinor(currency)) fail('MINIMUM_SAVING_INVALID');
-  return { snapshotVersion: body.snapshotVersion, minimumSavingMinor: body.minimumSavingMinor, expectedRevision: body.expectedRevision ?? 0 };
+  return { snapshotVersion: body.snapshotVersion, minimumSavingMinor: body.minimumSavingMinor, expectedRevision: body.expectedRevision ?? null };
 }
 
 // This session's committed watch for the booking's current versions, or null. Never mutates.
@@ -51,11 +52,12 @@ export function armDropWatch(session, { code, booking, request, at }) {
   if (request.snapshotVersion !== contentVersion) fail('SNAPSHOT_CHANGED');
   const { minimumSavingMinor, expectedRevision } = request;
   const committed = committedWatch(session, code, booking);
+  const checked = expectedRevision !== null;
   // An identical retry (a lost acknowledgement, or the same minimum again) changes nothing.
   if (committed && committed.minimumSavingMinor === minimumSavingMinor
-    && [committed.revision, committed.revision - 1].includes(expectedRevision)) return receipt(committed);
+    && (!checked || [committed.revision, committed.revision - 1].includes(expectedRevision))) return receipt(committed);
   const revision = committed?.revision ?? 0;
-  if (expectedRevision !== revision) fail('WATCH_REVISION_STALE');
+  if (checked && expectedRevision !== revision) fail('WATCH_REVISION_STALE');
   const reason = watchBlocker(bundle.baseline, at);
   if (reason) fail('WATCH_CANNOT_START', { reason });
   const drops = capturedDrops(booking);

@@ -10,6 +10,8 @@ const blockers = {
   CANCELLATION_FACTS_UNKNOWN: ['terms unknown', 'Cancellation terms are unknown', 'Without clear cancellation terms a switch could cost money, so the Drop Watch stays off.'],
 };
 const blockerFacts = reason => blockers[reason] ?? blockers.CANCELLATION_FACTS_UNKNOWN;
+// Reviewed card photos live in the public assets folder; anything else gets the honest fallback.
+const PHOTO_ASSET = /^assets\/[a-z0-9-]{1,80}\.(?:jpg|png|webp)$/;
 
 export function formatMoney(minor, currency) {
   const digits = minorDigits(currency);
@@ -20,64 +22,130 @@ export function formatInstant(value) {
   return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(date) + ', '
     + new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' }).format(date) + ' UTC';
 }
+const formatDay = day => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(day + 'T00:00:00Z'));
 export function tagFor(entry) {
   if (entry.blocker) return { kind: 'blocked', text: 'Cannot start: ' + blockerFacts(entry.blocker)[0] };
   return entry.tag === 'closing-soon' ? { kind: 'soon', text: 'Closing soon' } : { kind: 'ready', text: 'Drop Watch ready' };
 }
-export function placeText(hotel) {
+// The curated city name when the card has one, else the booking's city code, then the country.
+export function placeText(hotel, cityName) {
   let country = hotel.countryCode;
   try { country = new Intl.DisplayNames(['en'], { type: 'region' }).of(hotel.countryCode) || country; } catch { /* Keep the code. */ }
-  return [hotel.cityCode, country].filter(Boolean).join(', ');
+  return [cityName ?? hotel.cityCode, country].filter(Boolean).join(', ');
 }
 export function cancellationText(cancellation) {
   if (cancellation?.nonRefundable) return 'Non-refundable';
   return cancellation?.freeUntil ? 'Free cancellation until ' + formatInstant(cancellation.freeUntil) : 'No free cancellation';
 }
+// A reviewed photo, or the honest fallback: never a stand-in picture of some other hotel.
+export function cardPhoto(card) {
+  const photo = card?.photo;
+  if (photo && PHOTO_ASSET.test(photo.asset ?? '') && typeof photo.alt === 'string' && photo.alt) return { kind: 'photo', src: '/' + photo.asset, alt: photo.alt };
+  return { kind: 'fallback', city: card?.cityName ?? null };
+}
+// The curated scenario label shows only while the booking can still start, so a card whose free
+// cancellation has since ended never advertises its old scenario; the tag gives the current state.
+export function cardFacts(entry) {
+  return { city: placeText(entry.hotel, entry.card?.cityName), scenario: entry.blocker ? null : entry.card?.scenarioLabel ?? null, tag: tagFor(entry) };
+}
+export function capturedNote(data) {
+  const readAt = data.baseline?.source?.readAt;
+  return HONEST_NOTE + (/^\d{4}-\d{2}-\d{2}$/.test(readAt ?? '') ? ' · captured ' + formatDay(readAt) : '');
+}
+export function cannotStart(reason) { const [, title, text] = blockerFacts(reason); return { title, text }; }
+// The minimum choices, from the agency's 10.00 floor in the booking currency upwards.
+export function minimumOptions(data, chosen) {
+  const currency = data.baseline.quotedRetail.currency;
+  const floor = data.agencyMinimumSavingMinor ?? agencyMinimumSavingMinor(currency);
+  const values = minimumSavingChoices(currency).filter(value => value >= floor);
+  const selected = values.includes(chosen) ? chosen : values.includes(data.watch?.minimumSavingMinor) ? data.watch.minimumSavingMinor : values[0];
+  return values.map((value, index) => ({ value, label: index === 0 ? 'Any drop' : '-' + formatMoney(value, currency).replace(currency + ' ', ''),
+    caption: index === 0 ? formatMoney(value, currency) + ' or more' : currency + ' or more', checked: value === selected }));
+}
+// The arm request. It names the revision this tab last saw (0 before the first arm), so a stale tab
+// cannot replace a newer setup: the server answers 409 WATCH_REVISION_STALE instead.
+export function armRequestBody(data, minimumSavingMinor) {
+  return { snapshotVersion: data.snapshotVersion, consent: true, minimumSavingMinor, expectedRevision: data.watch?.revision ?? 0 };
+}
+// The armed line, from the committed receipt only; no receipt, no armed state.
+export function armedDetail(data) {
+  if (!data.watch) return null;
+  const currency = data.baseline.quotedRetail.currency; const minimum = data.watch.minimumSavingMinor;
+  const floor = data.agencyMinimumSavingMinor ?? agencyMinimumSavingMinor(currency);
+  return (minimum <= floor ? 'Any drop of ' : 'Drops of ') + formatMoney(minimum, currency) + ' or more · replayed check from ' + formatInstant(data.watch.firstCheck.checkedAt);
+}
 const guests = occupancy => {
   const people = occupancy.adults + occupancy.childAges.length + occupancy.infantAges.length;
   return people + (people === 1 ? ' guest' : ' guests');
 };
-const svgIcon = path => {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false');
-  const shape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); shape.setAttribute('d', path); svg.append(shape);
+const svgNode = (tag, attributes) => {
+  const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
+  return element;
+};
+const svgIcon = (path, viewBox = '0 0 24 24') => {
+  const svg = svgNode('svg', { viewBox, 'aria-hidden': 'true', focusable: 'false' });
+  for (const d of [].concat(path)) svg.append(svgNode('path', { d }));
   return svg;
 };
 const tagIcons = { ready: 'M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11Z', soon: 'M12 7v5l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z', blocked: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-6 15L18 6' };
+// A line-drawn postcard hotel with a falling price drop: decoration for the photo fallback.
+const fallbackArt = ['M14 70h92', 'M34 70V30h40v40', 'M30 30h48l-6-10H36l-6 10Z', 'M42 38h6m8 0h6M42 48h6m8 0h6M42 58h6m8 0h6', 'M50 70v-8h8v8',
+  'M74 46h18v24', 'M80 54h6m-6 8h6', 'M98 10c3 4 6 7 6 10a6 6 0 0 1-12 0c0-3 3-6 6-10Z'];
 
 export function createJudgeScreens(ui) {
-  const { $, node, stayPhoto, stayText, setActionContent } = ui;
-  const photoFor = code => [...($('catalogue-list').children)].findIndex(card => card.dataset.code === code) % 2 === 1 ? 3 : 0;
+  const { $, node, stayText, setActionContent } = ui;
+  const cards = new Map();
   const tagNode = entry => {
     const tag = tagFor(entry); const chip = node('span', undefined, 'watch-tag tag-' + tag.kind);
     chip.append(svgIcon(tagIcons[tag.kind]), node('span', tag.text)); return chip;
   };
+  const fallback = city => {
+    const frame = node('span', undefined, 'photo-fallback'); frame.setAttribute('role', 'img');
+    frame.setAttribute('aria-label', 'No photo yet' + (city ? ' · ' + city : ''));
+    frame.append(svgIcon(fallbackArt, '0 0 120 80'));
+    if (city) frame.append(node('strong', city, 'fallback-city'));
+    frame.append(node('span', 'No photo yet', 'fallback-note'));
+    return frame;
+  };
+  // Returns the photo element and whether it is a supplied photo (a failed load falls back too).
+  const photoNode = (card, onFallback = () => {}) => {
+    const photo = cardPhoto(card);
+    if (photo.kind === 'fallback') { onFallback(); return fallback(photo.city); }
+    const image = node('img', undefined, 'card-photo'); image.src = photo.src; image.alt = photo.alt; image.decoding = 'async';
+    image.addEventListener('error', () => { onFallback(); image.replaceWith(fallback(card.cityName)); });
+    return image;
+  };
   return {
     renderCatalogue(entries, open) {
       $('catalogue-note').textContent = 'Each card is a real Altovo staging quotation standing in for a confirmed booking.';
+      cards.clear(); for (const entry of entries) cards.set(entry.code, entry.card ?? null);
       $('catalogue-list').replaceChildren(...entries.map((entry, index) => {
+        const facts = cardFacts(entry);
         const card = node('article', undefined, 'catalogue-card'); card.dataset.code = entry.code;
         const title = node('h2', entry.hotel.name); title.id = 'catalogue-hotel-' + entry.code;
         card.setAttribute('aria-labelledby', title.id);
         const photo = node('div', undefined, 'catalogue-photo');
-        photo.append(stayPhoto(index % 2 === 1 ? 3 : 0, true), tagNode(entry));
+        photo.append(photoNode(entry.card), tagNode(entry));
         const body = node('div', undefined, 'catalogue-body');
+        if (facts.scenario) body.append(node('p', facts.scenario, 'scenario-label scenario-' + (index % 3)));
         const price = node('p', undefined, 'catalogue-price');
-        price.append(node('strong', formatMoney(entry.quotedRetail.totalMinor, entry.quotedRetail.currency)), node('span', 'quoted, whole stay'));
-        body.append(title, node('p', placeText(entry.hotel), 'catalogue-place'), node('p', stayText(entry), 'catalogue-stay'), price);
+        price.append(node('strong', formatMoney(entry.quotedRetail.totalMinor, entry.quotedRetail.currency)), node('span', 'whole stay'));
+        body.append(title, node('p', facts.city, 'catalogue-place'), node('p', stayText(entry), 'catalogue-stay'), price);
         const button = node('button', undefined, 'offer-action catalogue-open'); button.type = 'button';
         setActionContent(button, 'Open this booking');
-        button.setAttribute('aria-label', 'Open booking at ' + entry.hotel.name + ', ' + tagFor(entry).text);
+        button.setAttribute('aria-label', 'Open booking at ' + entry.hotel.name + ', ' + facts.tag.text);
         button.addEventListener('click', event => open(entry.code, event.currentTarget));
-        card.append(photo, body, button);
+        card.append(photo, node('div', undefined, 'ticket-tear'), body, button);
         return card;
       }));
     },
     renderBooked(data) {
-      const b = data.baseline;
+      const b = data.baseline; const card = cards.get(data.code) ?? null;
       $('booked-title').textContent = b.hotel.name;
-      $('booked-place').textContent = [placeText(b.hotel), b.hotel.star ? b.hotel.star + ' star' : null, 'Ref ' + b.quotationCode].filter(Boolean).join(' · ');
-      $('booked-photo').replaceChildren(stayPhoto(photoFor(data.code), true));
+      $('booked-place').textContent = [placeText(b.hotel, card?.cityName), b.hotel.star ? b.hotel.star + ' star' : null, 'Ref ' + b.quotationCode].filter(Boolean).join(' · ');
+      $('booked-photo-tag').hidden = false;
+      $('booked-photo').replaceChildren(photoNode(card, () => { $('booked-photo-tag').hidden = true; }));
       const facts = [['Room', b.room.name || 'Room not named'], ['Meals', b.room.board || 'Not specified'], ['Dates', stayText(b)],
         ['Guests', guests(b.occupancy)], ['Cancellation', cancellationText(b.cancellation)]];
       $('booked-facts').replaceChildren(...facts.map(([label, value]) => {
@@ -85,23 +153,23 @@ export function createJudgeScreens(ui) {
         row.append(node('dt', label), node('dd', value)); return row;
       }));
       $('booked-price').textContent = formatMoney(b.quotedRetail.totalMinor, b.quotedRetail.currency);
-      $('booked-note').textContent = HONEST_NOTE;
-      $('booked-ready').hidden = Boolean(data.blocker); $('booked-blocked').hidden = !data.blocker;
-      if (data.blocker) { const [, title, text] = blockerFacts(data.blocker); $('blocked-title').textContent = title; $('blocked-text').textContent = text; }
+      $('booked-note').textContent = capturedNote(data);
+      // A booking that cannot start stays viewable: its reason, and the setup action shown but disabled.
+      $('booked-blocked').hidden = !data.blocker; $('setup-drop').disabled = Boolean(data.blocker);
+      if (data.blocker) {
+        const { title, text } = cannotStart(data.blocker); $('blocked-title').textContent = title; $('blocked-text').textContent = text;
+        $('setup-drop').setAttribute('aria-describedby', 'blocked-title');
+      } else $('setup-drop').removeAttribute('aria-describedby');
       $('setup-drop').textContent = data.watch ? 'Change my Drop Watch' : 'Set up a drop';
     },
     renderSetup(data, chosen) {
       const b = data.baseline; const currency = b.quotedRetail.currency;
       $('setup-booking').textContent = b.hotel.name + ' · ' + formatMoney(b.quotedRetail.totalMinor, currency);
-      const floor = data.agencyMinimumSavingMinor ?? agencyMinimumSavingMinor(currency);
-      const choices = minimumSavingChoices(currency).filter(value => value >= floor);
-      const selected = choices.includes(chosen) ? chosen : choices.includes(data.watch?.minimumSavingMinor) ? data.watch.minimumSavingMinor : choices[0];
-      $('minimum-options').replaceChildren(...choices.map((value, index) => {
+      $('minimum-options').replaceChildren(...minimumOptions(data, chosen).map(option => {
         const label = node('label', undefined, 'chip'); const input = node('input');
-        input.type = 'radio'; input.name = 'minimum-saving'; input.value = String(value); input.checked = value === selected;
+        input.type = 'radio'; input.name = 'minimum-saving'; input.value = String(option.value); input.checked = option.checked;
         const text = node('span', undefined, 'chip-text');
-        text.append(node('strong', index === 0 ? 'Any drop' : '-' + formatMoney(value, currency).replace(currency + ' ', '')),
-          node('span', index === 0 ? formatMoney(value, currency) + ' or more' : currency + ' or more'));
+        text.append(node('strong', option.label), node('span', option.caption));
         label.append(input, text); return label;
       }));
       $('judge-consent').checked = Boolean(data.watch);
@@ -109,6 +177,7 @@ export function createJudgeScreens(ui) {
       $('arm-watch').textContent = data.watch ? 'Update my Drop Watch' : 'Arm my Drop Watch'; $('arm-watch').disabled = false;
     },
     chosenMinimum() { return Number(document.querySelector('input[name="minimum-saving"]:checked')?.value); },
+    armRequestBody,
     // Replays the captured check: a short playful beat, never a live search.
     async playCheck(data, isCurrent) {
       const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -125,10 +194,6 @@ export function createJudgeScreens(ui) {
       await new Promise(resolve => setTimeout(resolve, reduced ? 200 : 700));
       return isCurrent();
     },
-    armedDetail(data) {
-      const currency = data.baseline.quotedRetail.currency; const minimum = data.watch.minimumSavingMinor;
-      const floor = data.agencyMinimumSavingMinor ?? agencyMinimumSavingMinor(currency);
-      return (minimum <= floor ? 'Any drop of ' : 'Drops of ') + formatMoney(minimum, currency) + ' or more · replayed check from ' + formatInstant(data.watch.firstCheck.checkedAt);
-    },
+    armedDetail,
   };
 }

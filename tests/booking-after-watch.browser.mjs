@@ -39,6 +39,19 @@ try {
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${stage} overflow at ${width}`);
       const path = join(output, `${stage}-${width}.png`); await page.screenshot({ path, fullPage: true }); report.screenshots.push(path);
     };
+    const checkLauncher = async stage => {
+      const placement = await page.locator('#gemini-launcher').evaluate(button => {
+        const box = button.getBoundingClientRect();
+        const parent = button.parentElement.getBoundingClientRect();
+        const targets = [...document.querySelectorAll('#offers .offer-ticket, #comparison .price-breakdown, #flexibility-warning, .review-actions')]
+          .filter(element => element.getClientRects().length).map(element => element.getBoundingClientRect());
+        return { inFlow: getComputedStyle(button).position === 'static', insideParent: box.top >= parent.top && box.bottom <= parent.bottom + 1,
+          occludesContent: targets.some(target => box.left < target.right && box.right > target.left && box.top < target.bottom && box.bottom > target.top) };
+      });
+      assert.equal(placement.inFlow, true, `${stage}: Gemini launch button must stay in its heading`);
+      assert.equal(placement.insideParent, true, `${stage}: Gemini launch button outside heading`);
+      assert.equal(placement.occludesContent, false, `${stage}: Gemini overlaps card or consent/action content`);
+    };
     const arm = async (target, minimum = 1000) => {
       await page.goto(origin + '/#setup-' + target); await visible('setup-screen');
       await page.locator('#judge-consent').check();
@@ -47,9 +60,9 @@ try {
     };
     await arm(code);
     assert.match(await page.locator('#armed-detail').innerText(), /Replayed .*Captured .*not live/);
-    assert.equal(await page.locator('#offers .offer-ticket').count(), 3); await shot('drops');
+    assert.equal(await page.locator('#offers .offer-ticket').count(), 3); await checkLauncher('drops'); await shot('drops');
     await page.locator('[data-offer-id="option-fixture-final-deluxe"]').focus(); await page.keyboard.press('Enter');
-    await visible('comparison'); await page.locator('#approve-offer').click();
+    await visible('comparison'); await checkLauncher('review'); await page.locator('#approve-offer').click();
     assert.match(await page.locator('#review-message').innerText(), /confirm the cancellation flexibility/);
     await page.locator('#accept-reduced-flexibility').check();
     await page.locator('#gemini-launcher').click(); await visible('gemini-dialog');

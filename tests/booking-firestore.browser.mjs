@@ -128,6 +128,17 @@ try {
     assert.equal(await page.locator('#offers .offer-ticket').count(), 0);
     const rearmed = await (await judge.request.get(origin + '/api/booking-demo/q/' + code)).json();
     assert.equal(rearmed.confirmation, null); await shot('empty');
+    const staleTab = await judge.newPage();
+    await staleTab.goto(origin + '/#setup-' + code); await staleTab.locator('#setup-screen').waitFor({ state: 'visible' });
+    const newer = await judge.request.post(origin + '/api/booking-demo/q/' + code + '/watch', { headers: { Origin: origin, 'X-CSRF-Token': rearmed.csrfToken },
+      data: { snapshotVersion: rearmed.snapshotVersion, consent: true, minimumSavingMinor: minimum * 5, expectedRevision: rearmed.watch.revision } });
+    assert.equal(newer.status(), 200); const newerReceipt = await newer.json();
+    await staleTab.locator('#arm-watch').click();
+    await staleTab.locator('#setup-message').filter({ hasText: /changed.*Reload/ }).waitFor();
+    assert.equal(await staleTab.locator('#checking-screen').isVisible(), false);
+    assert.deepEqual((await (await judge.request.get(origin + '/api/booking-demo/q/' + code)).json()).watch, newerReceipt.watch);
+    const staleShot = join(output, `stale-tab-${width}.png`); await staleTab.screenshot({ path: staleShot, fullPage: true }); report.screenshots.push(staleShot);
+    await staleTab.close();
     report.checks.push({ width, arm: 'passed', qualifyingDrops: 'passed', confirm: 'passed', restart: 'passed', context: 'passed', isolation: 'passed', rearm: 'passed' });
     await judge.close(); await second.close();
   }

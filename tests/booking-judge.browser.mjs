@@ -1,31 +1,55 @@
-// Judge flow browser check on the deterministic fixture catalogue: start -> booked -> setup -> armed -> Drops -> Review -> Confirmed,
-// plus the non-refundable cannot-start path, at 320, 768 and 1440 px. No live supplier, Altovo or Gemini calls.
+// Judge flow browser check on the curated fixture catalogue (tests/fixtures/curated-bookings.json) served through the
+// booking storage read interface with memory sessions: start grid -> Original Booking -> setup -> armed (by keyboard),
+// a failed arm, reload of the committed receipt, Drops -> Review -> Confirmed, cannot-start paths and an eligibility
+// change over time, at 320, 768 and 1440 px. No live supplier, Altovo or Gemini calls. Listens on port 0.
 import assert from 'node:assert/strict';
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { homedir } from 'node:os';
 import { createBookingDemoServer } from '../app/booking-demo-server.mjs';
-import { altovoCatalogueFixture } from './fixtures/altovo-catalogue.mjs';
+import { createMemorySessionStorage } from '../app/quotation-session-storage.mjs';
+import { curated, plannedBookings } from './fixtures/roomdrop-harness.mjs';
 
 const output = resolve('.local/judge-flow/browser'); await mkdir(output, { recursive: true });
 let playwright; try { playwright = await import('playwright'); } catch { playwright = await import(pathToFileURL(join(process.env.APPDATA || '', 'npm/node_modules/@playwright/cli/node_modules/playwright/index.mjs')).href); }
 const cache = join(process.env.LOCALAPPDATA || join(homedir(), 'AppData/Local'), 'ms-playwright');
 const builds = (await readdir(cache)).filter(name => /^chromium-\d+$/.test(name)).sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]));
 const browser = await playwright.chromium.launch({ headless: true, executablePath: join(cache, builds[0], 'chrome-win64/chrome.exe') });
-const server = createBookingDemoServer({ catalogue: altovoCatalogueFixture(), now: () => new Date('2026-10-20T00:00:00Z') });
-await new Promise(r => server.listen(0, '127.0.0.1', r)); const origin = 'http://127.0.0.1:' + server.address().port;
+// The real six cards have no reviewed photo yet, so the main walk shows the honest fallback on every card;
+// the fixture's illustrative photo is checked on the later-clock server.
+const noPhotos = () => { const input = curated(); for (const card of input.cards) card.photo = null; return input; };
+const start = async (now, input = noPhotos()) => {
+  const server = createBookingDemoServer({ bookingStorage: plannedBookings(input), sessionStorage: createMemorySessionStorage({ now }), now });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  return { server, origin: 'http://127.0.0.1:' + server.address().port };
+};
+const servers = [];
+const { origin } = servers[servers.push(await start(() => new Date('2026-10-20T00:00:00Z'))) - 1];
 const report = { status: 'started', checks: [], errors: [], external: [], screenshots: [] };
+const SIAM = 'AIRB000180'; const HYATT = 'AIRB000179';
 try {
   for (const width of [320, 768, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: width === 1440 ? 'no-preference' : 'reduce' });
-    await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : (report.external.push(route.request().url()), route.abort()));
+    await context.route('**/*', route => [origin, ...servers.map(item => item.origin)].includes(new URL(route.request().url()).origin) ? route.continue()
+      : (report.external.push(route.request().url()), route.abort()));
     const page = await context.newPage();
-    page.on('pageerror', e => report.errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') report.errors.push(m.text()); });
+    page.on('pageerror', e => report.errors.push(e.message));
+    page.on('console', m => { if (m.type() === 'error' && !/status of 503/.test(m.text())) report.errors.push(m.text()); });
     const visible = id => page.locator('#' + id).waitFor({ state: 'visible' });
+    const active = () => page.evaluate(() => document.activeElement?.id || document.activeElement?.getAttribute('name') || document.activeElement?.className);
     const focused = async id => assert.equal(await page.evaluate(() => document.activeElement?.id), id, width + ' focus ' + id);
+    // Presses Tab until the element matching `selector` has focus: the judge's own keyboard path.
+    const tabTo = async selector => {
+      for (let i = 0; i < 20; i += 1) {
+        if (await page.evaluate(s => document.activeElement?.matches(s), selector)) return;
+        await page.keyboard.press('Tab');
+      }
+      assert.fail(width + ' could not tab to ' + selector + ', at ' + await active());
+    };
     const shot = async (stage, fullPage = true) => {
-      assert.doesNotMatch(await page.locator('body').innerText(), /fictional|potential refund after|[\u2013\u2014]/i, stage);
+      assert.doesNotMatch(await page.locator('body').innerText(), /fictional|potential refund after|AirBorneo|[–—]/i, stage);
+      assert.equal(await page.locator('img[src*="altovo" i], img[alt*="altovo" i], img[alt*="airborneo" i]').count(), 0, stage + ' partner branding');
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), stage + ' overflow at ' + width);
       for (const button of await page.locator('button:visible').all()) assert((await button.boundingBox()).height >= 44, stage + ' small control at ' + width);
       const path = join(output, stage + '-' + width + '.png'); await page.screenshot({ path, fullPage }); report.screenshots.push(path);
@@ -35,43 +59,89 @@ try {
       await page.locator('#arm-watch').click();
       await visible('checking-screen');
       assert.match(await page.locator('#checking-replay').innerText(), /Replayed check · captured 18 Oct 2026, 12:10 UTC · not live/);
-      if (choice === 5000) await shot('checking', false);
       await visible('armed-strip'); await focused('armed-title');
       assert.equal(await page.locator('#offer-empty').isVisible(), expectEmpty);
     };
 
+    // F6 start grid: curated photo/city/dates/price/scenario cards, no code or link input.
     await page.goto(origin); await visible('catalogue-screen');
     assert.equal(new URL(page.url()).hash, '#start'); assert.equal(await page.locator('#customer-steps').isVisible(), false);
     assert.equal(await page.locator('.catalogue-card').count(), 2);
-    assert.match(await page.locator('[data-code="AIRB000180"] .watch-tag').innerText(), /Drop Watch ready/);
-    assert.match(await page.locator('[data-code="AIRB000179"] .watch-tag').innerText(), /Cannot start: non-refundable/);
+    assert.equal(await page.locator('#content input:visible, #content textarea:visible').count(), 0, 'no free-text code or share-link input');
+    const siamCard = page.locator(`[data-code="${SIAM}"]`); const hyattCard = page.locator(`[data-code="${HYATT}"]`);
+    assert.match(await siamCard.locator('.watch-tag').innerText(), /Drop Watch ready/);
+    assert.equal(await siamCard.locator('.scenario-label').innerText(), 'Free cancellation');
+    assert.match(await siamCard.innerText(), /Bangkok, Thailand[\s\S]*17 Feb - 18 Feb · 1 night[\s\S]*MYR 2,335\.52/);
+    assert.equal(await siamCard.locator('.photo-fallback').getAttribute('aria-label'), 'No photo yet · Bangkok');
+    assert.match(await hyattCard.locator('.watch-tag').innerText(), /Cannot start: non-refundable/);
+    assert.equal(await hyattCard.locator('.scenario-label').count(), 0);
+    assert.equal(await hyattCard.locator('.photo-fallback').getAttribute('aria-label'), 'No photo yet · Kuala Lumpur');
     await shot('start');
 
-    await page.locator('[data-code="AIRB000180"] .catalogue-open').click(); await visible('booked-screen'); await focused('booked-title');
-    assert.equal(new URL(page.url()).hash, '#booked-AIRB000180');
+    // F6 Original Booking, opened by keyboard; refresh keeps the page.
+    await siamCard.locator('.catalogue-open').focus(); await page.keyboard.press('Enter');
+    await visible('booked-screen'); await focused('booked-title');
+    assert.equal(new URL(page.url()).hash, '#booked-' + SIAM);
     const booked = await page.locator('#booked-screen').innerText();
-    assert.match(booked, /Your agency booked this/i); assert.match(booked, /A real Altovo staging quotation standing in for a confirmed booking/);
+    assert.match(booked, /Your agency booked this/i);
+    assert.match(booked, /A real Altovo staging quotation standing in for a confirmed booking · captured 18 Oct 2026/);
     assert.match(booked, /Free cancellation until 14 Feb 2027, 16:58 UTC/); assert.match(booked, /MYR 2,335\.52/); assert.match(booked, /1 guest/);
+    assert.equal(await page.locator('#booked-screen button.primary:visible').count(), 1, 'one primary action');
+    assert.equal(await page.locator('#setup-drop').innerText(), 'Set up a drop');
+    if (width === 768) { await page.reload(); await visible('booked-screen'); }
     await shot('booked');
 
-    await page.locator('#setup-drop').click(); await visible('setup-screen'); await focused('setup-title');
+    // F7a setup by keyboard: consent is required, then a failed arm stays retryable and never shows armed.
+    await page.locator('#booked-title').focus(); await tabTo('#setup-drop'); await page.keyboard.press('Enter');
+    await visible('setup-screen'); await focused('setup-title');
     assert.equal(await page.locator('input[name="minimum-saving"]').count(), 4);
-    await page.locator('#arm-watch').click(); await page.getByText('Tick the box so RoomDrop may check this booking').waitFor(); await focused('judge-consent');
-    await page.locator('#judge-consent').check(); await shot('setup');
-    await arm(5000);
-    assert.equal(new URL(page.url()).hash, '#drops-AIRB000180');
+    assert.match(await page.locator('#minimum-options').innerText(), /Any drop\s+MYR 10 or more/);
+    await tabTo('input[name="minimum-saving"]:checked'); await page.keyboard.press('ArrowRight');
+    assert.equal(await page.locator('input[name="minimum-saving"][value="5000"]').isChecked(), true);
+    await tabTo('#arm-watch'); await page.keyboard.press('Enter');
+    await page.getByText('Tick the box so RoomDrop may check this booking').waitFor(); await focused('judge-consent');
+    await page.keyboard.press('Space'); assert.equal(await page.locator('#judge-consent').isChecked(), true);
+    await shot('setup');
+    let failed = 0;
+    await page.route(`**/api/booking-demo/q/${SIAM}/watch`, route => (failed += 1, route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":{"code":"DEMO_UNAVAILABLE"}}' })));
+    await tabTo('#arm-watch'); await page.keyboard.press('Enter');
+    await page.getByText('RoomDrop is unavailable right now. Please try again.').waitFor();
+    assert.equal(failed, 1);
+    assert.deepEqual([await page.locator('#setup-screen').isVisible(), await page.locator('#armed-strip').isVisible(), await page.locator('#checking-screen').isVisible()], [true, false, false]);
+    assert.equal(new URL(page.url()).hash, '#setup-' + SIAM); assert.equal(await page.locator('#arm-watch').isDisabled(), false);
+    await shot('arm-failed');
+    await page.unroute(`**/api/booking-demo/q/${SIAM}/watch`);
+    const armed = page.waitForResponse(response => response.url().endsWith(`/q/${SIAM}/watch`) && response.request().method() === 'POST');
+    await page.locator('#arm-watch').focus(); await page.keyboard.press('Enter');
+    const receipt = await (await armed).json();
+    await visible('checking-screen');
+    assert.match(await page.locator('#checking-replay').innerText(), /Replayed check · captured 18 Oct 2026, 12:10 UTC · not live/);
+    await shot('checking', false);
+    await visible('armed-strip'); await focused('armed-title');
+    assert.deepEqual([receipt.watch.revision, receipt.watch.minimumSavingMinor, receipt.dropOptionIds.length], [1, 5000, 2]);
+    assert.equal(new URL(page.url()).hash, '#drops-' + SIAM);
+    const detail = await page.locator('#armed-detail').innerText();
+    assert.match(detail, /^Drops of MYR 50 or more .*replayed check from 18 Oct 2026, 12:10 UTC/);
+    assert.match(detail, /Replayed 20 Oct 2026, 00:00 UTC.*Captured 18 Oct 2026, 12:10 UTC.*not live$/);
     assert.equal(await page.locator('#offers .offer-ticket').count(), 2);
-    assert.match(await page.locator('#armed-detail').innerText(), /Drops of MYR 50 or more · replayed check from 18 Oct 2026, 12:10 UTC/);
-    await shot('drops');
+    await shot('armed');
 
-    await page.goBack(); await visible('setup-screen'); await page.goForward(); await visible('armed-strip');
+    // Reload after arming shows the same committed receipt.
+    await page.reload(); await visible('armed-strip');
+    assert.equal(await page.locator('#armed-detail').innerText(), detail);
+    assert.deepEqual(await page.evaluate(async code => (await (await fetch('/api/booking-demo/q/' + code)).json()).watch, SIAM), receipt.watch);
+
+    // Re-arm with new minima (existing Drops screens consume the receipt).
+    await page.goBack(); await page.goForward(); await visible('armed-strip');
     await page.locator('#change-minimum').click(); await visible('setup-screen');
     assert.equal(await page.locator('input[name="minimum-saving"][value="5000"]').isChecked(), true);
+    assert.equal(await page.locator('#arm-watch').innerText(), 'Update my Drop Watch');
     await arm(25000, true);
     assert.match(await page.locator('#offer-empty').innerText(), /No drops above your minimum yet/);
     await shot('empty');
     await page.locator('#lower-minimum').click(); await visible('setup-screen'); await arm(1000);
     assert.equal(await page.locator('#offers .offer-ticket').count(), 3);
+    assert.equal((await page.evaluate(async code => (await (await fetch('/api/booking-demo/q/' + code)).json()).watch, SIAM)).revision, 3);
 
     const first = page.locator('#offers .offer-action').first(); await first.focus(); await page.keyboard.press('Enter');
     await visible('comparison'); assert.match(new URL(page.url()).hash, /^#review-AIRB000180$/);
@@ -84,22 +154,45 @@ try {
     await page.reload(); await visible('simulated-switch');
     await page.goBack(); await visible('comparison'); await page.goBack(); await visible('armed-strip');
 
+    // Cannot start: the reason, with the setup action shown but disabled; direct setup links fall back.
     await page.locator('.brand').click(); await visible('catalogue-screen'); await focused('catalogue-title');
-    await page.locator('[data-code="AIRB000179"] .catalogue-open').click(); await visible('booked-screen');
-    assert.equal(await page.locator('#setup-drop').isVisible(), false); await visible('booked-blocked');
+    await hyattCard.locator('.catalogue-open').click(); await visible('booked-screen'); await visible('booked-blocked');
+    assert.equal(await page.locator('#setup-drop').isDisabled(), true);
+    assert.equal(await page.locator('#setup-drop').getAttribute('aria-describedby'), 'blocked-title');
     assert.match(await page.locator('#booked-blocked').innerText(), /non-refundable/i);
     assert.match(await page.locator('#booked-screen').innerText(), /Non-refundable/);
+    assert.equal(await page.locator('#booked-photo-tag').isVisible(), false, 'no photo tag on the fallback');
     await shot('cannot-start');
-    await page.goto(origin + '/#setup-AIRB000179'); await visible('booked-blocked');
+    await page.goto(origin + '/#setup-' + HYATT); await visible('booked-blocked');
     await page.locator('#pick-another').click(); await visible('catalogue-screen');
     await page.goBack(); await visible('booked-blocked');
-    report.checks.push({ width, start: 'passed', booked: 'passed', consentRequired: 'passed', armed: 'passed', minimumFilter: 'passed', empty: 'passed',
-      review: 'passed', confirmed: 'passed', reload: 'passed', backForward: 'passed', cannotStart: 'passed' });
+    report.checks.push({ width, start: 'passed', booked: 'passed', keyboard: 'passed', consentRequired: 'passed', failedArm: 'passed', armed: 'passed',
+      reloadReceipt: 'passed', minimumFilter: 'passed', empty: 'passed', review: 'passed', confirmed: 'passed', backForward: 'passed', cannotStart: 'passed' });
     await context.close();
   }
+
+  // Eligibility is evaluated at the actual time: once free cancellation ends the card and the page say so.
+  const late = servers[servers.push(await start(() => new Date('2027-02-15T00:00:00Z'), curated())) - 1];
+  const context = await browser.newContext({ viewport: { width: 768, height: 900 }, reducedMotion: 'reduce' });
+  await context.route('**/*', route => new URL(route.request().url()).origin === late.origin ? route.continue() : (report.external.push(route.request().url()), route.abort()));
+  const page = await context.newPage(); page.on('pageerror', e => report.errors.push(e.message));
+  await page.goto(late.origin); await page.locator('#catalogue-screen').waitFor({ state: 'visible' });
+  const card = page.locator(`[data-code="${SIAM}"]`);
+  assert.match(await card.locator('.watch-tag').innerText(), /Cannot start: free cancellation ended/);
+  assert.equal(await card.locator('.scenario-label').count(), 0, 'an ended scenario is not advertised');
+  // A supplied photo renders as an image with its reviewed alt text; the other card keeps the fallback.
+  assert.equal(await card.locator('img.card-photo').getAttribute('alt'), 'Illustrative hotel stay (not this hotel)');
+  assert.equal(await page.locator(`[data-code="${HYATT}"] .photo-fallback`).count(), 1);
+  await page.screenshot({ path: join(output, 'ended-start-768.png'), fullPage: true }); report.screenshots.push(join(output, 'ended-start-768.png'));
+  await page.goto(late.origin + '/#setup-' + SIAM); await page.locator('#booked-blocked').waitFor({ state: 'visible' });
+  assert.match(await page.locator('#blocked-title').innerText(), /Free cancellation has ended/);
+  assert.equal(await page.locator('#setup-drop').isDisabled(), true);
+  await page.screenshot({ path: join(output, 'ended-booked-768.png'), fullPage: true }); report.screenshots.push(join(output, 'ended-booked-768.png'));
+  await context.close();
+  report.checks.push({ width: 768, endedEligibility: 'passed' });
   assert.deepEqual(report.errors, []); assert.deepEqual(report.external, []); report.status = 'passed';
 } catch (e) { report.status = 'failed'; report.error = e.message; process.exitCode = 1; }
 finally {
   await writeFile(join(output, 'result.json'), JSON.stringify(report, null, 2)); console.log(JSON.stringify(report, null, 2));
-  await browser.close(); await new Promise(r => { server.closeAllConnections(); server.close(r); });
+  await browser.close(); await Promise.all(servers.map(({ server }) => new Promise(r => { server.closeAllConnections(); server.close(r); })));
 }

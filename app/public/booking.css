@@ -456,7 +456,26 @@ footer p { margin: 0; }
 .catalogue-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .catalogue-card { display: flex; min-width: 0; flex-direction: column; overflow: hidden; border: 1px solid rgba(213, 222, 232, .75); border-radius: 20px; background: var(--surface); box-shadow: 0 8px 18px rgba(32, 44, 59, .07); }
 .catalogue-photo { position: relative; height: 150px; overflow: hidden; background: #dce6ef; }
-.catalogue-photo > .stay-photo { width: 100%; height: 100%; }
+.catalogue-photo > .stay-photo, .catalogue-photo > .card-photo, .catalogue-photo > .photo-fallback,
+#booked-photo > .card-photo, #booked-photo > .photo-fallback { width: 100%; height: 100%; }
+.card-photo { display: block; object-fit: cover; }
+/* Honest fallback when no reviewed photo exists: a drawn airmail postcard, never another hotel's picture. */
+.photo-fallback { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 18px 16px 14px;
+  background: repeating-linear-gradient(-45deg, var(--coral) 0 10px, var(--surface) 10px 18px, var(--blue) 18px 28px, var(--surface) 28px 36px); }
+.photo-fallback::before { position: absolute; inset: 9px; border-radius: 12px; background: linear-gradient(180deg, #fdf6ec 0%, #f6efe2 100%); content: ''; }
+.photo-fallback > * { position: relative; }
+.photo-fallback svg { width: min(46%, 130px); height: auto; max-height: 58%; fill: none; stroke: var(--blue); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.photo-fallback svg path:last-child { fill: var(--coral); stroke: var(--coral); }
+.fallback-city { color: var(--ink); font: 800 22px/1.1 var(--heading); letter-spacing: -.01em; text-align: center; overflow-wrap: anywhere; }
+.fallback-note { border: 1.5px dashed #b8c7d7; border-radius: 999px; padding: 1px 9px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.catalogue-photo > .photo-fallback { padding-top: 46px; }
+.catalogue-photo > .photo-fallback svg { max-height: 44%; }
+#booked-photo > .photo-fallback { padding-right: 112px; padding-left: 28px; align-items: flex-start; }
+#booked-photo > .photo-fallback .fallback-city { text-align: left; }
+.scenario-label { justify-self: start; margin: 0 0 6px; border-radius: 8px; padding: 3px 9px; font-size: 12px; font-weight: 700; line-height: 1.35; transform: rotate(-1.5deg); }
+.scenario-0 { background: var(--green-bg); color: var(--green); }
+.scenario-1 { background: var(--blue-bg); color: #23466e; }
+.scenario-2 { background: var(--amber-bg); color: var(--amber); }
 .watch-tag { position: absolute; top: 12px; left: 12px; display: inline-flex; max-width: calc(100% - 24px); align-items: center; gap: 6px; border-radius: 999px; padding: 6px 11px; font-size: 12px; font-weight: 700; line-height: 1.25; box-shadow: 0 2px 6px rgba(32, 44, 59, .12); }
 .watch-tag svg { width: 15px; height: 15px; flex: 0 0 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .tag-ready { background: var(--green-bg); color: var(--green); }
@@ -535,6 +554,8 @@ footer p { margin: 0; }
   .catalogue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .catalogue-photo { height: 170px; }
   .booked-photo { height: 240px; }
+  #booked-photo > .photo-fallback { padding-right: 16px; padding-left: 16px; align-items: center; }
+  #booked-photo > .photo-fallback .fallback-city { font-size: 28px; text-align: center; }
   .chip-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .armed-strip { grid-template-columns: 46px minmax(0, 1fr) auto; }
   .armed-strip .secondary { grid-column: auto; width: auto; }

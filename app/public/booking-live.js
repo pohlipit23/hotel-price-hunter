@@ -9,7 +9,8 @@ export async function startBookingDemo(ui) {
   let data, view, selected, busy = false, lastTrigger, code = null, judge, entries = [], navigation = 0;
   const api = action => catalogueMode ? `/api/booking-demo/q/${code}${action ? '/' + action : ''}` : '/api/booking-demo' + (action ? '/' + action : '');
   const instantLabel = value => new Date(value).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC';
-  const adviser = createStayAdviser({ parent: $('comparison'), before: $('price-details'), getData: () => data, chatUrl: () => api('chat') });
+  const adviser = createStayAdviser({ parent: $('comparison'), before: $('price-details'),
+    overviewParent: $('deal-list').querySelector('.section-heading'), getData: () => data, chatUrl: () => api('chat') });
   const explanation = 'Estimated savings before final pricing and fees. Full cancellation terms and room matching still need verification.';
   const judgeScreens = { start: 'catalogue-screen', booked: 'booked-screen', setup: 'setup-screen', checking: 'checking-screen' };
   const stepIndex = catalogueMode ? { booked: 0, setup: 1, checking: 1, options: 2, review: 3, confirmed: 4 } : { options: 0, review: 1, confirmed: 2 };
@@ -243,8 +244,7 @@ export async function startBookingDemo(ui) {
     try {
       const response = await fetch(api('watch'), { method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': data.csrfToken },
-        body: JSON.stringify({ snapshotVersion: data.snapshotVersion, consent: true, minimumSavingMinor: minimum,
-          expectedRevision: data.watch?.revision ?? 0 }) });
+        body: JSON.stringify(judge.armRequestBody(data, minimum)) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
         if (result.error?.code === 'WATCH_CANNOT_START') { data.blocker = result.error.reason; busy = false; return go('booked', code, { push: false }); }

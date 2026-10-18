@@ -48,7 +48,7 @@ test('the replay threshold is the minimum in the booking currency, at least 10.0
   assert.deepEqual(arm(session(), 23123).dropOptionIds, ['option-fixture-flex-premier']);
   assert.deepEqual(arm(session(), 23124).dropOptionIds, []);
   // Minimum validation uses the booking currency's minor units: 10 JPY, 10.000 KWD.
-  assert.deepEqual(armRequest({ snapshotVersion: 'v', consent: true, minimumSavingMinor: 10 }, 'JPY'), { snapshotVersion: 'v', minimumSavingMinor: 10, expectedRevision: 0 });
+  assert.deepEqual(armRequest({ snapshotVersion: 'v', consent: true, minimumSavingMinor: 10 }, 'JPY'), { snapshotVersion: 'v', minimumSavingMinor: 10, expectedRevision: null });
   refuses(() => armRequest({ snapshotVersion: 'v', consent: true, minimumSavingMinor: 9999 }, 'KWD'), 'MINIMUM_SAVING_INVALID');
   assert.equal(armRequest({ snapshotVersion: 'v', consent: true, minimumSavingMinor: 10000 }, 'KWD').minimumSavingMinor, 10000);
 });
@@ -84,6 +84,28 @@ test('an identical retry returns the committed receipt; a stale request cannot r
   // The retry of revision 1's request no longer restores it.
   refuses(() => arm(state, 5000, { at: later }), 'WATCH_REVISION_STALE');
   assert.equal(state.byCode[SIAM].watch.revision, 2);
+});
+
+test('expectedRevision is optional: absent skips the stale check, present must name the current revision', () => {
+  const body = (minimumSavingMinor, extra = {}) => ({ snapshotVersion: 'a'.repeat(64), consent: true, minimumSavingMinor, ...extra });
+  const send = (state, value, at = ARMED) => armDropWatch(state, { code: SIAM, booking: booking(), request: armRequest(value, 'MYR'), at });
+  const later = new Date('2026-10-20T00:05:00Z');
+  // Absent on a first arm and on a re-arm: no stale check, a new minimum makes the next revision.
+  const state = session();
+  const first = send(state, body(5000));
+  assert.equal(first.watch.revision, 1);
+  // Absent with the committed minimum is an identical retry, not a new revision.
+  assert.deepEqual(send(state, body(5000), later), first);
+  const changed = send(state, body(25000), later);
+  assert.deepEqual([changed.watch.revision, changed.watch.minimumSavingMinor, changed.watch.armedAt], [2, 25000, '2026-10-20T00:05:00.000Z']);
+  // Present and stale: refused, nothing changes.
+  refuses(() => send(state, body(1000, { expectedRevision: 1 }), later), 'WATCH_REVISION_STALE');
+  refuses(() => send(state, body(1000, { expectedRevision: 3 }), later), 'WATCH_REVISION_STALE');
+  assert.equal(state.byCode[SIAM].watch.revision, 2);
+  // Present and current: the next revision.
+  assert.equal(send(state, body(1000, { expectedRevision: 2 }), later).watch.revision, 3);
+  // Present 0 on a first arm is the explicit first-arm form.
+  assert.equal(send(session(), body(1000, { expectedRevision: 0 })).watch.revision, 1);
 });
 
 test('a changed Drop set resets the watch, so the next arm starts again at revision 1', () => {
@@ -182,6 +204,20 @@ test('HTTP arm: a missing or malformed capture is 503 CAPTURE_UNAVAILABLE and co
   assert.equal((await (await v.post(SIAM, 'watch', armBody(contentVersion, 1000))).json()).watch.revision, 1);
 });
 
+test('HTTP re-arm: absent expectedRevision changes the minimum, a stale one is 409, the current one is the next revision', async t => {
+  const bookingStorage = plannedBookings();
+  const origin = await listen(t, createBookingDemoServer({ bookingStorage, sessionStorage: createMemorySessionStorage({ now: NOW }), now: NOW }));
+  const v = await visit(origin);
+  const { contentVersion } = await bookingStorage.getBooking(SIAM);
+  const revisionOf = async response => [response.status, (await response.json()).watch?.revision];
+  assert.deepEqual(await revisionOf(await v.post(SIAM, 'watch', armBody(contentVersion, 5000))), [200, 1]);
+  assert.deepEqual(await revisionOf(await v.post(SIAM, 'watch', armBody(contentVersion, 25000))), [200, 2]);
+  assert.deepEqual(await errorOf(await v.post(SIAM, 'watch', armBody(contentVersion, 1000, { expectedRevision: 1 }))), [409, 'WATCH_REVISION_STALE']);
+  assert.deepEqual(await revisionOf(await v.post(SIAM, 'watch', armBody(contentVersion, 1000, { expectedRevision: 2 }))), [200, 3]);
+  const current = (await (await v.get(SIAM)).json()).watch;
+  assert.deepEqual([current.revision, current.minimumSavingMinor], [3, 1000]);
+});
+
 test('Firestore arm: identical concurrent arms on two app instances and a lost acknowledgement give one receipt, with no upstream call', integration, async t => {
   const { first, second, storage, versions } = await emulatorCatalogue(t);
   const spy = upstreamSpy(t);
@@ -213,7 +249,8 @@ test('Firestore arm: different minima racing from one revision commit exactly on
   const { first, storage, versions } = await emulatorCatalogue(t);
   const origin = await listen(t, createBookingDemoServer({ ...storage(first), now: NOW }));
   const v = await visit(origin); const version = versions[SIAM].contentVersion;
-  const results = await Promise.all([1000, 5000, 15000].map(async minimum => ({ minimum, response: await v.post(SIAM, 'watch', armBody(version, minimum)) })));
+  // Each racing first arm names revision 0 explicitly, so only one can commit.
+  const results = await Promise.all([1000, 5000, 15000].map(async minimum => ({ minimum, response: await v.post(SIAM, 'watch', armBody(version, minimum, { expectedRevision: 0 })) })));
   const winners = results.filter(result => result.response.status === 200);
   assert.equal(winners.length, 1);
   for (const loser of results.filter(result => result.response.status !== 200)) assert.deepEqual(await errorOf(loser.response), [409, 'WATCH_REVISION_STALE']);
@@ -223,7 +260,7 @@ test('Firestore arm: different minima racing from one revision commit exactly on
   // A deliberate new minimum names revision 1; retrying the winning request afterwards cannot restore it.
   const raised = await (await v.post(SIAM, 'watch', armBody(version, 25000, { expectedRevision: 1 }))).json();
   assert.deepEqual([raised.watch.revision, raised.dropOptionIds], [2, []]);
-  assert.deepEqual(await errorOf(await v.post(SIAM, 'watch', armBody(version, winners[0].minimum))), [409, 'WATCH_REVISION_STALE']);
+  assert.deepEqual(await errorOf(await v.post(SIAM, 'watch', armBody(version, winners[0].minimum, { expectedRevision: 0 }))), [409, 'WATCH_REVISION_STALE']);
   assert.deepEqual(await errorOf(await v.post(SIAM, 'watch', armBody(version, 1000, { expectedRevision: 1 }))), [409, 'WATCH_REVISION_STALE']);
   assert.deepEqual((await (await v.get(SIAM)).json()).watch, raised.watch);
 });

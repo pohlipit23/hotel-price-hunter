@@ -1,6 +1,6 @@
 import { watchBinding } from './booking-live-data.js';
 /** One conversation shared by the compact adviser and the floating Gemini dialog. */
-export function createStayAdviser({ parent, before, getData, chatUrl = () => '/api/booking-demo/chat' }) {
+export function createStayAdviser({ parent, before, overviewParent, getData, chatUrl = () => '/api/booking-demo/chat' }) {
   const el = (tag, text, className) => {
     const item = document.createElement(tag);
     if (text) item.textContent = text;
@@ -38,6 +38,7 @@ export function createStayAdviser({ parent, before, getData, chatUrl = () => '/a
   const privacy = el('p', 'Your question and comparison go to Google Gemini. Leave out personal details.', 'stay-chat-privacy');
   dialog.append(header, log);
   document.body.append(launcher, dialog);
+  if (overviewParent) overviewParent.classList.add('gemini-overview-heading');
 
   let context, controller, generation = 0, draft = '', returnFocus;
   let notice = '', noticeKey;
@@ -75,6 +76,11 @@ export function createStayAdviser({ parent, before, getData, chatUrl = () => '/a
   }
   function refresh() {
     const active = Boolean(context?.enabled);
+    if (overviewParent) {
+      const target = context?.pageContext === 'drop-detail' ? heading : overviewParent;
+      if (launcher.parentElement !== target) target.append(launcher);
+      launcher.classList.add('gemini-docked'); openInline.hidden = true;
+    }
     launcher.hidden = !active; section.hidden = !active || context.pageContext !== 'drop-detail';
     launcher.setAttribute('aria-expanded', String(dialog.open));
     contextLabel.textContent = context?.label || 'RoomDrop support';
