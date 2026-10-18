@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { AdviceUnavailableError } from './gemini.mjs';
+import { createStayChat } from './stay-chat.mjs';
 
 export const QUOTATION_MODEL = 'gemini-3.8-flash';
 
@@ -59,6 +60,8 @@ function parse(text, catalog) {
 }
 export async function createQuotationAdvisor({ environment = process.env, generateContent, googleAuthOptions, timeoutMs = 20000 } = {}) {
   const systemInstruction = await readFile(new URL('./prompts/quotation-advice.txt', import.meta.url), 'utf8');
+  const chatInstruction = await readFile(new URL('./prompts/stay-chat.txt', import.meta.url), 'utf8');
+  const openingInstruction = await readFile(new URL('./prompts/stay-chat-opening.txt', import.meta.url), 'utf8');
   const configured = environment.QUOTATION_ADVICE_ENABLED === 'true' && environment.GOOGLE_CLOUD_PROJECT && environment.GOOGLE_CLOUD_LOCATION && environment.GEMINI_MODEL;
   if (configured && environment.GEMINI_MODEL !== QUOTATION_MODEL) throw new Error(`Quotation advice requires ${QUOTATION_MODEL}.`);
   let generate = generateContent;
@@ -69,6 +72,7 @@ export async function createQuotationAdvisor({ environment = process.env, genera
     generate = request => client.models.generateContent(request);
   }
   return { available: Boolean(generate), model: QUOTATION_MODEL, status: generateContent ? 'test-injected' : configured ? 'configured-unverified' : 'unconfigured',
+    chat: createStayChat({ generate, buildComparison: context, systemInstruction: chatInstruction, openingInstruction, model: QUOTATION_MODEL, timeoutMs }),
     async advise(input) {
       if (!generate || typeof input.message !== 'string' || !input.message.trim() || input.message.length > 1200) return unavailable();
       const { catalog, facts, retail, estimate } = context(input);

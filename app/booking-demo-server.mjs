@@ -4,6 +4,7 @@ import { createQuotationDemoServer, createHostedQuotationDemoServer } from './qu
 const assets = new Map([
   ['/', ['booking.html', 'text/html']], ['/booking.js', ['booking.js', 'text/javascript']],
   ['/booking-live.js', ['booking-live.js', 'text/javascript']], ['/booking-live-data.js', ['booking-live-data.js', 'text/javascript']],
+  ['/drop-eligibility.js', ['drop-eligibility.js', 'text/javascript']],
   ['/booking.css', ['booking.css', 'text/css']], ['/pricing.js', ['pricing.js', 'text/javascript']],
   ['/watch.js', ['watch.js', 'text/javascript']], ['/stay-photos.js', ['stay-photos.js', 'text/javascript']],
   ['/stay-advice.js', ['stay-advice.js', 'text/javascript']], ['/stay-advice.css', ['stay-advice.css', 'text/css']],
@@ -16,7 +17,7 @@ export function createBookingDemoServer({ bundle, snapshot, environment, now, ad
   const delegate = server.listeners('request')[0];
   server.removeListener('request', delegate);
   server.on('request', async (req, res) => {
-    const api = { '/api/booking-demo': '/api/quotation-demo', '/api/booking-demo/confirm': '/api/quotation-demo/confirm', '/api/booking-demo/advice': '/api/quotation-demo/advice' };
+    const api = { '/api/booking-demo': '/api/quotation-demo', '/api/booking-demo/confirm': '/api/quotation-demo/confirm', '/api/booking-demo/advice': '/api/quotation-demo/advice', '/api/booking-demo/chat': '/api/quotation-demo/chat' };
     if (Object.hasOwn(api, req.url)) { req.url = api[req.url]; return delegate(req, res); }
     if (req.url === '/health' || req.url === '/healthz') return delegate(req, res);
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');

@@ -1,4 +1,5 @@
 /** Display adapter only. Estimates never become execution or refund authority. */
+import { isDisplayedDrop } from './drop-eligibility.js';
 export function bookingView(snapshot) {
   const b = snapshot.baseline;
   const currency = b.quotedRetail.currency;
@@ -16,7 +17,7 @@ export function bookingView(snapshot) {
         : option.freeCancellation === false ? 'non-refundable' : 'unknown' },
       displaySaving: { available: delta > 0, minor: delta, isEstimate: true }, option };
   });
-  const ranked = offers.filter(offer => offer.displaySaving.available).toSorted((a, b) => b.displaySaving.minor - a.displaySaving.minor);
+  const ranked = offers.filter(offer => isDisplayedDrop(b, offer.option)).toSorted((a, b) => b.displaySaving.minor - a.displaySaving.minor);
   const flexible = ranked.find(offer => offer.option.freeCancellation === true && offer !== ranked[0]);
   const remaining = ranked.filter(offer => offer !== ranked[0] && offer !== flexible);
   const picks = [ranked[0], flexible, ...remaining].filter(Boolean).slice(0, 3);

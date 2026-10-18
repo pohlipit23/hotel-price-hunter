@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { publicQuotationDemo } from './domain/quotation-demo.mjs';
 import { QUOTATION_MODEL } from './quotation-advisor.mjs';
+import { isDisplayedDrop } from './public/drop-eligibility.js';
 
 export function validateLocalQuotationMode(env = process.env) {
   if (env.NODE_ENV === 'production' || env.K_SERVICE || env.CLOUD_RUN_JOB || (env.BIND_HOST && env.BIND_HOST !== '127.0.0.1')) {
@@ -80,31 +81,53 @@ function createQuotationServer({ bundle, now = () => new Date(), cloudOrigin = n
         if (!session) {
           for (const [key, value] of sessions) if (value.expiresAt <= now().getTime()) sessions.delete(key);
           if (sessions.size >= 64) return error(503, 'DEMO_SESSION_CAPACITY');
-          const id = randomBytes(32).toString('hex'); session = { csrfToken: randomBytes(32).toString('hex'), expiresAt: now().getTime() + 3600000, confirmation: null, adviceWindow: 0, adviceCount: 0, adviceHistory: {} };
+          const id = randomBytes(32).toString('hex'); session = { csrfToken: randomBytes(32).toString('hex'), expiresAt: now().getTime() + 3600000, confirmation: null, adviceWindow: 0, adviceCount: 0, adviceHistory: {}, chatHistory: [] };
           sessions.set(id, session); res.setHeader('Set-Cookie', `roomdrop_quote=${id}; Path=/; HttpOnly; SameSite=Strict; Max-Age=3600${cloudOrigin ? '; Secure' : ''}`);
         }
         return json(res, 200, { ...publicQuotationDemo(bundle), csrfToken: session.csrfToken, confirmation: session.confirmation, model });
       }
-      if (['/api/quotation-demo/confirm', '/api/quotation-demo/advice'].includes(url.pathname) && req.method === 'POST') {
+      if (['/api/quotation-demo/confirm', '/api/quotation-demo/advice', '/api/quotation-demo/chat'].includes(url.pathname) && req.method === 'POST') {
         if (!session || req.headers.origin !== origin || req.headers['x-csrf-token'] !== session.csrfToken
           || req.headers['sec-fetch-site'] === 'cross-site') return error(403, 'DEMO_SESSION_REQUIRED');
         if (!(req.headers['content-type'] ?? '').startsWith('application/json')) return error(400, 'INVALID_SELECTION');
         const chunks = []; let size = 0;
         for await (const chunk of req) { size += chunk.length; if (size > 4096) return error(413, 'SELECTION_TOO_LARGE'); chunks.push(chunk); }
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return error(400, 'INVALID_SELECTION'); }
-        if (url.pathname.endsWith('/advice')) {
+        const chat = url.pathname.endsWith('/chat');
+        if (chat || url.pathname.endsWith('/advice')) {
+          if (chat) {
+            if (!body || Array.isArray(body) || Object.keys(body).some(key => !['optionId', 'snapshotVersion', 'message', 'pageContext', 'intent'].includes(key))
+              || !['drops-overview', 'drop-detail'].includes(body.pageContext) || !['opening', 'question'].includes(body.intent)
+              || (body.intent === 'question' && (typeof body.message !== 'string' || !body.message.trim() || body.message.length > 1200))
+              || (body.intent === 'opening' && Object.hasOwn(body, 'message'))
+              || (body.pageContext === 'drops-overview' && Object.hasOwn(body, 'optionId'))
+              || (body.pageContext === 'drop-detail' && typeof body.optionId !== 'string')) return error(400, 'INVALID_ADVICE');
+          } else {
           if (!body || Array.isArray(body) || Object.keys(body).some(key => !['optionId', 'snapshotVersion', 'message'].includes(key))
             || typeof body.message !== 'string' || !body.message.trim() || body.message.length > 1200) return error(400, 'INVALID_ADVICE');
+          }
           if (body.snapshotVersion !== bundle.snapshotVersion) return error(409, 'SNAPSHOT_CHANGED');
           const option = bundle.options.find(value => value.optionId === body.optionId);
-          if (!option) return error(404, 'OPTION_UNAVAILABLE');
-          if (!advisor.available) return error(503, 'ADVICE_UNAVAILABLE');
+          if ((!chat || body.pageContext === 'drop-detail') && !option) return error(404, 'OPTION_UNAVAILABLE');
+          if (chat && option && !isDisplayedDrop(bundle.baseline, option)) return error(404, 'OPTION_UNAVAILABLE');
+          if (!advisor.available || (chat && typeof advisor.chat !== 'function')) return error(503, 'ADVICE_UNAVAILABLE');
           const time = now().getTime();
           if (time - session.adviceWindow >= 60000) { session.adviceWindow = time; session.adviceCount = 0; }
           if (time - adviceWindow >= 60000) { adviceWindow = time; adviceCount = 0; }
           if (session.adviceCount >= 4 || adviceCount >= 20 || advicePending >= 2) return error(429, 'ADVICE_RATE_LIMIT');
           session.adviceCount++; adviceCount++; advicePending++;
           try {
+            if (chat) {
+              const optionId = option?.optionId ?? null;
+              const advice = await advisor.chat({ baseline: bundle.baseline, options: option ? [option] : bundle.options.filter(item => isDisplayedDrop(bundle.baseline, item)),
+                pageContext: body.pageContext, optionId, snapshotVersion: bundle.snapshotVersion, checkedAt: bundle.checkedAt,
+                intent: body.intent, message: body.message, history: session.chatHistory });
+              if (sessions.get(cookie) !== session || session.expiresAt <= now().getTime()) return error(401, 'DEMO_SESSION_REQUIRED');
+              session.chatHistory = [...session.chatHistory, { pageContext: body.pageContext, optionId, snapshotVersion: bundle.snapshotVersion,
+                question: body.intent === 'opening' ? 'Opening guidance' : body.message, reply: advice.reply }].slice(-4);
+              return json(res, 200, { advice, optionId, pageContext: body.pageContext, snapshotVersion: bundle.snapshotVersion,
+                source: advisor.status === 'test-injected' ? 'test-injected' : 'vertex-gemini', selectionChanged: false });
+            }
             const history = session.adviceHistory[option.optionId] || [];
             const advice = await advisor.advise({ baseline: bundle.baseline, option, checkedAt: bundle.checkedAt, message: body.message, history });
             if (sessions.get(cookie) !== session || session.expiresAt <= now().getTime()) return error(401, 'DEMO_SESSION_REQUIRED');

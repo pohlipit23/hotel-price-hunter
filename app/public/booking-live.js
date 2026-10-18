@@ -6,6 +6,11 @@ export async function startBookingDemo(ui) {
   const { $, node, money, savingLabel, addStamp, setActionContent, factTile, stayText, guestText, stayPhoto, offerPhotoIndex } = ui;
   let data, view, selected, busy = false, lastTrigger;
   const adviser = createStayAdviser({ parent: $('comparison'), before: $('price-details'), getData: () => data });
+  const barObserver = new ResizeObserver(entries => {
+    const height = entries[0].target.getBoundingClientRect().height;
+    document.documentElement.style.setProperty('--review-bar-height', height + 'px');
+  });
+  barObserver.observe(document.querySelector('.review-actions'));
   const explanation = 'Estimated savings before final pricing and fees. Full cancellation terms and room matching still need verification.';
   const steps = screen => {
     $('booking-summary').hidden = screen === 'review'; $('comparison').hidden = screen !== 'review';
@@ -17,9 +22,11 @@ export async function startBookingDemo(ui) {
       if (index === current) step.setAttribute('aria-current', 'step'); else step.removeAttribute('aria-current');
       step.classList.toggle('passed', index < current);
     });
+    const dropLabel = view?.highlights.find(highlight => highlight.offer.offerId === selected?.offerId)?.label;
+    adviser.setContext({ pageContext: screen === 'review' ? 'drop-detail' : 'drops-overview', optionId: screen === 'review' ? selected?.offerId : null,
+      label: screen === 'review' ? (dropLabel || 'This drop') + ' · ' + selected.room.name : 'Compare your drops', enabled: Boolean(data) && screen !== 'confirmed' });
   };
   const navigate = (screen, push = true) => {
-    if (screen !== 'review') adviser.clear();
     if (push) history.pushState({ bookingScreen: screen, optionId: selected?.offerId }, '', screen === 'review' ? '#comparison' : screen === 'confirmed' ? '#confirmed' : '#booking-summary');
     steps(screen); window.scrollTo({ top: 0, behavior: 'instant' });
   };
@@ -28,7 +35,6 @@ export async function startBookingDemo(ui) {
   function review(offer, trigger, push = true) {
     if (busy) return;
     selected = offer; lastTrigger = trigger || lastTrigger;
-    adviser.select(offer.offerId);
     $('accept-reduced-flexibility').checked = false;
     $('flexibility-warning').hidden = offer.option.freeCancellation === true;
     $('flexibility-title').textContent = offer.option.freeCancellation === false ? 'Final drop · Non-refundable' : 'Review cancellation flexibility';
@@ -58,7 +64,7 @@ export async function startBookingDemo(ui) {
     $('selected-checked').textContent = 'Rates captured ' + new Date(data.checkedAt).toLocaleString() + '. Availability can change.';
     $('review-message').textContent = ''; $('review-message').classList.remove('error'); $('approve-help').hidden = true;
     $('review-consent-link').hidden = true; $('content').classList.remove('needs-review-consent');
-    setActionContent($('approve-offer'), 'Choose this drop ' + savingLabel(offer.displaySaving.minor));
+    setActionContent($('approve-offer'), 'Choose this drop');
     $('approve-offer').disabled = false; $('price-details').open = false;
     navigate('review', push); $('comparison-title').focus({ preventScroll: true });
   }
