@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://hotel-price-hunter-2qbcpylngq-as.a.run.app"><img alt="Try the live demo" src="https://img.shields.io/badge/Try_the_live_demo-c2402f?style=for-the-badge&logo=googlecloud&logoColor=white"></a>
-  <a href="submission/roomdrop-demo.mp4"><img alt="Watch the video" src="https://img.shields.io/badge/Watch_the_video-202c3b?style=for-the-badge&logo=youtube&logoColor=white"></a>
+  <a href="https://youtube.com/shorts/zKe3UFlgUNc"><img alt="Watch the video" src="https://img.shields.io/badge/Watch_the_video-202c3b?style=for-the-badge&logo=youtube&logoColor=white"></a>
   <a href="https://aibuildercup.com"><img alt="AI Builder Cup 2026" src="https://img.shields.io/badge/AI_Builder_Cup-2026-f5c542?style=for-the-badge"></a>
 </p>
 
@@ -26,11 +26,11 @@
 ## 🎬 See it in action
 
 <p align="center">
-  <a href="submission/roomdrop-demo.mp4">
-    <img src="submission/readme/demo-video-poster.png" alt="Watch the RoomDrop demo (3:32)" width="820">
+  <a href="https://youtube.com/shorts/zKe3UFlgUNc">
+    <img src="submission/readme/demo-video-poster.png" alt="Watch the RoomDrop demo on YouTube" width="820">
   </a>
   <br>
-  <sub>Click to play the 3:32 demo, or <a href="https://hotel-price-hunter-2qbcpylngq-as.a.run.app">try it yourself</a>: pick a booking, set your minimum and watch the drops land.</sub>
+  <sub>Click to watch the demo on YouTube, or <a href="https://hotel-price-hunter-2qbcpylngq-as.a.run.app">try it yourself</a>: pick a booking, set your minimum and watch the drops land.</sub>
 </p>
 
 ## 💡 The idea
