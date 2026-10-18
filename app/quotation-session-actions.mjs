@@ -7,6 +7,7 @@ export function actionError(code, status = 409, extra = {}) {
   return Object.assign(new Error('Reload RoomDrop and review the current Drops.'), { code, status, ...extra });
 }
 export function requireCurrentWatch({ scope, bundle, body, at }) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw actionError('INVALID_SELECTION', 400);
   if (body.snapshotVersion !== bundle.snapshotVersion) throw actionError('DROPS_CHANGED');
   if (!scope?.watch) throw actionError('WATCH_NOT_ARMED');
   const watch = scope.watch;
@@ -25,7 +26,7 @@ export function requireCurrentWatch({ scope, bundle, body, at }) {
   if (scope.confirmation && scope.confirmation.watchBinding !== binding) scope.confirmation = null;
   return { binding, options: replay.options };
 }
-export function selectDrop({ scope, bundle, body, at, selectionId }) {
+export function selectDrop({ scope, bundle, body, at, selectionId, confirmedAt = at.toISOString() }) {
   const { binding, options } = requireCurrentWatch({ scope, bundle, body, at });
   const allowed = ['optionId', 'snapshotVersion', 'acceptedDemoOnly', 'acceptReducedFlexibility', 'watchBinding'];
   if (!body || Array.isArray(body) || Object.keys(body).some(key => !allowed.includes(key)) || body.acceptedDemoOnly !== true)
@@ -37,7 +38,7 @@ export function selectDrop({ scope, bundle, body, at, selectionId }) {
   if (scope.confirmation?.optionId !== option.optionId) scope.confirmation = {
     status: 'demo-selection-confirmed', selectionId, optionId: option.optionId, snapshotVersion: bundle.snapshotVersion,
     watchBinding: binding, ...(scope.watch.revision !== undefined ? { watchRevision: scope.watch.revision } : {}),
-    confirmedAt: at.toISOString(), reservationCreated: false, quoteModified: false, customerRefund: null,
+    confirmedAt, reservationCreated: false, quoteModified: false, customerRefund: null,
   };
   return scope.confirmation;
 }
@@ -75,7 +76,8 @@ export function createSessionActions({ update, now = () => new Date() }) {
   const change = async (id, code, csrfToken, operation) => {
     let result;
     await update(id, session => {
-      if (!session || session.expiresAt <= now().getTime() || session.csrfToken !== csrfToken) throw actionError('DEMO_SESSION_REQUIRED', 403);
+      if (!session || !Number.isFinite(session.expiresAt) || session.expiresAt <= now().getTime()
+        || session.csrfToken !== csrfToken) throw actionError('DEMO_SESSION_REQUIRED', 403);
       const scope = session.byCode?.[code];
       if (!scope) throw actionError('WATCH_NOT_ARMED');
       result = operation(session, scope); return session;
@@ -84,8 +86,8 @@ export function createSessionActions({ update, now = () => new Date() }) {
   };
   return {
     confirm: ({ id, code, csrfToken, bundle, body }) => {
-      const at = now(), selectionId = `demo-${randomBytes(12).toString('hex')}`;
-      return change(id, code, csrfToken, (session, scope) => selectDrop({ scope, bundle, body, at, selectionId }));
+      const confirmedAt = now().toISOString(), selectionId = `demo-${randomBytes(12).toString('hex')}`;
+      return change(id, code, csrfToken, (session, scope) => selectDrop({ scope, bundle, body, at: now(), confirmedAt, selectionId }));
     },
     reserve: ({ id, code, csrfToken, bundle, body }) => change(id, code, csrfToken,
       (session, scope) => reserveAdvice({ session, scope, bundle, body, at: now() })),

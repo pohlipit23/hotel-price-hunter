@@ -8,6 +8,7 @@ export async function startBookingDemo(ui) {
   const catalogueMode = document.body.dataset.bookingMode === 'catalogue';
   let data, view, selected, busy = false, lastTrigger, code = null, judge, entries = [], navigation = 0;
   const api = action => catalogueMode ? `/api/booking-demo/q/${code}${action ? '/' + action : ''}` : '/api/booking-demo' + (action ? '/' + action : '');
+  const instantLabel = value => new Date(value).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC';
   const adviser = createStayAdviser({ parent: $('comparison'), before: $('price-details'), getData: () => data, chatUrl: () => api('chat') });
   const explanation = 'Estimated savings before final pricing and fees. Full cancellation terms and room matching still need verification.';
   const judgeScreens = { start: 'catalogue-screen', booked: 'booked-screen', setup: 'setup-screen', checking: 'checking-screen' };
@@ -71,10 +72,15 @@ export async function startBookingDemo(ui) {
       changeTile('Cancellation', termText(offer), 'cancellation', labels.cancellation));
     $('cancellation-summary').textContent = 'Room matching and full cancellation terms still need checking.';
     const details = [['Current room', view.booking.room.name], ['Selected room', offer.room.name],
-      ['Meals', offer.option.board], ['Exchange rate', `1 ${data.baseline.fx.from} = ${data.baseline.fx.rate} ${data.baseline.fx.to}`],
+      ['Meals', offer.option.board],
+      ...(data.baseline.quotedSource ? [['Original source amount', data.baseline.quotedSource.currency + ' ' +
+        (data.baseline.quotedSource.totalMinor / 10 ** new Intl.NumberFormat('en', { style: 'currency', currency: data.baseline.quotedSource.currency }).resolvedOptions().maximumFractionDigits)]] : []),
+      ...(offer.option.sourcePrice ? [['Captured source amount', offer.option.sourcePrice.currency + ' ' + offer.option.sourcePrice.amount]] : []),
+      ['Exchange rate', data.baseline.fx ? `1 ${data.baseline.fx.from} = ${data.baseline.fx.rate} ${data.baseline.fx.to}` : 'Not supplied'],
       ['Pricing', explanation], ['Cancellation', termText(offer)]];
     $('differences').replaceChildren(...details.flatMap(([label, value]) => [node('dt', label), node('dd', value)]));
-    $('selected-checked').textContent = 'Rates captured ' + new Date(data.checkedAt).toLocaleString() + '. Availability can change.';
+    $('selected-checked').textContent = 'Rates captured ' + (catalogueMode ? replayResult(data).capturedAt : [data.checkedAt]).map(instantLabel).join(', ')
+      + '. Availability can change. No live search was run.';
     $('review-message').textContent = ''; $('review-message').classList.remove('error'); $('approve-help').hidden = true;
     $('review-consent-link').hidden = true; $('content').classList.remove('needs-review-consent');
     setActionContent($('approve-offer'), 'Choose this drop');
@@ -95,7 +101,7 @@ export async function startBookingDemo(ui) {
     $('switch-from-status').textContent = 'current booking'; $('switch-to-status').textContent = 'selected room';
     addStamp($('switch-stamp'), selected.displaySaving.minor, view.currency.code, 'Estimated drop', 'switch-stamp');
     $('switch-trail').replaceChildren(node('li', 'You reviewed the room and confirmed your choice.'),
-      node('li', 'Selection receipt ' + receipt.selectionId + ' - ' + new Date(receipt.confirmedAt).toLocaleString()));
+      node('li', 'Selection receipt ' + receipt.selectionId + ' - ' + instantLabel(receipt.confirmedAt)));
     $('switch-reassurance').textContent = 'Your original booking is unchanged. No reservation, cancellation, payment or refund was made.';
     $('switch-money').replaceChildren(node('dt', 'Estimated savings'), node('dd', savingLabel(selected.displaySaving.minor)));
     $('switch-message').textContent = explanation; $('switch-history-details').hidden = true;
@@ -122,12 +128,12 @@ export async function startBookingDemo(ui) {
     $('offer-empty').hidden = view.highlights.length > 0;
     $('lower-minimum').hidden = !catalogueMode || replay.status !== 'empty';
     $('offer-empty').textContent = replay?.status === 'unavailable' ? 'The replayed check is unavailable. Reload to try again. Your Original Booking is unchanged.'
-      : catalogueMode ? 'No captured Drops meet your minimum. Your Original Booking is unchanged.' : 'No lower rates in the latest check. Your current booking stays unchanged.';
+      : catalogueMode ? 'No drops above your minimum yet. This is a captured check; no live search was run. Your Original Booking is unchanged.' : 'No lower rates in the latest check. Your current booking stays unchanged.';
     if (catalogueMode && data.watch) {
       $('armed-title').textContent = replay.status === 'unavailable' ? 'Replayed check unavailable' : 'Drop Watch armed';
       $('armed-detail').textContent = replay.status === 'unavailable' ? 'Captured data could not be verified. No live search was run.'
-        : judge.armedDetail(data) + ' - Replayed ' + new Date(replay.replayedAt).toLocaleString()
-          + ' - Captured ' + replay.capturedAt.map(at => new Date(at).toLocaleString()).join(', ') + ' - not live';
+        : judge.armedDetail(data) + ' - Replayed ' + instantLabel(replay.replayedAt)
+          + ' - Captured ' + replay.capturedAt.map(instantLabel).join(', ') + ' - not live';
     }
   }
   $('close-comparison').addEventListener('click', event => { event.preventDefault(); overview(); });
@@ -276,7 +282,8 @@ export async function startBookingDemo(ui) {
     chrome(); $('content').hidden = false; status('');
     const parsed = /^#(booked|setup|drops|review|confirmed)-([A-Z0-9]{4,20})$/.exec(location.hash);
     const screen = parsed ? Object.keys(routes).find(key => routes[key] === parsed[1]) : 'start';
-    history.replaceState({ bookingScreen: screen, code: parsed?.[2] ?? null }, '', screen === 'start' ? '#start' : location.hash);
-    await go(screen, parsed?.[2], { push: false });
+    const optionId = history.state?.code === parsed?.[2] ? history.state?.optionId : undefined;
+    history.replaceState({ bookingScreen: screen, code: parsed?.[2] ?? null, optionId }, '', screen === 'start' ? '#start' : location.hash);
+    await go(screen, parsed?.[2], { push: false, optionId });
   } catch { status('The demo bookings could not be loaded. Please reload to try again.', true); }
 }
