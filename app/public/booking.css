@@ -610,6 +610,7 @@ footer p { margin: 0; }
 .armed-copy p { margin: 0; overflow-wrap: anywhere; }
 .armed-strip .secondary { grid-column: 1 / -1; width: 100%; min-height: 44px; }
 .lower-minimum { width: 100%; margin-top: 10px; }
+.drops-minimum { min-height: 44px; margin-top: 8px; padding: 8px 16px; font-size: 14px; }
 /* Journey strip: pick (Altovo) -> set up (RoomDrop) -> get your drop (RoomDrop app). Full on start, compact later. */
 .journey-strip { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; max-width: 100%; gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
 .journey-step { display: grid; gap: 3px; min-width: 0; border: 2px dashed var(--line); border-radius: 16px; padding: 10px 12px; background: rgba(255, 255, 255, .55); color: var(--muted); }

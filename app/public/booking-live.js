@@ -187,6 +187,8 @@ export async function startBookingDemo(ui) {
     }
     $('offer-empty').hidden = view.highlights.length > 0;
     $('lower-minimum').hidden = !catalogueMode || replay.status !== 'empty';
+    // With drops showing, this is the way back to the minimum (the empty state has its own "Lower my minimum").
+    $('drops-minimum').hidden = !catalogueMode || !data.watch || view.highlights.length === 0;
     $('offer-empty').textContent = replay?.status === 'unavailable' ? 'Drops are unavailable right now. Reload to try again.'
       : catalogueMode ? 'No drops above your minimum yet. Your original booking stays active.' :'No lower rates in the latest check. Your current booking stays unchanged.';
     if (catalogueMode && data.watch) {
@@ -336,6 +338,7 @@ export async function startBookingDemo(ui) {
   $('arm-watch').addEventListener('click', arm);
   $('judge-consent').addEventListener('change', () => { $('setup-message').textContent = ''; $('setup-message').classList.remove('error'); });
   $('change-minimum').addEventListener('click', () => go('setup', code)); $('lower-minimum').addEventListener('click', () => go('setup', code));
+  $('drops-minimum').addEventListener('click', () => go('setup', code));
   // Neither choice is stored yet; the buttons only acknowledge the judge's pick on this page.
   function nextChoice(choice) {
     $('keep-watching').setAttribute('aria-pressed', String(choice === 'watch'));

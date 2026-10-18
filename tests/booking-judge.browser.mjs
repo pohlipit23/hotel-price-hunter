@@ -198,7 +198,9 @@ try {
     await page.reload(); await drops();
     // Re-arm with new minima (existing Drops screens consume the receipt); the saved address shows masked and is kept.
     await page.goBack(); await page.goForward(); await drops();
-    await page.evaluate(code => { location.hash = '#setup-' + code; }, SIAM); await visible('setup-screen');
+    // With drops showing, "Change minimum" under the Drops heading is the way back to setup.
+    await page.locator('#drops-minimum').click(); await visible('setup-screen');
+    assert.equal(new URL(page.url()).hash, '#setup-' + SIAM);
     assert.equal(await page.locator('#delivery-saved-email').innerText(), 'j***@example.test');
     assert.equal(await page.locator('input[name="minimum-saving"][value="5000"]').isChecked(), true);
     assert.equal(await page.locator('#arm-watch').innerText(), 'Update my Drop Watch');
