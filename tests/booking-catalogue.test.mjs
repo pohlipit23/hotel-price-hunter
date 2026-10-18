@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
+import { readFileSync } from 'node:fs';
 import { createBookingDemoServer } from '../app/booking-demo-server.mjs';
 import { createQuotationDemoServer, createHostedQuotationDemoServer, deploymentCatalogue } from '../app/quotation-demo-server.mjs';
 import { createBookingStorage } from '../app/booking-storage.mjs';
@@ -30,6 +31,23 @@ test('catalogue lists public booking facts with blockers and tags derived at req
   for (const path of ['/api/booking-demo', '/api/booking-demo/confirm', '/api/booking-demo/catalogue?code=X', '/api/booking-demo/q/AIRB000180?x=1', '/drop-watch.js?x'])
     assert.ok([400, 404].includes((await fetch(origin + path)).status), path);
   assert.equal((await fetch(origin + '/drop-watch.js')).status, 200); assert.equal((await fetch(origin + '/booking-judge.js')).status, 200);
+});
+
+// The reviewed S0.5 photos (hotel avatars and two booked-room photos); AIRB000184's room photo was rejected.
+const REVIEWED_PHOTOS = ['179-hotel', '180-hotel', '181-hotel', '181-room', '182-hotel', '182-room', '183-hotel', '184-hotel'].map(name => `assets/roomdrop-airb000${name}.jpg`);
+test('both demo servers serve exactly the reviewed photo assets', async t => {
+  const servers = { booking: createBookingDemoServer({ catalogue: altovoCatalogueFixture(), now: NOW }), quotation: createQuotationDemoServer({ catalogue: altovoCatalogueFixture(), now: NOW }) };
+  for (const [name, server] of Object.entries(servers)) {
+    const origin = await listen(t, server);
+    for (const asset of REVIEWED_PHOTOS) {
+      const response = await fetch(origin + '/' + asset);
+      assert.equal(response.status, 200, name + ' ' + asset); assert.equal(response.headers.get('content-type'), 'image/jpeg', name + ' ' + asset);
+      assert.equal(sha256(Buffer.from(await response.arrayBuffer())), sha256(readFileSync(new URL('../app/public/' + asset, import.meta.url))), name + ' ' + asset);
+    }
+    for (const path of ['/assets/roomdrop-airb000184-room.jpg', '/assets/roomdrop-airb000180-room.jpg', '/assets/']) assert.equal((await fetch(origin + path)).status, 404, name + ' ' + path);
+    // The booking server matches the exact path, query string included.
+    if (name === 'booking') assert.equal((await fetch(origin + '/assets/roomdrop-airb000179-hotel.jpg?x=1')).status, 404);
+  }
 });
 
 test('closing-soon and ended windows come from the injected clock', async t => {
