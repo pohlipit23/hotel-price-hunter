@@ -124,7 +124,7 @@ function fileCatalogueStore(entries, { now, processLocal = false }) {
   return { bookings, sessions };
 }
 // Storage and arm refusals the routes report; anything else is a bounded 503 with no detail.
-const REFUSALS = { INVALID_WATCH: 400, WATCH_CONSENT_REQUIRED: 400, MINIMUM_SAVING_INVALID: 400, DEMO_SESSION_REQUIRED: 403, BOOKING_UNAVAILABLE: 404,
+const REFUSALS = { INVALID_WATCH: 400, WATCH_CONSENT_REQUIRED: 400, MINIMUM_SAVING_INVALID: 400, DELIVERY_EMAIL_INVALID: 400, DEMO_SESSION_REQUIRED: 403, BOOKING_UNAVAILABLE: 404,
   SNAPSHOT_CHANGED: 409, WATCH_REVISION_STALE: 409, WATCH_CANNOT_START: 409, CAPTURE_UNAVAILABLE: 503, CATALOGUE_UNAVAILABLE: 503 };
 const refusal = code => Object.assign(new Error('The booking demo is unavailable.'), { code });
 function createQuotationServer({ bundle: single, store = null, now = () => new Date(), cloudOrigin = null, advisor = { available: false, status: 'unconfigured' } }) {

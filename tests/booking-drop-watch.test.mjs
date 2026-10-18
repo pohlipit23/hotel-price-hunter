@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { armDropWatch, armRequest, committedWatch, DROP_WATCH_CONSENT_VERSION } from '../app/domain/booking-drop-watch.mjs';
+import { armDropWatch, armRequest, committedWatch, publicWatch, DELIVERY_CONSENT_VERSION, DROP_WATCH_CONSENT_VERSION } from '../app/domain/booking-drop-watch.mjs';
 import { createBookingDemoServer } from '../app/booking-demo-server.mjs';
 import { createMemorySessionStorage } from '../app/quotation-session-storage.mjs';
 import { NOW, curated, emulatorCatalogue, integration, listen, plannedBookings, rehash, visit } from './fixtures/roomdrop-harness.mjs';
@@ -158,6 +158,65 @@ test('a missing or malformed capture refuses without changing the session; a val
   assert.equal(state.byCode[SIAM].watch.firstCheck.checkedAt, CAPTURED);
 });
 
+// v7: an optional delivery email, stored in the same arm transaction. The address stays in the session; every
+// receipt shows only a masked form. Synthetic addresses only (example.test).
+const JUDGE = 'judge@example.test';
+const DELIVERY = { channel: 'email', email: JUDGE, consentVersion: DELIVERY_CONSENT_VERSION, status: 'pending-service' };
+const MASKED = { channel: 'email', maskedEmail: 'j***@example.test', consentVersion: DELIVERY_CONSENT_VERSION, status: 'pending-service' };
+
+test('an optional delivery email commits with the arm; the receipt shows only a masked form', () => {
+  const state = session();
+  const receipt = arm(state, 5000, { extra: { deliveryEmail: JUDGE } });
+  assert.deepEqual(state.byCode[SIAM].watch.delivery, DELIVERY);
+  assert.deepEqual(receipt.watch.delivery, MASKED);
+  assert.doesNotMatch(JSON.stringify(receipt), /judge@/);
+  // The committed watch read back for bootstrap is the same masked receipt, never the stored address.
+  assert.deepEqual(committedWatch(state, SIAM, booking()), receipt.watch);
+  assert.deepEqual(publicWatch(state.byCode[SIAM].watch), receipt.watch);
+  // Without an email the receipt is exactly the v3 shape: no delivery key at all.
+  assert.equal(Object.hasOwn(arm(session(), 5000).watch, 'delivery'), false);
+  assert.equal(DELIVERY_CONSENT_VERSION, 'roomdrop-drop-email-consent-2026-10-18');
+});
+
+test('the delivery email is optional, at most 254 characters and a basic address', () => {
+  const ok = { snapshotVersion: 'v', consent: true, minimumSavingMinor: 1000 };
+  assert.deepEqual(armRequest({ ...ok, deliveryEmail: JUDGE }, 'MYR'), { snapshotVersion: 'v', minimumSavingMinor: 1000, expectedRevision: null, deliveryEmail: JUDGE });
+  // null asks to remove a saved address; absent keeps whatever is saved.
+  assert.equal(armRequest({ ...ok, deliveryEmail: null }, 'MYR').deliveryEmail, null);
+  assert.equal(Object.hasOwn(armRequest(ok, 'MYR'), 'deliveryEmail'), false);
+  const long = 'a'.repeat(64) + '@' + 'b'.repeat(180) + '.example'; assert.equal(long.length, 253);
+  assert.equal(armRequest({ ...ok, deliveryEmail: long + 'x' }, 'MYR').deliveryEmail.length, 254);
+  for (const deliveryEmail of ['', 'judge', 'judge@example', '@example.test', 'judge@@example.test', ' judge@example.test', 'judge@example.test ',
+    'ju dge@example.test', 'judge@exa mple.test', 'a'.repeat(65) + '@example.test', long + 'xy', 42, true, {}, ['judge@example.test']]) {
+    refuses(() => armRequest({ ...ok, deliveryEmail }, 'MYR'), 'DELIVERY_EMAIL_INVALID');
+  }
+});
+
+test('identical retries include the delivery email; a changed or removed email is the next revision', () => {
+  const state = session(); const later = new Date('2026-10-20T00:05:00Z');
+  const first = arm(state, 5000, { extra: { deliveryEmail: JUDGE } });
+  // A lost acknowledgement, retried with the same email or with no email key at all (keep), is the same receipt.
+  assert.deepEqual(arm(state, 5000, { at: later, extra: { deliveryEmail: JUDGE } }), first);
+  assert.deepEqual(arm(state, 5000, { at: later, extra: { expectedRevision: 1 } }), first);
+  assert.equal(state.byCode[SIAM].watch.delivery.email, JUDGE);
+  // A different email with the same minimum is a deliberate change: stale from revision 0, revision 2 from 1.
+  refuses(() => arm(state, 5000, { at: later, extra: { deliveryEmail: 'other@example.test' } }), 'WATCH_REVISION_STALE');
+  const changed = arm(state, 5000, { at: later, extra: { deliveryEmail: 'other@example.test', expectedRevision: 1 } });
+  assert.deepEqual([changed.watch.revision, changed.watch.delivery.maskedEmail], [2, 'o***@example.test']);
+  // Its own retry (based on revision 1) is identical; the old email based on revision 1 is now stale.
+  assert.deepEqual(arm(state, 5000, { at: later, extra: { deliveryEmail: 'other@example.test', expectedRevision: 1 } }), changed);
+  refuses(() => arm(state, 5000, { at: later, extra: { deliveryEmail: JUDGE, expectedRevision: 1 } }), 'WATCH_REVISION_STALE');
+  // A new minimum without the key keeps the saved email.
+  const raised = arm(state, 25000, { at: later, extra: { expectedRevision: 2 } });
+  assert.deepEqual([raised.watch.revision, raised.watch.delivery], [3, { ...MASKED, maskedEmail: 'o***@example.test' }]);
+  // null removes it: the next revision has no delivery, and nothing of the address is left in the session.
+  const removed = arm(state, 25000, { at: later, extra: { deliveryEmail: null, expectedRevision: 3 } });
+  assert.deepEqual([removed.watch.revision, Object.hasOwn(removed.watch, 'delivery')], [4, false]);
+  assert.doesNotMatch(JSON.stringify(state), /@example\.test/);
+  // Removing again is an identical retry, not another revision.
+  assert.deepEqual(arm(state, 25000, { at: later, extra: { deliveryEmail: null, expectedRevision: 4 } }), removed);
+});
+
 test('arming one code never touches another code or unknown fields', () => {
   const state = session();
   state.adviceCount = 3;
@@ -218,6 +277,45 @@ test('HTTP re-arm: absent expectedRevision changes the minimum, a stale one is 4
   assert.deepEqual([current.revision, current.minimumSavingMinor], [3, 1000]);
 });
 
+// Captures everything the process would log while a test runs; the delivery address must never appear.
+function logSpy(t) {
+  const lines = []; const saved = {};
+  for (const name of ['log', 'info', 'warn', 'error', 'debug']) { saved[name] = console[name]; console[name] = (...args) => lines.push(args.map(String).join(' ')); }
+  const write = process.stdout.write; const writeError = process.stderr.write;
+  process.stdout.write = (chunk, ...rest) => (lines.push(String(chunk)), write.call(process.stdout, chunk, ...rest));
+  process.stderr.write = (chunk, ...rest) => (lines.push(String(chunk)), writeError.call(process.stderr, chunk, ...rest));
+  t.after(() => { Object.assign(console, saved); process.stdout.write = write; process.stderr.write = writeError; });
+  return lines;
+}
+
+test('HTTP arm: a delivery email commits with the arm, only masked in every response, never logged, per session', async t => {
+  const logs = logSpy(t);
+  const bookingStorage = plannedBookings(); const sessionStorage = createMemorySessionStorage({ now: NOW });
+  const origin = await listen(t, createBookingDemoServer({ bookingStorage, sessionStorage, now: NOW }));
+  const a = await visit(origin); const b = await visit(origin);
+  const { contentVersion } = await bookingStorage.getBooking(SIAM);
+  // A malformed address is refused before anything commits.
+  assert.deepEqual(await errorOf(await a.post(SIAM, 'watch', armBody(contentVersion, 5000, { deliveryEmail: 'judge@example' }))), [400, 'DELIVERY_EMAIL_INVALID']);
+  assert.deepEqual((await sessionStorage.get(a.cookie.split('=')[1])).byCode, {});
+  const response = await a.post(SIAM, 'watch', armBody(contentVersion, 5000, { deliveryEmail: JUDGE }));
+  const text = await response.text(); const receipt = JSON.parse(text);
+  assert.equal(response.status, 200);
+  assert.deepEqual([receipt.watch.revision, receipt.watch.delivery], [1, MASKED]);
+  assert.doesNotMatch(text + JSON.stringify([...response.headers]), /judge@/);
+  // Bootstrap shows the same masked receipt; the address itself is only in judge A's session.
+  const bootstrap = await (await a.get(SIAM)).text();
+  assert.deepEqual(JSON.parse(bootstrap).watch, receipt.watch); assert.doesNotMatch(bootstrap, /judge@/);
+  assert.deepEqual((await sessionStorage.get(a.cookie.split('=')[1])).byCode[SIAM].watch.delivery, DELIVERY);
+  // Judge B sees nothing of it, and arming without an email gives B no delivery.
+  assert.equal((await (await b.get(SIAM)).json()).watch, null);
+  const other = await (await b.post(SIAM, 'watch', armBody(contentVersion, 5000))).json();
+  assert.equal(Object.hasOwn(other.watch, 'delivery'), false);
+  assert.doesNotMatch(JSON.stringify(await sessionStorage.get(b.cookie.split('=')[1])), /@example\.test/);
+  // An identical retry (the lost acknowledgement) returns the same masked receipt.
+  assert.deepEqual(await (await a.post(SIAM, 'watch', armBody(contentVersion, 5000, { deliveryEmail: JUDGE }))).json(), receipt);
+  assert.doesNotMatch(logs.join('\n'), /judge@|example\.test/);
+});
+
 test('Firestore arm: identical concurrent arms on two app instances and a lost acknowledgement give one receipt, with no upstream call', integration, async t => {
   const { first, second, storage, versions } = await emulatorCatalogue(t);
   const spy = upstreamSpy(t);
@@ -263,6 +361,35 @@ test('Firestore arm: different minima racing from one revision commit exactly on
   assert.deepEqual(await errorOf(await v.post(SIAM, 'watch', armBody(version, winners[0].minimum, { expectedRevision: 0 }))), [409, 'WATCH_REVISION_STALE']);
   assert.deepEqual(await errorOf(await v.post(SIAM, 'watch', armBody(version, 1000, { expectedRevision: 1 }))), [409, 'WATCH_REVISION_STALE']);
   assert.deepEqual((await (await v.get(SIAM)).json()).watch, raised.watch);
+});
+
+test('Firestore arm: the delivery email is stored only in that judge\'s session document and every read shows it masked', integration, async t => {
+  const logs = logSpy(t);
+  const { first, second, prefix, storage, versions } = await emulatorCatalogue(t);
+  const [one, two] = await Promise.all([first, second].map(client => listen(t, createBookingDemoServer({ ...storage(client), now: NOW }))));
+  const a = await visit(one); const b = await visit(two); const version = versions[SIAM].contentVersion;
+  const [armA, armB] = await Promise.all([a.post(SIAM, 'watch', armBody(version, 5000, { deliveryEmail: JUDGE })),
+    b.post(SIAM, 'watch', armBody(version, 5000, { deliveryEmail: 'second@example.test' }))].map(async response => (await response).text()));
+  assert.deepEqual(JSON.parse(armA).watch.delivery, MASKED); assert.equal(JSON.parse(armB).watch.delivery.maskedEmail, 's***@example.test');
+  assert.doesNotMatch(armA + armB, /judge@|second@/);
+  // Committed before the response; another app instance reads the same masked receipt for A and B.
+  const readA = await (await fetch(`${two}/api/booking-demo/q/${SIAM}`, { headers: { Cookie: a.cookie } })).text();
+  assert.deepEqual(JSON.parse(readA).watch, JSON.parse(armA).watch); assert.doesNotMatch(readA, /judge@/);
+  assert.deepEqual((await (await b.get(SIAM)).json()).watch, JSON.parse(armB).watch);
+  // Each address sits only in its own session document, keyed by the cookie digest; nowhere else.
+  const docs = (await first.collection(`${prefix}PublicSessionsV1`).get()).docs;
+  const holding = docs.filter(doc => /@example\.test/.test(JSON.stringify(doc.data())));
+  assert.equal(holding.length, 2);
+  assert.deepEqual(holding.map(doc => doc.data().byCode[SIAM].watch.delivery.email).sort(), [JUDGE, 'second@example.test']);
+  for (const doc of holding) assert.match(doc.id, /^[a-f0-9]{64}$/);
+  assert.deepEqual((await storage(second).sessionStorage.get(a.cookie.split('=')[1])).byCode[SIAM].watch.delivery, DELIVERY);
+  const capacity = await first.collection(`${prefix}PublicSessionsV1Capacity`).doc('live').get();
+  assert.doesNotMatch(JSON.stringify(capacity.data()), /@/);
+  const shared = await first.collection(`${prefix}BookingsV1`).doc(SIAM).get();
+  assert.doesNotMatch(JSON.stringify(shared.data()), /@example\.test/);
+  // Judge A's other code holds nothing of it.
+  assert.equal((await (await a.get(HYATT)).json()).watch, null);
+  assert.doesNotMatch(logs.join('\n'), /judge@|second@/);
 });
 
 test('Firestore arm: two judges arming one code at once never overwrite each other', integration, async t => {
