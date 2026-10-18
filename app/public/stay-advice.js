@@ -167,7 +167,7 @@ export function createStayAdviser({ parent, before, overviewParent, getData, cha
       const data = getData();
       const scope = [data?.code ?? 'single', data?.snapshotVersion, watchBinding(data?.watch)].join(':');
       const key = [scope, next.pageContext, next.optionId || 'overview'].join(':');
-      if (!hydrated.has(scope) && data?.conversation?.watchBinding === watchBinding(data.watch)
+      if (!hydrated.has(scope) && data?.conversation?.watchBinding === watchBinding(data?.watch)
         && Array.isArray(data.conversation.chatHistory)) {
         for (const turn of data.conversation.chatHistory.slice(-4)) {
           if (!['drops-overview', 'drop-detail'].includes(turn.pageContext) || turn.snapshotVersion !== data.snapshotVersion
