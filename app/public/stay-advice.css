@@ -1,0 +1,10 @@
+.stay-adviser { margin: 24px 0; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--blue-bg); }
+.stay-adviser h2 { margin: 0 0 12px; font-size: 22px; }
+.stay-adviser label { display: block; font-weight: 700; font-size: 14px; margin: 12px 0 8px; }
+.stay-adviser textarea { display: block; box-sizing: border-box; width: 100%; min-height: 88px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 16px; resize: vertical; }
+.stay-advice-prompts { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.stay-adviser button { min-height: 44px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; }
+.stay-advice-answer { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.stay-advice-answer ul { padding-left: 20px; font-size: 14px; }
+.stay-advice-answer li { margin-bottom: 10px; }.stay-advice-summary { font-weight: 700; }
+.stay-adviser :focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }

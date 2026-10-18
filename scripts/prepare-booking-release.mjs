@@ -5,7 +5,8 @@ import { resolve, dirname, relative, isAbsolute, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { deploymentQuotationSnapshot } from '../app/quotation-demo-server.mjs';
 
-const sourceFiles = ['app/booking-cloud.mjs','app/booking-demo-server.mjs','app/quotation-demo-server.mjs',
+const sourceFiles = ['package.json','package-lock.json','app/quotation-advisor.mjs','app/gemini.mjs','app/prompts/quotation-advice.txt',
+'app/public/stay-advice.js','app/public/stay-advice.css','app/booking-cloud.mjs','app/booking-demo-server.mjs','app/quotation-demo-server.mjs',
 'app/domain/quotation-demo.mjs','app/domain/live-comparison.mjs','app/domain/decision.mjs','app/domain/money.mjs','app/live-engine.mjs',
 'app/public/booking.html','app/public/booking.css','app/public/booking.js','app/public/booking-live.js','app/public/booking-live-data.js',
 'app/public/pricing.js','app/public/watch.js','app/public/stay-photos.js',

@@ -1,9 +1,11 @@
 import { bookingView } from './booking-live-data.js';
+import { createStayAdviser } from './stay-advice.js';
 
 /** Use the existing booking screens and shared cards; confirmation is selection-only. */
 export async function startBookingDemo(ui) {
   const { $, node, money, savingLabel, addStamp, setActionContent, factTile, stayText, guestText, stayPhoto, offerPhotoIndex } = ui;
   let data, view, selected, busy = false, lastTrigger;
+  const adviser = createStayAdviser({ parent: $('comparison'), before: $('price-details'), getData: () => data });
   const explanation = 'Estimated savings before final pricing and fees. Full cancellation terms and room matching still need verification.';
   const steps = screen => {
     $('booking-summary').hidden = screen === 'review'; $('comparison').hidden = screen !== 'review';
@@ -17,6 +19,7 @@ export async function startBookingDemo(ui) {
     });
   };
   const navigate = (screen, push = true) => {
+    if (screen !== 'review') adviser.clear();
     if (push) history.pushState({ bookingScreen: screen, optionId: selected?.offerId }, '', screen === 'review' ? '#comparison' : screen === 'confirmed' ? '#confirmed' : '#booking-summary');
     steps(screen); window.scrollTo({ top: 0, behavior: 'instant' });
   };
@@ -25,6 +28,7 @@ export async function startBookingDemo(ui) {
   function review(offer, trigger, push = true) {
     if (busy) return;
     selected = offer; lastTrigger = trigger || lastTrigger;
+    adviser.select(offer.offerId);
     $('accept-reduced-flexibility').checked = false;
     $('flexibility-warning').hidden = offer.option.freeCancellation === true;
     $('flexibility-title').textContent = offer.option.freeCancellation === false ? 'Final drop · Non-refundable' : 'Review cancellation flexibility';

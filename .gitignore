@@ -4,6 +4,7 @@ node_modules/
 .env.*
 !.env.example
 !.env.cloud.example
+!.env.quotation.example
 .wrangler/
 .local/
 .firebase/

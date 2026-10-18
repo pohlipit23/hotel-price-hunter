@@ -24,6 +24,15 @@ test('hosted quotation profile accepts only the exact private customer Cloud Run
     assert.throws(() => validateCloudQuotationMode({ ...environment(), ...patch }));
   }
 });
+
+test('hosted Gemini activation requires explicit opt-in plus complete model configuration', () => {
+  const configured = { ...environment(), QUOTATION_ADVICE_ENABLED: 'true', GEMINI_MODEL: 'gemini-3.8-flash', GOOGLE_CLOUD_LOCATION: 'global' };
+  assert.doesNotThrow(() => validateCloudQuotationMode(configured));
+  for (const patch of [{ QUOTATION_ADVICE_ENABLED: 'false' }, { GEMINI_MODEL: '' }, { GEMINI_MODEL: 'gemini-3.1-flash-lite' }, { GOOGLE_CLOUD_LOCATION: '' }, { GOOGLE_CLOUD_LOCATION: 'asia-southeast1' }]) {
+    assert.throws(() => validateCloudQuotationMode({ ...configured, ...patch }));
+  }
+  assert.throws(() => validateCloudQuotationMode({ ...environment(), GOOGLE_CLOUD_LOCATION: 'global' }));
+});
 test('deployment snapshot excludes source selection tokens and rejects private data on cloud startup', () => {
   const snapshot = deploymentQuotationSnapshot(bundle());
   assert.doesNotMatch(JSON.stringify(snapshot), /PRIVATE-token|PRIVATE-source|privateReferences/);

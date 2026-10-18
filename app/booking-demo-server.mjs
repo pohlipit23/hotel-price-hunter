@@ -6,16 +6,17 @@ const assets = new Map([
   ['/booking-live.js', ['booking-live.js', 'text/javascript']], ['/booking-live-data.js', ['booking-live-data.js', 'text/javascript']],
   ['/booking.css', ['booking.css', 'text/css']], ['/pricing.js', ['pricing.js', 'text/javascript']],
   ['/watch.js', ['watch.js', 'text/javascript']], ['/stay-photos.js', ['stay-photos.js', 'text/javascript']],
+  ['/stay-advice.js', ['stay-advice.js', 'text/javascript']], ['/stay-advice.css', ['stay-advice.css', 'text/css']],
   ['/assets/roomdrop-logo.png', ['assets/roomdrop-logo.png', 'image/png']],
   ['/assets/roomdrop-key-icon.png', ['assets/roomdrop-key-icon.png', 'image/png']],
   ['/assets/illustrative-stays.jpg', ['assets/illustrative-stays.jpg', 'image/jpeg']],
 ]);
-export function createBookingDemoServer({ bundle, snapshot, environment, now } = {}) {
-  const server = environment ? createHostedQuotationDemoServer({ snapshot, environment, now }) : createQuotationDemoServer({ bundle, now });
+export function createBookingDemoServer({ bundle, snapshot, environment, now, advisor } = {}) {
+  const server = environment ? createHostedQuotationDemoServer({ snapshot, environment, now, advisor }) : createQuotationDemoServer({ bundle, now, advisor });
   const delegate = server.listeners('request')[0];
   server.removeListener('request', delegate);
   server.on('request', async (req, res) => {
-    const api = { '/api/booking-demo': '/api/quotation-demo', '/api/booking-demo/confirm': '/api/quotation-demo/confirm' };
+    const api = { '/api/booking-demo': '/api/quotation-demo', '/api/booking-demo/confirm': '/api/quotation-demo/confirm', '/api/booking-demo/advice': '/api/quotation-demo/advice' };
     if (Object.hasOwn(api, req.url)) { req.url = api[req.url]; return delegate(req, res); }
     if (req.url === '/health' || req.url === '/healthz') return delegate(req, res);
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
@@ -30,6 +31,7 @@ export function createBookingDemoServer({ bundle, snapshot, environment, now } =
       const [path, type] = assets.get(req.url);
       let content = await readFile(new URL('./public/' + path, import.meta.url));
       if (req.url === '/') content = content.toString().replace('<body>', '<body data-live-booking="true">').replace('Fictional demo', 'Booking demo')
+        .replace('</head>', '<link rel="stylesheet" href="/stay-advice.css"></head>')
         .replace(/\s*<link[^>]+https:\/\/fonts\.[^>]+>/g, '');
       res.writeHead(200, { 'Content-Type': type + (type.startsWith('text/') ? '; charset=utf-8' : '') }); res.end(content);
     } catch { res.writeHead(503); res.end('Booking unavailable. Please reload.'); }
