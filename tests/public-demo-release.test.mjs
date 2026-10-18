@@ -40,6 +40,7 @@ test('test-injected booking context closes all runtime imports and packages only
   const files = new Map(manifest.files.map(file => [file.path, file]));
   assert.ok(files.has('app/quotation-session-actions.mjs'));
   assert.ok(files.has('app/booking-storage.mjs')); assert.ok(files.has('app/quotation-session-storage.mjs'));
+  assert.equal(manifest.files.filter(file => /^app\/public\/assets\/roomdrop-airb.*\.jpg$/.test(file.path)).length, 8);
   assert.equal(files.has('booking-demo.json'), false); assert.equal(files.has('booking-catalogue.json'), false);
   for (const file of manifest.files) {
     const bytes = await readFile(resolve(result.contextDirectory, file.path));
@@ -71,6 +72,12 @@ test('test-injected booking context closes all runtime imports and packages only
   const confirmation = await post('confirm', { snapshotVersion: data.snapshotVersion, watchBinding: JSON.stringify(committed.watch), optionId: 'option-fixture-flex-premier', acceptedDemoOnly: true });
   assert.equal(confirmation.status, 200); assert.equal((await confirmation.json()).confirmation.reservationCreated, false);
   for (const asset of ['/booking-live.js', '/booking-live-data.js', '/stay-advice.js']) assert.equal((await fetch(origin + asset)).status, 200);
+  for (const file of manifest.files.filter(file => /^app\/public\/assets\/roomdrop-airb.*\.jpg$/.test(file.path))) {
+    const photo = await fetch(origin + '/' + file.path.slice('app/public/'.length));
+    assert.equal(photo.status, 200); assert.equal(photo.headers.get('content-type'), 'image/jpeg');
+    assert.equal(createHash('sha256').update(Buffer.from(await photo.arrayBuffer())).digest('hex'), file.sha256);
+  }
+  assert.equal((await fetch(origin + '/assets/roomdrop-airb000184-room.jpg')).status, 404);
   assert.equal((await fetch(origin + '/api/import')).status, 404);
   console.log(JSON.stringify({ evidence: 'test-injected-source-only', ...result }));
 });

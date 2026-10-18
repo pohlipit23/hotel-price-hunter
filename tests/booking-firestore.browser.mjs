@@ -11,7 +11,9 @@ import { agencyMinimumSavingMinor } from '../app/public/drop-watch.js';
 
 const args = process.argv.slice(2), existing = args.includes('--existing');
 const inputPath = args.find(arg => arg.startsWith('--catalogue='))?.slice(12);
-assert.ok(args.every(arg => arg === '--existing' || arg.startsWith('--catalogue=')) && existing === Boolean(inputPath));
+const existingPrefix = args.find(arg => arg.startsWith('--prefix='))?.slice(9) ?? 'roomdrop';
+assert.ok(args.every(arg => arg === '--existing' || arg.startsWith('--catalogue=') || arg.startsWith('--prefix=')) && existing === Boolean(inputPath));
+assert.match(existingPrefix, /^roomdrop(?:Part2[A-Za-z0-9]{1,60})?$/);
 const output = resolve(existing ? '.local/part2-firestore-real-browser' : '.local/part2-firestore-browser'); await mkdir(output, { recursive: true });
 const report = { status: 'started', proof: 'actual-Part-1-and-Part-2', catalogue: existing ? 'reviewed-real-capture-emulator-only' : 'synthetic-fixture', clock: existing ? 'actual-UTC' : 'injected-test-clock', checks: [], screenshots: [], errors: [], external: [] };
 let browser, firestore, server, prefix;
@@ -34,7 +36,7 @@ try {
   firestore = new Firestore({ projectId: 'demo-roomdrop-part2', host: '127.0.0.1:8281', ssl: false });
   prefix = 'roomdropPart2Browser' + randomBytes(8).toString('hex');
   const now = existing ? () => new Date() : () => new Date('2026-10-20T00:00:00Z');
-  const bookingStorage = bookingModule.createBookingStorage({ firestore, prefix: existing ? 'roomdrop' : prefix });
+  const bookingStorage = bookingModule.createBookingStorage({ firestore, prefix: existing ? existingPrefix : prefix });
   if (!existing) {
   const otherCode = 'PART2002', extra = structuredClone(input.entries[0]);
   extra.code = otherCode; extra.bundle.baseline.quotationCode = otherCode;
@@ -63,7 +65,7 @@ try {
   const code = eligible[0].code, otherCode = existing ? eligible[1].code : 'PART2002';
   const minimum = agencyMinimumSavingMinor(eligible[0].bundle.baseline.quotedRetail.currency);
   const otherMinimum = agencyMinimumSavingMinor(loaded.entries.find(entry => entry.code === otherCode).bundle.baseline.quotedRetail.currency);
-  for (const width of [320, 768, 1024, 1440]) {
+  for (const width of [320, 390, 768, 1024, 1440]) {
     const judge = await browser.newContext({ viewport: { width, height: 1000 }, reducedMotion: 'reduce' });
     const second = await browser.newContext();
     await judge.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue()
@@ -95,6 +97,19 @@ try {
     }
     await arm(code, minimum); await shot('drops');
     assert.match(await page.locator('#armed-detail').innerText(), /Replayed .*Captured .*not live/);
+    assert.equal(await page.locator('#gemini-launcher').evaluate(button => {
+      const box = button.getBoundingClientRect();
+      return getComputedStyle(button).position === 'static' && [...document.querySelectorAll('#offers .offer-ticket')].every(card => {
+        const bounds = card.getBoundingClientRect();
+        return box.bottom <= bounds.top || box.top >= bounds.bottom || box.right <= bounds.left || box.left >= bounds.right;
+      });
+    }), true, 'Gemini must not overlap Drop content');
+    const withPhotos = loaded.entries.find(entry => entry.code === code).bundle.options.every(option => option.photo);
+    if (withPhotos) {
+      await page.waitForFunction(() => [...document.querySelectorAll('#offers img')].every(image => image.complete && image.naturalWidth > 0));
+      assert.equal(await page.locator('#offers .photo-tag').filter({ hasText: /^Hotel photo$/ }).count(), await page.locator('#offers .offer-ticket').count());
+      assert.equal(await page.locator('#offers img').evaluateAll(images => images.every(image => /^\/assets\/roomdrop-[a-z0-9-]+\.jpg$/.test(image.getAttribute('src')))), true);
+    }
     await page.locator('#offers .offer-action').first().focus(); await page.keyboard.press('Enter'); await visible('comparison');
     if (await page.locator('#flexibility-warning').isVisible()) await page.locator('#accept-reduced-flexibility').check();
     await page.locator('#gemini-launcher').click(); await visible('gemini-dialog');
@@ -117,6 +132,21 @@ try {
     assert.equal((await (await second.request.get(origin + '/api/booking-demo/q/' + code)).json()).watch.minimumSavingMinor, minimum * 5);
     assert.ok(restored.conversation?.chatHistory.length, 'Durable conversation missing from bootstrap projection');
     await arm(otherCode, otherMinimum);
+    if (existing) {
+      const otherDetail = await page.locator('#armed-detail').innerText();
+      const thirdCode = 'AIRB000182';
+      const third = await (await judge.request.get(origin + '/api/booking-demo/q/' + thirdCode)).json();
+      assert.equal((await judge.request.post(origin + '/api/booking-demo/q/' + thirdCode + '/watch', {
+        headers: { Origin: origin, 'X-CSRF-Token': third.csrfToken }, data: { snapshotVersion: third.snapshotVersion, consent: true,
+          minimumSavingMinor: third.agencyMinimumSavingMinor * 5, expectedRevision: third.watch?.revision ?? 0 } })).status(), 200);
+      await page.evaluate(code => { location.hash = '#drops-' + code; }, thirdCode);
+      await page.locator('#booking-label').filter({ hasText: thirdCode }).waitFor();
+      assert.notEqual(await page.locator('#armed-detail').innerText(), otherDetail);
+      await page.evaluate(code => { location.hash = '#drops-' + code; }, otherCode);
+      await page.locator('#booking-label').filter({ hasText: otherCode }).waitFor();
+      assert.equal(await page.locator('#armed-detail').innerText(), otherDetail);
+      await shot('hash-navigation-182-to-181');
+    }
     assert.deepEqual((await (await judge.request.get(origin + '/api/booking-demo/q/' + code)).json()).confirmation, mine.confirmation);
     const beforeRearm = await (await judge.request.get(origin + '/api/booking-demo/q/' + code)).json();
     const emptyMinimum = Math.max(25000, ...beforeRearm.options.map(option => option.indicativeDifferenceMinor + minimum));

@@ -1,5 +1,6 @@
 import { bookingView, comparisonLabels, replayResult, currentConfirmation } from './booking-live-data.js';
 import { createStayAdviser } from './stay-advice.js';
+import { cardPhoto } from './booking-judge.js';
 
 /** Use the existing booking screens and shared cards; confirmation is selection-only.
  * Catalogue mode adds the judge flow in front: Original Booking, Drop Watch setup and a replayed first check. */
@@ -7,6 +8,7 @@ export async function startBookingDemo(ui) {
   const { $, node, money, savingLabel, addStamp, setActionContent, factTile, stayText, guestText, stayPhoto, offerPhotoIndex } = ui;
   const catalogueMode = document.body.dataset.bookingMode === 'catalogue';
   let data, view, selected, busy = false, lastTrigger, code = null, judge, entries = [], navigation = 0;
+  let pendingRoute = false, routingLocation = null;
   const api = action => catalogueMode ? `/api/booking-demo/q/${code}${action ? '/' + action : ''}` : '/api/booking-demo' + (action ? '/' + action : '');
   const instantLabel = value => new Date(value).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC';
   const adviser = createStayAdviser({ parent: $('comparison'), before: $('price-details'),
@@ -44,6 +46,22 @@ export async function startBookingDemo(ui) {
   const focusHeading = id => $(id).focus({ preventScroll: true });
   const termText = offer => offer.option.freeCancellation === true ? 'Free cancellation flag · full terms to check'
     : offer.option.freeCancellation === false ? 'Non-refundable' : 'Cancellation terms to check';
+  function photoContent(photo, onFallback = () => {}) {
+    const frame = node('span', undefined, 'stay-photo');
+    const fallback = () => { frame.replaceChildren(node('span', 'No photo yet', 'photo-unavailable')); onFallback(); };
+    const reviewed = cardPhoto({ photo });
+    if (reviewed.kind === 'fallback') fallback();
+    else {
+      const image = node('img', undefined, 'card-photo'); image.src = reviewed.src; image.alt = reviewed.alt; image.decoding = 'async';
+      image.addEventListener('error', fallback, { once: true }); frame.append(image);
+    }
+    return frame;
+  }
+  function setPhoto(target, photo, label = 'Hotel photo') {
+    const tag = target.parentElement.querySelector(':scope > .photo-tag');
+    if (tag) { tag.textContent = label; tag.hidden = false; }
+    target.replaceChildren(photoContent(photo, () => { if (tag) tag.hidden = true; }));
+  }
   function review(offer, trigger, push = true) {
     if (busy) return;
     selected = offer; lastTrigger = trigger || lastTrigger;
@@ -57,6 +75,7 @@ export async function startBookingDemo(ui) {
     $('comparison-title').textContent = offer.hotel.name; $('after-room').textContent = offer.room.name;
     $('comparison-stay').textContent = stayText(offer); $('comparison-guests').textContent = guestText(offer);
     $('comparison-photo').replaceChildren(stayPhoto(offerPhotoIndex(offer), true));
+    if (catalogueMode) setPhoto($('comparison-photo'), offer.option.photo);
     $('comparison-category').textContent = 'Same hotel · room details to review';
     $('comparison-pills').replaceChildren(node('span', offer.option.board, 'pill'), node('span', termText(offer), 'pill'));
     $('before-price').textContent = money(view.booking.retail.totalMinor); $('after-price').textContent = money(offer.retail.totalMinor);
@@ -95,9 +114,11 @@ export async function startBookingDemo(ui) {
     $('switch-progress-label').textContent = 'Room choice confirmed'; $('switch-stage').textContent = 'Your new room choice is confirmed';
     $('switch-state').textContent = 'Demo complete';
     $('switch-explanation').textContent = 'Your selected room is shown below. The demo stops here before rebooking.';
+    const card = entries.find(entry => entry.code === code)?.card;
     for (const [prefix, record] of [['switch-from', view.booking], ['switch-to', selected]]) {
       $(prefix + '-hotel').textContent = record.hotel.name; $(prefix + '-room').textContent = record.room.name;
       $(prefix + '-price').textContent = money(record.retail.totalMinor); $(prefix + '-photo').replaceChildren(stayPhoto(1, true));
+      if (catalogueMode) setPhoto($(prefix + '-photo'), prefix === 'switch-to' ? selected.option.photo : card?.roomPhoto ?? card?.photo);
     }
     $('switch-from-status').textContent = 'current booking'; $('switch-to-status').textContent = 'selected room';
     addStamp($('switch-stamp'), selected.displaySaving.minor, view.currency.code, 'Estimated drop', 'switch-stamp');
@@ -126,6 +147,11 @@ export async function startBookingDemo(ui) {
     $('booking-label').textContent = (catalogueMode ? 'Original Booking · ' : 'Your booking · ') + view.booking.reference;
     $('room').textContent = view.booking.room.name + ' · ' + data.baseline.room.board;
     $('offers').replaceChildren(...view.highlights.map(highlight => ui.offerCard(highlight.offer, highlight)));
+    if (catalogueMode) for (const [index, highlight] of view.highlights.entries()) {
+      const card = $('offers').children[index], tag = card.querySelector('.photo-tag');
+      tag.textContent = 'Hotel photo';
+      card.querySelector('.offer-photo > .stay-photo').replaceWith(photoContent(highlight.offer.option.photo, () => tag.remove()));
+    }
     $('offer-empty').hidden = view.highlights.length > 0;
     $('lower-minimum').hidden = !catalogueMode || replay.status !== 'empty';
     $('offer-empty').textContent = replay?.status === 'unavailable' ? 'The replayed check is unavailable. Reload to try again. Your Original Booking is unchanged.'
@@ -157,9 +183,9 @@ export async function startBookingDemo(ui) {
           ...(reduced ? { acceptReducedFlexibility: true } : {}) }) });
       if (!response.ok) throw Error();
       const result = await response.json(); data.confirmation = result.confirmation;
-      busy = false; confirmed(result.confirmation);
+      busy = false; if (!pendingRoute) confirmed(result.confirmation);
     } catch { $('review-message').textContent = 'Your choice could not be confirmed. Reload and review the latest room options.'; $('review-message').classList.add('error'); }
-    finally { busy = false; $('approve-offer').disabled = false; $('keep-booking').disabled = false; $('approve-offer').removeAttribute('aria-busy'); }
+    finally { busy = false; $('approve-offer').disabled = false; $('keep-booking').disabled = false; $('approve-offer').removeAttribute('aria-busy'); if (pendingRoute) followLocation(); }
   });
   const chrome = () => {
     $('changes-title').textContent = 'Find your next drop';
@@ -253,6 +279,7 @@ export async function startBookingDemo(ui) {
         throw Error();
       }
       data.watch = result.watch; data.confirmation = null; selected = null; applyData();
+      if (pendingRoute) { busy = false; return; }
       if (replayResult(data).status === 'unavailable') { busy = false; overview(); return; }
       const token = ++navigation;
       history.pushState({ bookingScreen: 'options', code }, '', hashFor('options'));
@@ -261,7 +288,7 @@ export async function startBookingDemo(ui) {
       if (await judge.playCheck(data, () => token === navigation)) { steps('options'); window.scrollTo({ top: 0, behavior: 'instant' }); focusHeading('armed-title'); }
     } catch (error) {
       $('setup-message').textContent = error.userMessage || 'Your Drop Watch could not be armed. Please try again.'; $('setup-message').classList.add('error');
-    } finally { busy = false; $('arm-watch').disabled = false; $('arm-watch').removeAttribute('aria-busy'); }
+    } finally { busy = false; $('arm-watch').disabled = false; $('arm-watch').removeAttribute('aria-busy'); if (pendingRoute) followLocation(); }
   }
   const link = (id, handler) => $(id).addEventListener('click', event => { event.preventDefault(); handler(); });
   link('booked-back', () => go('start')); link('setup-back', () => go('booked', code));
@@ -271,13 +298,21 @@ export async function startBookingDemo(ui) {
   $('judge-consent').addEventListener('change', () => { $('setup-message').textContent = ''; $('setup-message').classList.remove('error'); });
   $('change-minimum').addEventListener('click', () => go('setup', code)); $('lower-minimum').addEventListener('click', () => go('setup', code));
   document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); go('start'); });
-  addEventListener('popstate', event => {
-    if (busy) return;
+  function followLocation() {
+    if (busy) { pendingRoute = true; return; }
+    pendingRoute = false;
     const parsed = /^#(start|booked|setup|drops|review|confirmed)(?:-([A-Z0-9]{4,20}))?$/.exec(location.hash);
     const route = Object.keys(routes).find(key => routes[key] === parsed?.[1]) ?? 'start';
-    go(event.state?.bookingScreen && event.state.bookingScreen !== 'checking' ? event.state.bookingScreen : route,
-      event.state?.code ?? parsed?.[2], { push: false, optionId: event.state?.optionId });
-  });
+    const state = history.state, target = parsed?.[2];
+    const optionId = state?.code === target && state?.bookingScreen === route ? state.optionId : undefined;
+    const key = location.hash + ':' + (optionId ?? '');
+    // Native fragment navigation can emit both events. Fetch once while that route is loading.
+    if (routingLocation === key) return;
+    routingLocation = key;
+    void go(route, target, { push: false, optionId }).finally(() => { if (routingLocation === key) routingLocation = null; });
+  }
+  addEventListener('popstate', followLocation);
+  addEventListener('hashchange', followLocation);
   try {
     const response = await fetch('/api/booking-demo/catalogue', { credentials: 'same-origin' }); if (!response.ok) throw Error();
     entries = (await response.json()).entries;

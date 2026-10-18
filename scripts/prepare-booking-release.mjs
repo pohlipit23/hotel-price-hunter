@@ -9,7 +9,9 @@ const sourceFiles = ['package.json','package-lock.json','app/quotation-advisor.m
 'app/domain/quotation-demo.mjs','app/domain/altovo-quotation.mjs','app/domain/live-comparison.mjs','app/domain/decision.mjs','app/domain/money.mjs','app/live-engine.mjs',
 'app/public/booking.html','app/public/booking.css','app/public/booking.js','app/public/booking-live.js','app/public/booking-live-data.js','app/public/drop-eligibility.js',
 'app/public/booking-judge.js','app/public/drop-watch.js','app/public/pricing.js','app/public/watch.js','app/public/stay-photos.js',
-'app/public/assets/roomdrop-logo.png','app/public/assets/roomdrop-key-icon.png','app/public/assets/illustrative-stays.jpg'];
+'app/public/assets/roomdrop-logo.png','app/public/assets/roomdrop-key-icon.png','app/public/assets/illustrative-stays.jpg',
+...['179','180','181','182','183','184'].map(code => `app/public/assets/roomdrop-airb000${code}-hotel.jpg`),
+...['181','182'].map(code => `app/public/assets/roomdrop-airb000${code}-room.jpg`)];
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 export async function main(args = process.argv.slice(2), { root = fileURLToPath(new URL('../', import.meta.url)), readSource } = {}) {
   if (!args.includes('--prepare')) return { status: 'offline', requirements: ['--prepare', '--source=exact-commit', '--manifest=reviewed-.local-code-version-pins'] };

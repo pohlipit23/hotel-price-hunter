@@ -17,6 +17,8 @@ const catalogue = altovoCatalogueFixture(), code = 'AIRB000180', otherCode = 'PA
 const other = structuredClone(catalogue.entries[0]); other.code = otherCode; other.bundle.baseline.quotationCode = otherCode;
 // Deliberately share snapshot/option aliases to prove the UI also binds conversation state to code.
 catalogue.entries.push(other);
+const photo = { asset: 'assets/roomdrop-airb000180-hotel.jpg', alt: 'Siam Kempinski Hotel Bangkok - hotel photo' };
+for (const option of catalogue.entries[0].bundle.options) option.photo = photo;
 const requests = [];
 const advisor = { available: true, status: 'test-injected', chat: async request => {
   requests.push(structuredClone(request));
@@ -28,7 +30,7 @@ const origin = 'http://127.0.0.1:' + server.address().port;
 const report = { status: 'started', storage: 'test-memory-session-with-actual-v3-arm', integratedFirestoreBrowser: 'separate-gate',
   checks: [], errors: [], external: [], screenshots: [] };
 try {
-  for (const width of [320, 768, 1024, 1440]) {
+  for (const width of [320, 390, 768, 1024, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 1000 }, reducedMotion: 'reduce' });
     await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue()
       : (report.external.push(route.request().url()), route.abort()));
@@ -61,8 +63,12 @@ try {
     await arm(code);
     assert.match(await page.locator('#armed-detail').innerText(), /Replayed .*Captured .*not live/);
     assert.equal(await page.locator('#offers .offer-ticket').count(), 3); await checkLauncher('drops'); await shot('drops');
+    assert.equal(await page.locator('#offers .photo-tag').filter({ hasText: /^Hotel photo$/ }).count(), 3);
+    assert.equal(await page.locator('#offers img').evaluateAll(images => images.every(image => image.getAttribute('src') === '/assets/roomdrop-airb000180-hotel.jpg' && image.complete && image.naturalWidth > 0)), true);
     await page.locator('[data-offer-id="option-fixture-final-deluxe"]').focus(); await page.keyboard.press('Enter');
     await visible('comparison'); await checkLauncher('review'); await page.locator('#approve-offer').click();
+    assert.equal(await page.locator('#comparison-photo img').getAttribute('src'), '/' + photo.asset);
+    assert.equal(await page.locator('#comparison .review-photo > .photo-tag').innerText(), 'Hotel photo');
     assert.match(await page.locator('#review-message').innerText(), /confirm the cancellation flexibility/);
     await page.locator('#accept-reduced-flexibility').check();
     await page.locator('#gemini-launcher').click(); await visible('gemini-dialog');
@@ -75,18 +81,56 @@ try {
     await page.locator('#approve-offer').click(); await visible('simulated-switch');
     assert.match(await page.locator('#switch-reassurance').innerText(), /Original|original/);
     await shot('confirmed'); await page.reload(); await visible('simulated-switch');
+    assert.equal(await page.locator('#switch-to-photo img').getAttribute('src'), '/' + photo.asset);
     const initial = await (await context.request.get(origin + '/api/booking-demo/q/' + code)).json();
     assert.equal(initial.confirmation.reservationCreated, false); assert.equal(initial.confirmation.quoteModified, false);
     assert.equal(initial.confirmation.customerRefund, null);
     const second = await browser.newContext();
     const theirs = await (await second.request.get(origin + '/api/booking-demo/q/' + code)).json();
     assert.equal(theirs.watch, null); assert.equal(theirs.confirmation, null); await second.close();
-    await arm(otherCode);
+    await arm(otherCode, 5000);
+    assert.equal(await page.locator('#offers .photo-unavailable').count(), await page.locator('#offers .offer-ticket').count());
+    assert.equal(await page.locator('#offers .photo-tag').count(), 0);
+    const otherDetail = await page.locator('#armed-detail').innerText();
+    // Hash routing must use the URL even when a host retains an older history-state object.
+    await page.evaluate(code => {
+      history.replaceState(history.state, '', '#drops-' + code);
+      dispatchEvent(new HashChangeEvent('hashchange'));
+    }, code);
+    await page.locator('#booking-label').filter({ hasText: code }).waitFor({ timeout: 5000 });
+    await page.evaluate(code => { location.hash = '#drops-' + code; }, otherCode);
+    await page.locator('#booking-label').filter({ hasText: otherCode }).waitFor();
+    await page.evaluate(code => { location.hash = '#drops-' + code; }, code);
+    await page.locator('#booking-label').filter({ hasText: code }).waitFor();
+    assert.notEqual(await page.locator('#armed-detail').innerText(), otherDetail);
+    await page.evaluate(code => { location.hash = '#drops-' + code; }, otherCode);
+    await page.locator('#booking-label').filter({ hasText: otherCode }).waitFor();
+    assert.equal(await page.locator('#armed-detail').innerText(), otherDetail);
     await page.locator('#gemini-launcher').click(); await visible('gemini-dialog');
     assert.doesNotMatch(await page.locator('.gemini-log').innerText(), /Private to first code/);
     await page.keyboard.press('Escape');
     const untouched = await (await context.request.get(origin + '/api/booking-demo/q/' + code)).json();
     assert.equal(untouched.confirmation.selectionId, initial.confirmation.selectionId);
+    if (width === 320) {
+      let release, seen;
+      const held = new Promise(resolve => { release = resolve; }), requested = new Promise(resolve => { seen = resolve; });
+      const watchUrl = '**/api/booking-demo/q/' + code + '/watch';
+      await page.route(watchUrl, async route => { const response = await route.fetch(); seen(); await held; await route.fulfill({ response }); });
+      await page.goto(origin + '/#setup-' + code); await visible('setup-screen');
+      await page.locator('#arm-watch').click(); await requested;
+      await page.evaluate(code => { location.hash = '#drops-' + code; }, otherCode);
+      release();
+      await page.locator('#booking-label').filter({ hasText: otherCode }).waitFor(); await visible('armed-strip');
+      assert.equal(await page.locator('#armed-detail').innerText(), otherDetail);
+      await page.unroute(watchUrl);
+    }
+    // A failed local image must remove the Hotel photo claim, just like an absent photo.
+    await page.route('**/' + photo.asset, route => route.fulfill({ status: 404, body: '' }));
+    await arm(code);
+    await page.waitForFunction(() => document.querySelectorAll('#offers img').length === 0);
+    assert.equal(await page.locator('#offers .photo-tag').count(), 0);
+    assert.equal(await page.locator('#offers .photo-unavailable').count(), 3);
+    await page.unroute('**/' + photo.asset);
     await arm(code, 25000); assert.equal(await page.locator('#offers .offer-ticket').count(), 0);
     assert.match(await page.locator('#offer-empty').innerText(), /captured check/);
     await page.goto(origin + '/#confirmed-' + code); await visible('armed-strip');
@@ -101,7 +145,8 @@ try {
     assert.equal(await page.locator('#lower-minimum').isVisible(), false); await shot('unavailable');
     await context.close();
     report.checks.push({ width, keyboard: 'passed', reviewRefresh: 'passed', receipt: 'passed', confirmationRefresh: 'passed',
-      twoJudges: 'passed', twoCodes: 'passed', conversationIsolation: 'passed', rearm: 'passed', empty: 'passed', unavailable: 'passed' });
+      twoJudges: 'passed', twoCodes: 'passed', conversationIsolation: 'passed', rearm: 'passed', empty: 'passed', unavailable: 'passed',
+      reviewedPhotos: 'passed', missingAndFailedPhotos: 'passed', hashNavigation: 'passed', launcherPlacement: 'passed' });
   }
   assert.deepEqual(report.errors, []); assert.deepEqual(report.external, []); report.status = 'passed';
 } catch (error) { report.status = 'failed'; report.error = error.stack; process.exitCode = 1; }
