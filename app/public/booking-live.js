@@ -30,9 +30,12 @@ export async function startBookingDemo(ui) {
     if (catalogueMode) {
       const site = screen === 'start' ? null : existing || screen === 'launch' ? 'roomdrop' : 'agency';
       $('app-frame').dataset.site = site ?? 'none'; shownSite = site;
+      // While the splash plays, the frame and the judge bar both flag that the actual app is starting.
+      $('app-frame').classList.toggle('launching', screen === 'launch'); $('judge-bar').classList.toggle('judge-bar-entering', screen === 'launch');
       // The launch splash carries its own logo, so the header waits until the Drops page.
       document.querySelector('.site-header').hidden = !site || screen === 'launch';
-      $('judge-bar-text').textContent = site === 'roomdrop' ? 'Hackathon submission starts here' : 'How this demo works';
+      $('judge-bar-text').textContent = screen === 'launch' ? 'Now starting the RoomDrop app · the hackathon submission'
+        : site === 'roomdrop' ? 'Hackathon submission starts here' : 'How this demo works';
       document.querySelector('.brand').hidden = site !== 'roomdrop'; $('agency-brand').hidden = site !== 'agency';
     }
     $('customer-steps').hidden = catalogueMode || screen === 'start';
@@ -52,7 +55,7 @@ export async function startBookingDemo(ui) {
   // Entering RoomDrop from anywhere else (the agency pages, the start page or a fresh load) plays a short launch
   // splash first; moving between RoomDrop pages does not. Focus requested meanwhile lands once the page shows.
   let shownSite = null, launchTimer = null, pendingFocus = null;
-  const launchMs = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 1000 : 2500;
+  const launchMs = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 2000 : 5000;
   const navigate = (screen, push = true) => {
     const state = { bookingScreen: screen, optionId: screen === 'review' ? selected?.offerId : null, code: screen === 'start' ? null : code };
     if (push) history.pushState(state, '', hashFor(screen));
@@ -267,6 +270,8 @@ export async function startBookingDemo(ui) {
   }
   async function go(screen, target, { push = true, optionId, trigger } = {}) {
     const token = ++navigation;
+    // A new route cancels a running splash at once, so its timer cannot reveal the old screen while this one loads.
+    clearTimeout(launchTimer); launchTimer = null; pendingFocus = null;
     if (screen !== 'start') {
       try {
         const payload = await load(target);

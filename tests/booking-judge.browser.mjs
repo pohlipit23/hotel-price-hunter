@@ -161,7 +161,14 @@ try {
     await shot('checking', false);
     await visible('handoff'); await shot('handoff');
     await handoff('j***@example.test');
-    await drops(); await focused('changes-title'); await step(3); await site('roomdrop');
+    // Entering the app plays the launch splash for the full 5s (2s with reduced motion) and the judge bar says so.
+    await visible('launch-screen'); const launchedAt = Date.now(); await focused('launch-title'); await step(3);
+    assert.equal(await page.locator('#judge-bar-text').innerText(), 'Now starting the RoomDrop app · the hackathon submission');
+    assert.equal(await page.locator('#app-frame').evaluate(frame => frame.classList.contains('launching')), true);
+    if (width === 1440) { await page.waitForTimeout(2400); await shot('launch', false); }
+    await drops(); assert(Date.now() - launchedAt >= (width === 1440 ? 4500 : 1700), width + ' splash too short');
+    assert.equal(await page.locator('#app-frame').evaluate(frame => frame.classList.contains('launching')), false);
+    await focused('changes-title'); await step(3); await site('roomdrop');
     assert.equal(await page.locator('#changes-title').innerText(), 'Find your next drop');
     assert.deepEqual([await page.locator('#armed-strip').isVisible(), await page.locator('footer').isVisible()], [false, false], 'no armed strip or footer on Drops');
     assert.deepEqual([receipt.watch.revision, receipt.watch.minimumSavingMinor, receipt.dropOptionIds.length], [1, 5000, 2]);
