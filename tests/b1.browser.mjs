@@ -30,7 +30,7 @@ export async function runB1(browser, origin, { allowFonts = false } = {}) {
   let checkpoint = 'setup';
   const result = status => ({ status, checkpoint, storage: 'test-memory', fontMode: allowFonts ? 'Google Fonts allowed' : 'external fonts blocked; fallback typography', checks, screenshots, geometry, syntheticFixtures, blockedExternal, errors });
   const settled = page => page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
-  async function fresh(width = 375, bootstrapOverride = null, { dark = false, failPhotos = false } = {}) {
+  async function fresh(width = 375, bootstrapOverride = null, { dark = false, failPhotos = false, refundableOnly = false } = {}) {
     const context = await browser.newContext({ viewport: { width, height: 1000 }, colorScheme: dark ? 'dark' : 'light', reducedMotion: 'reduce' });
     contexts.push(context);
     await context.route('**/*', async route => {
@@ -40,9 +40,12 @@ export async function runB1(browser, origin, { allowFonts = false } = {}) {
         if (allowFonts && ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'].includes(url.origin)) return route.continue();
         blockedExternal.push(url.href); return route.abort();
       }
-      if (bootstrapOverride && url.pathname === '/api/bootstrap') {
+      if ((bootstrapOverride && url.pathname === '/api/bootstrap') || (refundableOnly && url.pathname.startsWith('/api/'))) {
         const response = await route.fetch();
-        return route.fulfill({ response, json: bootstrapOverride(await response.json()) });
+        let data = await response.json();
+        if (refundableOnly && Array.isArray(data.offers)) data = { ...data, offers: data.offers.filter(offer => offer.cancellation?.refundability === 'refundable') };
+        if (bootstrapOverride && url.pathname === '/api/bootstrap') data = bootstrapOverride(data);
+        return route.fulfill({ response, json: data });
       }
       return route.continue();
     });
@@ -55,6 +58,7 @@ export async function runB1(browser, origin, { allowFonts = false } = {}) {
     assert.equal(writes.length, 0, 'Opening page must not mutate state');
     return { page, context, writes };
   }
+  const freshRefundable = (width = 375, override = null, options = {}) => fresh(width, override, { ...options, refundableOnly: true });
   async function state(page) { const response = await page.request.get(origin + '/api/bootstrap'); assert(response.ok()); return response.json(); }
   async function reload(test) {
     const count = test.writes.length;
@@ -97,56 +101,105 @@ export async function runB1(browser, origin, { allowFonts = false } = {}) {
     await test.page.locator('#comparison').waitFor({ state: 'visible' });
   }
   try {
+    checkpoint = 'three choices and current booking';
+    const landing = await fresh();
+    assert.equal(await landing.page.locator('#hotel').innerText(), 'Example Harbour Hotel');
+    assert.equal(await landing.page.locator('#booking-total').innerText(), 'USD 600');
+    assert.equal(await landing.page.locator('#booking-details').count(), 1, 'The compact booking must retain expandable room and guest details');
+    assert.equal(await landing.page.locator('#booking-details').getAttribute('open'), null);
+    await landing.page.locator('#booking-details summary').focus(); await landing.page.keyboard.press('Enter');
+    assert.match(await landing.page.locator('#booking-details').innerText(), /Deluxe King.*Breakfast included.*2 adults.*1 child/is);
+    await landing.page.keyboard.press('Enter');
+    assert.equal(await landing.page.locator('#booking-details').getAttribute('open'), null);
+    assert.equal(landing.writes.length, 0, 'Opening booking details must not mutate saved state');
+    assert.equal(await landing.page.locator('#booking-label').textContent(), 'Your current booking');
+    assert.equal(await landing.page.locator('#offers > article').count(), 3);
+    assert.equal(await landing.page.locator('#offer-filters, #lower-rate').count(), 0);
+    assert.deepEqual(await landing.page.locator('#offers .offer-pick').allTextContents(), ['Best drop', 'Best in the same hotel', 'Best in the same room']);
+    assert.equal(await landing.page.locator('#offers [data-offer-id="DEMO_NON_REFUNDABLE"]').count(), 3);
+    assert.equal(await landing.page.locator('#offers .offer-condition.warning').count(), 3);
+    assert((await landing.page.locator('#offers').innerText()).includes('Final drop'));
+    assert((await landing.page.locator('#offers').innerText()).includes('Price watch ends'));
+    assert.equal(await landing.page.locator('#offers button.room-key-action svg[aria-hidden="true"]').count(), 3);
+    for (const button of await landing.page.locator('#offers button.room-key-action').all()) {
+      assert.match(await button.getAttribute('aria-label'), /^Peek at this drop:/, 'The accessible name must contain the visible CTA text');
+      assert.match(await button.getAttribute('aria-describedby'), /offer-final-/, 'A final drop must expose its watch-ending warning to focused controls');
+    }
+    assert.equal(await landing.page.locator('#offers .offer-overlap').count(), 2);
+    assert.equal(await landing.page.evaluate(() => { const ids = [...document.querySelectorAll('[id]')].map(el => el.id); return ids.length - new Set(ids).size; }), 0, 'Overlapping options must not duplicate DOM IDs');
+    await inspect(landing.page, 'three-options');
+    for (const slot of ['overall', 'hotel', 'room']) {
+      await command(landing, '#review-drop-' + slot, '/api/selection');
+      assert.match(await landing.page.locator('#flexibility-warning').innerText(), /final drop.*non-refundable.*price watch ends/is);
+      assert(await landing.page.locator('#approve-offer').isDisabled());
+      await landing.page.locator('#keep-booking').click(); await settled(landing.page);
+      assert.equal(await landing.page.evaluate(() => document.activeElement.id), 'review-drop-' + slot);
+    }
+    assert.equal(landing.writes.filter(write => write.path === '/api/offer-approvals').length, 0, 'Reviewing a final drop must never approve it');
+    checks.push('A compact current-booking summary keeps keyboard-accessible details; three overlapping best-drop choices use normal buttons with decorative room-key icons and explicit final-drop terms');
+
     checkpoint = 'selection/history';
-    const test = await fresh(); const { page } = test;
+    const test = await freshRefundable(); const { page } = test;
+    syntheticFixtures.push({ name: 'refundable-candidate-set', source: 'State response substitution excludes the optional non-refundable candidate for refundable review and retry regressions; backend commands remain real test-memory commands' });
     assert.equal(await page.locator('#offers [data-offer-id]').count(), 3);
-    assert.equal(await page.locator('#hotel').innerText(), 'Example Garden Hotel');
-    assert.equal(await page.locator('#booking-total').innerText(), 'USD 510');
-    assert.equal(await page.locator('#booking-photo svg').getAttribute('viewBox'), '768 512 768 512');
-    assert.match(await page.locator('#booking-label').innerText(), /highest price drop.*new hotel/i);
-    assert.match(await page.locator('#current-booking-summary').innerText(), /Example Harbour Hotel.*USD 600/);
-    assert.match(await page.locator('#best-drop').getAttribute('aria-label'), /85 USD/);
-    const reordered = await fresh(375, value => {
+    assert.equal(await page.locator('#hotel').innerText(), 'Example Harbour Hotel');
+    assert.equal(await page.locator('#booking-total').innerText(), 'USD 600');
+    assert.deepEqual(await page.locator('#offers button[data-offer-id]').evaluateAll(buttons => buttons.map(button => button.dataset.offerId)), ['DEMO_DIFFERENT_HOTEL', 'DEMO_DIFFERENT_ROOM', 'DEMO_EQUIVALENT']);
+    await command(test, '#review-drop-overall', '/api/selection');
+    assert.equal(await page.locator('#comparison-title').innerText(), 'Example Garden Hotel');
+    await page.locator('#keep-booking').click(); await settled(page);
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'review-drop-overall');
+    assert(await page.locator('#review-drop-overall').evaluate(el => el.getBoundingClientRect().bottom <= innerHeight), 'Returning must keep the source action in view');
+    const reordered = await freshRefundable(375, value => {
       const offer = value.offers.find(offer => offer.offerId === 'DEMO_DIFFERENT_ROOM');
       offer.decision.netSavingMinor = 9500;
       return value;
     });
-    syntheticFixtures.push({ name: 'hero-changed-saving-ranking', source: 'bootstrap response substitution; presentation fixture only' });
+    syntheticFixtures.push({ name: 'changed-saving-ranking', source: 'bootstrap response substitution; presentation fixture only' });
     assert.equal(await reordered.page.locator('#hotel').innerText(), 'Example Harbour Hotel');
-    assert.equal(await reordered.page.locator('#booking-total').innerText(), 'USD 520');
-    assert.equal(await reordered.page.locator('#booking-photo svg').getAttribute('viewBox'), '0 512 768 512');
-    assert.match(await reordered.page.locator('#best-drop').getAttribute('aria-label'), /95 USD/);
-    checks.push('Hero photo, hotel, price and saving follow the highest verified net drop, including a changed ranking');
+    assert.equal(await reordered.page.locator('#booking-total').innerText(), 'USD 600');
+    assert.equal(await reordered.page.locator('#review-drop-overall').getAttribute('data-offer-id'), 'DEMO_DIFFERENT_ROOM');
+    assert.equal(await reordered.page.locator('#review-drop-hotel').getAttribute('data-offer-id'), 'DEMO_DIFFERENT_ROOM');
+    assert.equal(await reordered.page.locator('#review-drop-room').getAttribute('data-offer-id'), 'DEMO_EQUIVALENT');
+    assert.match(await reordered.page.locator('#offer-saving-overall').getAttribute('aria-label'), /95 USD/);
+    checks.push('Three relationship-based winners follow changed savings without replacing the current booking or removing overlapping slots');
     assert((await page.locator('#offers').innerText()).includes('-'), 'Savings lost their minus sign');
     await inspect(page, 'choose');
-    for (const [filter, offerId] of [['match', 'DEMO_EQUIVALENT'], ['room', 'DEMO_DIFFERENT_ROOM'], ['hotel', 'DEMO_DIFFERENT_HOTEL']]) {
-      const before = test.writes.length;
-      await page.locator(`#offer-filters [data-filter="${filter}"]`).click();
-      assert.equal(await page.locator('#offers [data-offer-id]:visible').count(), 1);
-      assert.equal(await page.locator('#offers [data-offer-id]:visible').getAttribute('data-offer-id'), offerId);
-      assert.equal(await page.locator('#offer-filters [aria-pressed="true"]').count(), 1);
-      assert.equal(test.writes.length, before, 'Filtering mutated saved booking');
-    }
-    await page.locator('#offer-filters [data-filter="all"]').click();
-    assert.equal(await page.locator('#offers [data-offer-id]').count(), 3);
-    checks.push('All offer filters isolate the intended relationship without mutating state');
     await select(test);
     assert.equal(await page.locator('#comparison-saving').innerText(), '-55 USD');
     assert(await page.locator('#approve-offer').isEnabled());
     assert((await page.locator('#comparison').innerText()).includes('USD 5'), 'Review lost fees');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.evaluate(() => scrollTo(0, 0));
+    const approveBox = await page.locator('#approve-offer').boundingBox();
+    assert(approveBox.y >= 0 && approveBox.y + approveBox.height <= 844, 'Approval must be reachable at the top of a mobile review');
+    assert.match(await page.locator('#cancellation-summary').innerText(), /USD 600.*USD 540/s, 'Review must explain the actual penalty change');
+    assert.match(await page.locator('#cancellation-summary').innerText(), /10 Nov 2026.*18:00.*Asia\/Kuala_Lumpur/s);
+    await page.locator('#price-details summary').click();
+    assert.match(await page.locator('#differences').innerText(), /USD 600 minus USD 540 minus USD 5 fees = USD 55 saving/);
+    assert.match(await page.locator('#comparison-saving').innerText(), /^-55 USD$/);
+    await page.locator('#price-details summary').click();
+    assert(await page.locator('#price-details summary').evaluate(el => !['none', 'normal'].includes(getComputedStyle(el, '::after').content)), 'Expandable details need a visible chevron');
+    await page.setViewportSize({ width: 375, height: 1000 });
     await inspect(page, 'review');
     const beforeKeep = test.writes.length;
     await page.locator('#keep-booking').click(); await page.locator('#comparison').waitFor({ state: 'hidden' });
     assert.equal(test.writes.length, beforeKeep, 'Keep my booking must not approve or mutate');
     await reload(test); assert(await page.locator('#comparison').isHidden(), 'Keep my booking did not survive reload');
     await select(test, 'DEMO_DIFFERENT_HOTEL');
+    await page.locator('#keep-booking').click(); await settled(page);
+    const returned = await page.evaluate(() => { const control = document.activeElement, rect = control.getBoundingClientRect(); return { offerId: control.dataset.offerId, top: rect.top, bottom: rect.bottom, height: innerHeight }; });
+    assert.equal(returned.offerId, 'DEMO_DIFFERENT_HOTEL');
+    assert(returned.top >= 0 && returned.bottom <= returned.height, 'Keep my booking must restore visible focus on the selected offer');
+    await select(test, 'DEMO_DIFFERENT_HOTEL');
     const count = test.writes.length;
     await page.goBack(); await page.locator('#comparison').waitFor({ state: 'hidden' }); await settled(page);
+    await page.waitForFunction(() => { const el = document.activeElement, box = el.getBoundingClientRect(); return el.dataset.offerId === 'DEMO_DIFFERENT_HOTEL' && box.top >= 0 && box.bottom <= innerHeight; });
     await page.goForward(); await page.locator('#comparison').waitFor({ state: 'visible' }); await settled(page);
     assert.equal(test.writes.length, count, 'Back/Forward must not mutate');
     await reload(test); assert(await page.locator('#comparison').isVisible());
     assert((await page.locator('#comparison').innerText()).includes('Example Garden Hotel'));
-    checks.push('Selection, Keep, Back, Forward and reload preserve navigation without approval or automatic writes');
+    checks.push('Key-shaped review and approval, readable cancellation penalties, positive arithmetic and visible return focus preserve navigation without automatic approval');
 
     checkpoint = 'relationship facts and keyboard';
     for (const choice of [
@@ -154,7 +207,7 @@ export async function runB1(browser, origin, { allowFonts = false } = {}) {
       { id: 'DEMO_DIFFERENT_ROOM', hotel: 'Example Harbour Hotel', price: 'USD 520', saving: '-75 USD', room: 'Premier King' },
       { id: 'DEMO_DIFFERENT_HOTEL', hotel: 'Example Garden Hotel', price: 'USD 510', saving: '-85 USD', room: 'Deluxe King' },
     ]) {
-      const target = await fresh(); const control = target.page.locator(`[data-offer-id="${choice.id}"]`);
+      const target = await freshRefundable(); const control = target.page.locator(`[data-offer-id="${choice.id}"]`);
       const reply = target.page.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/api/selection'));
       await control.focus(); await target.page.keyboard.press('Enter'); assert((await reply).ok());
       await target.page.locator('#comparison').waitFor({ state: 'visible' }); await settled(target.page);
@@ -188,10 +241,10 @@ export async function runB1(browser, origin, { allowFonts = false } = {}) {
     checks.push('All three reviews preserve exact hotel, room, price, after-fee saving and complete cancellation deadline; Same room applies only to verified equivalence; decorative SVG fact cards retain meaningful labels; Enter selects and focuses review');
 
     checkpoint = 'light theme and photo fallback';
-    const dark = await fresh(375, null, { dark: true });
+    const dark = await freshRefundable(375, null, { dark: true });
     assert.equal(await dark.page.locator('html').evaluate(el => getComputedStyle(el).colorScheme), 'light');
     assert.equal(await dark.page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(238, 244, 249)');
-    const failedPhotos = await fresh(375, null, { failPhotos: true }); await select(failedPhotos);
+    const failedPhotos = await freshRefundable(375, null, { failPhotos: true }); await select(failedPhotos);
     await failedPhotos.page.locator('#comparison .photo-unavailable').waitFor({ state: 'visible' });
     assert(await failedPhotos.page.locator('#approve-offer').isEnabled(), 'Failed illustrative photo blocked verified offer approval');
     await inspect(failedPhotos.page, 'failed-photo');
@@ -199,16 +252,37 @@ export async function runB1(browser, origin, { allowFonts = false } = {}) {
 
     checkpoint = 'non-refundable';
     const nonref = await fresh();
-    await nonref.page.locator('#lower-rate summary').click(); await select(nonref, 'DEMO_NON_REFUNDABLE');
+    await nonref.page.locator('#watch-consent-check').check();
+    await command(nonref, '#watch-button', '/api/price-watch');
+    await command(nonref, '#review-drop-overall', '/api/selection');
     assert(await nonref.page.locator('#approve-offer').isDisabled());
     assert(/no free cancellation/i.test(await nonref.page.locator('#flexibility-warning').innerText()));
     await inspect(nonref.page, 'nonref');
+    await nonref.page.setViewportSize({ width: 390, height: 844 });
+    await nonref.page.evaluate(() => scrollTo(0, 0));
+    await nonref.page.locator('#review-consent-link').click();
+    const consentPosition = await nonref.page.evaluate(() => ({ checkbox: document.querySelector('#accept-reduced-flexibility').getBoundingClientRect().toJSON(), bar: document.querySelector('.review-actions').getBoundingClientRect().toJSON(), focus: document.activeElement.id }));
+    assert.equal(consentPosition.focus, 'accept-reduced-flexibility');
+    assert(consentPosition.checkbox.top >= 0 && consentPosition.checkbox.bottom <= consentPosition.bar.top, 'Fixed approval bar must not obscure the consent checkbox');
+    assert(await nonref.page.locator('#approve-offer').isDisabled(), 'Jumping to cancellation terms must not accept them');
     await nonref.page.locator('#accept-reduced-flexibility').check(); assert(await nonref.page.locator('#approve-offer').isEnabled());
     await reload(nonref); assert(await nonref.page.locator('#approve-offer').isDisabled(), 'Non-refundable acknowledgment survived reload');
+    await nonref.page.locator('#accept-reduced-flexibility').check();
+    await command(nonref, '#approve-offer', '/api/offer-approvals');
+    await nonref.page.locator('#demo-controls summary').click();
+    for (let step = 0; step < 6; step++) await command(nonref, '#advance-demo', '/api/switches/' + (await state(nonref.page)).simulation.operation.operationId + '/advances');
+    assert.equal((await state(nonref.page)).priceWatch.status, 'ended');
+    assert.match(await nonref.page.locator('#watch-status').innerText(), /watch has ended/i);
+    await command(nonref, '#watch-button', '/api/price-watch');
+    assert.equal((await state(nonref.page)).priceWatch.enabled, false);
+    assert(await nonref.page.locator('#watch-button').isDisabled());
+    assert(await nonref.page.locator('#watch-consent').isHidden());
+    assert.match(await nonref.page.locator('#watch-status').innerText(), /final drop.*watch has ended/i);
+    await inspect(nonref.page, 'final-drop-complete');
     checks.push('Non-refundable approval needs an explicit acknowledgment which reload clears');
 
     checkpoint = 'watch';
-    const watch = await fresh();
+    const watch = await freshRefundable();
     await watch.page.locator('#watch-consent').waitFor({ state: 'visible' });
     const consentText = await watch.page.locator('#watch-consent').innerText();
     assert(/daily/i.test(consentText) && /weekly/i.test(consentText), 'Watch consent conflates checks and preview cadence');
@@ -226,7 +300,7 @@ export async function runB1(browser, origin, { allowFonts = false } = {}) {
     checks.push('Watch consent explicitly scopes daily checks, weekly previews and approval; stop/reload preserves saved state');
 
     checkpoint = 'approved six-stage journey';
-    const journey = await fresh(); await select(journey, 'DEMO_DIFFERENT_HOTEL');
+    const journey = await freshRefundable(); await select(journey, 'DEMO_DIFFERENT_HOTEL');
     data = await command(journey, '#approve-offer', '/api/offer-approvals');
     const snapshots = [structuredClone(data)];
     assert.equal(data.simulation.operation.stage, 'ready');
@@ -260,7 +334,7 @@ export async function runB1(browser, origin, { allowFonts = false } = {}) {
     checks.push('Exactly one selected approval and six deliberate demo advances; cancellation precedes refund; pending/completed/reload remain distinct');
 
     checkpoint = 'committed approval response lost';
-    const lost = await fresh(); await select(lost);
+    const lost = await freshRefundable(); await select(lost);
     let intercepted = false;
     await lost.page.route('**/api/offer-approvals', async route => {
       if (intercepted) return route.continue();
@@ -282,7 +356,7 @@ export async function runB1(browser, origin, { allowFonts = false } = {}) {
     checks.push('A committed approval with lost response keeps Retry reachable after Back, replays the same payload/key/operation and survives read-only reload');
 
     checkpoint = 'uncommitted approval response lost and history';
-    const uncommitted = await fresh(); await select(uncommitted);
+    const uncommitted = await freshRefundable(); await select(uncommitted);
     let aborted = false;
     await uncommitted.page.route('**/api/offer-approvals', route => {
       if (aborted) return route.continue();
@@ -332,8 +406,8 @@ export async function runB1(browser, origin, { allowFonts = false } = {}) {
     assert.equal(await empty.page.locator('#hotel').innerText(), 'Example Harbour Hotel');
     assert.equal(await empty.page.locator('#booking-total').innerText(), 'USD 600');
     assert.equal(await empty.page.locator('#booking-label').textContent(), 'Your current booking');
-    assert(await empty.page.locator('#best-drop').isHidden());
-    assert(await empty.page.locator('#current-booking-summary').isHidden());
+    assert.equal(await empty.page.locator('#offers > article').count(), 3, 'Missing groups retain honest unavailable slots');
+    assert.equal(await empty.page.locator('#offers button').count(), 0, 'No-offer fallback must not expose an approval path');
     assert(/no .*offer|no .*drop|no .*ticket|no .*saving|no .*cheaper/i.test(await empty.page.locator('body').innerText()), 'No-offer state lacks explanation');
     await inspect(empty.page, 'nooffers');
     const sourceUnavailable = await fresh(375, () => {

@@ -1,4 +1,262 @@
-# Hotel Price Hunter: proposed starting plan
+# Hotel Price Hunter: implementation plan
+
+## Curated RoomDrop judge flow and Firestore persistence - 18 October
+
+Source of truth: `docs\public-demo-firestore-spec.md`, updated with the approved
+judge-flow decisions in `docs\roomdrop-booking-setup-handoff.md`, and `GLOSSARY.md`.
+Status: approved by the user on 18 October 2026, with one modification: delivery
+is split into Part 1 (sample preparation and judge setup through Drop Watch armed)
+and Part 2 (RoomDrop app after watch activation). Sample preparation is an explicit
+tracked task (S0). Do not ask for this approval again. Live capture/import,
+deployment and access changes keep their separate approval boundaries.
+The user explicitly requested the spec update and this plan together.
+Earlier unchecked intake tasks are superseded for this tranche; historical
+completed work and other open project tasks remain below.
+
+Concurrent application changes appeared during planning: file-backed catalogue
+routes, per-code memory state, hosted packaging, `app\public\drop-watch.js` and
+`scripts\serve-booking-demo.mjs`. They were not authored or modified by this task.
+F0 must reconcile the actual current tree and reuse compatible work before any
+new implementation. New filenames below are proposed, not ownership claims or
+instructions to overwrite another writer's changes.
+
+### Approved behavior and superseded assumptions
+
+- Owner-created air1 staging quotations enter through guarded admin capture/import.
+  Judges select imported catalogue cards; there is no public share-link intake,
+  arbitrary-code lookup, customer login or generated invitation in this tranche.
+- Shared Original Booking facts and Drops are immutable. Store judge choices,
+  consent, minimum saving, first-check replay and confirmation only under
+  `session.byCode[code]`. One judge cannot overwrite another judge's Drop Watch.
+- Preserve the latest spec's agency minimum of 10.00 in the booking currency.
+  Arming performs a pure immediate replay of that booking's captured Drops,
+  filtered by `isDisplayedDrop` and the chosen minimum, with visible capture/replay
+  labels. There is no pending scheduled first check or runtime supplier request.
+- Add the start-page card grid and RoomDrop Original Booking confirmation page,
+  then setup/armed/replay screens feeding the existing Deals/Review/Confirmed flow.
+  The factual staging note remains visible beside "Your agency booked this".
+- Confirming a Drop requires that session's armed watch and current qualifying
+  membership. It remains a selection receipt, with no Altovo quotation creation,
+  supplier booking, money movement or change to the Current Booking.
+
+### Data and runtime design
+
+1. Review existing `app\domain\altovo-quotation.mjs` and
+   `scripts\prepare-altovo-catalogue.mjs` before modifying them. The actual share
+   payload needs a dedicated adapter, not `quotationBaseline()`. Capture provenance
+   and exact price/currency bindings; validate `non_refundable` and UTC schedules,
+   never the 1970 sentinel or a guessed deadline timezone. Keep absent guest-age
+   facts absent and mark my/my/adults-only Gateway search as agency defaults.
+2. Prepare one complete sanitised bundle per curated code, with photo/card/scenario
+   metadata and captured Drops. Two quotation projections currently exist; no
+   complete six-entry catalogue or per-booking Gateway results are assumed.
+   Additional owner-created entries and bounded captures are separate prerequisites.
+3. Create immutable `roomdropBookingsV1/{code}` records and append-only
+   `drops/{dropId}` documents through `scripts\import-altovo-catalogue.mjs`, dry-run
+   by default. Validate complete bundles and publish only a complete reviewed set.
+   Identical replay is safe; changed Original Booking facts fail `BOOKING_CHANGED`.
+   Distinguish a valid empty result from a missing/failed capture.
+4. Pin a bounded reviewed catalogue manifest of allowed codes and content/Drop-set
+   versions in the release. Read display records from Firestore; the manifest
+   contains no private quotation payload or credentials. Public APIs validate
+   membership before document access and cannot import or refresh records.
+5. Persist SHA-256 cookie-keyed anonymous sessions, fixed one-hour expiry, CSRF,
+   session-wide advice counters and per-code watch/receipt/context. Use explicit
+   versioned commands so identical retries replay while stale retries cannot undo
+   newer setup. Changed Drop bindings invalidate only the affected entry.
+6. Arming evaluates current cancellation eligibility and saves consent, threshold,
+   armed time and one completed captured-replay result atomically. Rearming with a
+   deliberate new minimum creates a new watch revision in that entry only.
+   Confirmation requires the current armed qualifying set and acknowledgements.
+7. Add path-based routes such as `/api/booking-demo/catalogue` and
+   `/api/booking-demo/q/<code>` with explicit action suffixes. Change exact URL
+   rewrites/static allowlists deliberately; keep no query lookup, canonical Host,
+   Origin/CSRF, request bounds and production emulator/credential guards.
+8. Keep Gemini outside retryable transactions. Reserve the session allowance,
+   then merge context for the exact code/watch/Drop versions without overwriting
+   newer confirmations. Preserve four requests/minute/session, existing twenty
+   requests/minute/instance and two concurrent calls/instance.
+9. Use the existing Firestore dependency and runtime identity. Keep session capacity
+   bounded at 64 live sessions with shared transactional accounting; reads and
+   per-session code maps are catalogue-bounded. No memory/file fallback in hosted
+   mode. Session TTL alone is proposed; shared bookings/Drops survive sessions
+   and source-link expiry. Existing simulation/agency/watch data remains separate.
+
+### Implementation order and checkpoints
+
+Detailed acceptance and file ownership are in `tasks\todo.md`. The seam, receipt
+and file-ownership rules are in the spec section "Delivery split, seam and
+ownership". Original order (historical reference):
+
+- F0-F2: audit captures/scaffolding, validate the adapter, then import/read one
+  complete booking/Drops bundle through the emulator.
+- F3-F5: durable per-code sessions, catalogue HTTP bootstrap, then atomic arming,
+  replay and selection guards.
+- F6-F8: start/Original Booking screens, setup-to-Deals flow, then durable Gemini
+  context. Check both judges on one booking and one judge across two bookings.
+- F9-F11: hosted entrypoints, frozen release export, browser/restart acceptance and a
+  concrete release bundle for a separate deployment/import decision.
+
+Approved two-part delivery (18 October 2026). Mixed F tasks are split into `a`
+(Part 1) and `b` (Part 2) sub-tasks:
+
+- Part 1 (Claude, `.local\roomdrop-part1`, branch `claude/roomdrop-part1-armed`):
+  S0 sample preparation; F0; F1; F2; F3a session core and watch entry; F4a
+  catalogue/per-code bootstrap; F5a atomic arm and first-check replay receipt;
+  F6 start grid and Original Booking confirmation; F7a consent/minimum setup,
+  cannot-start and armed state; F9a minimum hosted Firestore wiring for setup;
+  F10a minimum packaging closure; F11a Part 1 emulator/browser/restart evidence.
+  Part 1 ends at the committed arm receipt.
+- Part 2 (Codex, `.local\roomdrop-part2`, branch `codex/roomdrop-part2-app`):
+  Ownership update on 18 October: the user transferred F9a hosted wiring and F10a
+  packaging to Codex, and authorised merging pinned Part 1 `d14f70f` plus import
+  of the reviewed six-code catalogue into Part 2's 8281/demo emulator only.
+  Claude retains F6/F7a and F11a; later commits are not included in this approval.
+  F3b confirmation/context session fields; F4b confirm/advice/chat routes on
+  durable sessions; F5b membership, safe rearming, stale rejection and idempotent
+  selection receipts; F7b replay presentation and Deals/Review/Confirmed; F8
+  durable Gemini context; F9b complete hosted entrypoints; F10b frozen release
+  export; F11b integrated acceptance and release bundle.
+  Historical pre-integration record: receipt/UI and contract-v1 action/startup wiring are
+  implemented on this branch. Real-emulator tests exercise Part 2 transactions
+  and HTTP restart recovery through injected contract adapters. Part 1 modules
+  are not integrated here, so whole-journey persistence and a production release
+  candidate remain open. See the Part 2 verification section.
+  File splits for isolated ownership: F3b uses `quotation-session-actions.mjs`
+  and its test instead of creating Part 1's session-core file; F4b uses
+  `quotation-post-watch.mjs` and `quotation-durable-actions.test.mjs` for its
+  bounded durable handler; F7b has a separate `booking-after-watch.browser.mjs`
+  for memory-receipt evidence. F11b's `booking-firestore.browser.mjs` refuses to
+  substitute those doubles for the actual Part 1 dependencies.
+  Contract v2 follow-up: use Part 1's guarded Firestore client factory, constrain
+  session storage to manifest codes and handle `getDrops` booking-unavailable
+  errors. `part1-session-v2.test.mjs` evaluates the committed session module
+  read-only from `git show` to prove actual adapter compatibility without merging.
+  Contract v3 follow-up: send the current revision when arming/rearming, validate
+  receipt capture status, preserve stale/unavailable outcomes and pass storage as
+  the sole catalogue source. `booking-v3.browser.mjs` proves the request behaviour
+  against an injected v3 endpoint; it does not substitute for integrated acceptance.
+  First integration: merge `b1eda30` includes only pinned `d14f70f`; the real
+  six-code catalogue is imported into the authorised Part 2 emulator. Actual-UTC
+  browser checks pass at four widths, core emulator tests pass 48/48, and the full
+  Node run passes 370 with 29 explicit skips. Both hosted entrypoints and the
+  exact-source local image at `a1a3fcf` pass startup/arm/confirm/restart checks.
+  F3b/F4b/F5b/F7b/F8/F9a/F9b/F10a/F10b have local acceptance; final F11b waits
+  for Claude's F6/F7a/F11a and a
+  later authorised merge. See the current Part 2 integration verification section.
+  Subsequent authorised integration: merge `f47960e` includes pinned `8423825`,
+  with the optional-revision fix and setup screens. The arm fetch delegates to
+  the judge helper, and Gemini launches from the Drops/Review headings without
+  covering content. Full Node: 379 passed, 29 skipped; core emulator: 50 passed;
+  real-capture and placement browser gates pass four widths, including stale tabs.
+  The refreshed local image is pinned to `f47960e`. Photo capture and final F11a
+  evidence remain with Claude; no later merge or release action is authorised.
+  Final authorised integration: 33bb55f merged as 5eaf0ae, protected Part 1
+  modules unchanged. Source c7de6a4 renders reviewed photos, handles URL/hash
+  routing and packages all eight JPEGs. Node 388 pass/31 skips/zero fail; targeted
+  emulator 53/53; five-width real browser and both packaged entrypoints pass.
+  F11b local acceptance and offline bundle are complete. The later engine
+  recapture/new pins and live release prerequisites remain separate; no push,
+  deployment, production import or live call ran.
+- Both parts branch from `roomdrop/judge-flow-base`, a snapshot of pre-existing
+  shared-checkout work authored by neither part. Part 2 may start against the
+  current memory-backed `/watch` receipt and switches to the Firestore-backed
+  receipt once F5a lands; the receipt contract changes only by coordination.
+
+No task is marked complete by this plan. All proposed tasks are small or medium
+and name at most five likely files. Extra files require an explicit task split.
+
+### Verification commands
+
+Use PowerShell and the existing loopback emulator; never flush shared state.
+The proposed new harnesses below are not existing verification evidence.
+
+```powershell
+Set-Location 'C:\Users\pohli\Sites\hotel-price-hunter'
+$env:GOOGLE_CLOUD_PROJECT='demo-roomdrop-iap-qa'
+$env:FIRESTORE_EMULATOR_HOST='127.0.0.1:8081'
+$env:RUN_FIRESTORE_INTEGRATION='1'
+$env:NODE_ENV='test'
+Remove-Item Env:K_SERVICE,Env:CLOUD_RUN_JOB,Env:STORAGE_MODE,Env:GEMINI_MODEL,Env:GOOGLE_CLOUD_LOCATION,Env:QUOTATION_ADVICE_ENABLED -ErrorAction SilentlyContinue
+node --test .\tests\altovo-catalogue.test.mjs .\tests\booking-storage.test.mjs
+node --test .\tests\quotation-session-storage.test.mjs .\tests\booking-catalogue-server.test.mjs
+node --test .\tests\booking-drop-watch.test.mjs .\tests\booking-live.test.mjs
+node --test .\tests\quotation-advice-server.test.mjs .\tests\booking-advice.test.mjs
+node --test .\tests\quotation-cloud.test.mjs .\tests\public-demo-release.test.mjs
+node .\tests\booking-firestore.browser.mjs
+npm test
+git diff --check
+```
+
+The importer command proposed for local dry-run is
+`node .\scripts\import-altovo-catalogue.mjs --catalogue=.local\altovo-catalogue\REVIEWED-CATALOGUE.json`.
+An emulator write additionally requires `--execute --project=demo-roomdrop-iap-qa
+--database="(default)" --emulator=127.0.0.1:8081`. Implement explicit guards and
+canonical workspace path checks before executing it; the actual input path and
+manifest are chosen from inspected captures, not hard-coded private evidence.
+Do not execute the existing capture script with `--execute` during offline tests.
+
+Build the exact emitted context with `docker build --tag roomdrop-firestore-review
+CONTEXT_DIRECTORY`. Startup failure smoke uses `docker run --rm --network=none
+roomdrop-firestore-review`; a successful production-mode smoke must use the
+packaged app with explicit emulator/test dependency injection without weakening
+hosted production guards. Record the final executable harness/build/start commands
+in the verification report. The pitch Worker build/deploy is a separate product.
+
+### Content and acceptance prerequisites
+
+The handoff records AIRB000179 as non-refundable and AIRB000180 as refundable.
+Verify their allowlisted projections and cancellation schedules locally. Use
+injected responses and test-only clocks for boundary cases; do not change real
+capture dates/deadlines to manufacture a closing-soon or armable public scenario.
+A missing child-age/nationality field, supplier-net field or legacy token must
+never leak into a public projection or become invented source evidence.
+
+Keep the desired six-card scenario matrix separate from implementation acceptance:
+two samples can verify storage mechanics, while complete catalogue content needs
+owner-created quotations and corresponding reviewed captures. Card photo/city and
+scenario descriptions must be supplied as curated facts, not invented metadata.
+This content work is the explicit Part 1 task S0 in `tasks\todo.md`, tracked as
+separate steps: inspect the two existing projections, owner quotation creation,
+sanitised projection capture, matching per-quotation Gateway Drop capture,
+photo/scenario metadata and guarded Firestore import. Each live step needs its
+own user approval; plan approval grants no new live-call allowance.
+
+### Release and approval boundaries
+
+The approved judge-flow decisions settle this tranche's anonymous access,
+per-session ownership, immediate replay, start/confirmation pages and Deals
+handoff. Broader invitation identity (#7), general booking contracts (#6), setup
+prototype (#8) and future Drop-to-quotation behavior (#9) remain tracker references;
+this plan neither closes them remotely nor authorizes deferred capabilities.
+Research branches remain read-only and are never merged.
+
+Before a separately approved release, verify database and runtime permissions,
+reviewed catalogue manifest/import set, current scenario eligibility, exact image/
+configuration changes, session TTL, rollback and preservation of private services
+and data. The first persistent release may require fresh anonymous sessions.
+Do not import production Firestore data, deploy, change IAM/TTL, capture more live
+quotations/Gateway rates, make extra model calls, push source or commit `.local\`
+without the relevant authority. Plan approval was given on 18 October 2026 with
+the Part 1/Part 2 split; these release boundaries are unchanged by it.
+
+## Gemini restored and deployed, 18 October
+
+Model decision and execution: Gemini 3.8 Flash (`gemini-3.8-flash` / `global`) is
+deployed in the existing booking review on revision `hotel-price-hunter-00015-b8d`.
+The earlier three-request evaluation and three additional production acceptance
+checks passed. Both allowances are exhausted. See `docs/gemini-production-release.md`.
+
+The original hackathon plan explicitly requires live Gemini preference understanding
+and grounded comparisons. The published booking-backed demo now has a live model
+path. The restoration adds a Gemini stay adviser to selected-room
+review, with follow-up questions, a server-side Vertex AI adapter and deterministic
+financial/transaction boundaries. See `docs/quotation-gemini-contract.md`.
+The current room-selection UI remains; the historical opening questionnaire/chat
+modal is not reintroduced. The original five-call allowance stays exhausted and
+unchanged. The newly authorised 3.8 semantic tests and customer release have passed.
+Historical Gemini-disabled checkpoints below describe
+earlier releases and do not replace this restored AI requirement.
 
 Current cloud checkpoint, 15 October: RoomDrop customer revision
 `hotel-price-hunter-00007-lrm` is privately deployed behind its own operator-only IAP

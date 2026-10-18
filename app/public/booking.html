@@ -22,6 +22,7 @@
     <main id="main">
       <p id="page-status" role="status" class="page-status">Loading your demo booking…</p>
       <div id="content" hidden>
+        <ol id="journey-strip" class="journey-strip" aria-label="How this demo works" hidden></ol>
         <ol id="customer-steps" class="customer-steps" aria-label="Booking journey">
           <li aria-current="step"><span>1</span> Deals</li>
           <li><span>2</span> Review</li>
@@ -29,27 +30,113 @@
         </ol>
         <p id="switch-announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
 
-        <section id="booking-summary" aria-labelledby="hotel">
-          <article id="current-ticket" class="ticket current-ticket">
-            <div class="ticket-photo">
-              <div id="booking-photo"></div>
-              <span class="photo-tag">Illustrative photo</span>
-              <div id="best-drop" class="saving-stamp featured-stamp" hidden></div>
+        <section id="catalogue-screen" class="judge-screen" aria-labelledby="catalogue-title" hidden>
+          <div class="judge-intro">
+            <p class="eyebrow">Judge demo</p>
+            <h1 id="catalogue-title" tabindex="-1">Pick a booking</h1>
+            <p id="catalogue-note" class="muted"></p>
+          </div>
+          <div id="catalogue-list" class="catalogue-grid"></div>
+        </section>
+
+        <section id="booked-screen" class="judge-screen" aria-labelledby="booked-title" hidden>
+          <a id="booked-back" class="back" href="#start"><span aria-hidden="true">‹</span> All bookings</a>
+          <article class="ticket booked-ticket">
+            <div class="ticket-photo booked-photo">
+              <div id="booked-photo"></div>
+              <span id="booked-photo-tag" class="photo-tag">Hotel photo</span>
+              <span class="booked-stamp" aria-hidden="true"><span>Agency</span><strong>Booked</strong></span>
             </div>
             <div class="ticket-tear" aria-hidden="true"></div>
+            <div class="booked-caption">
+              <p class="eyebrow">Your agency booked this</p>
+              <h1 id="booked-title" tabindex="-1"></h1>
+              <p id="booked-place" class="muted"></p>
+              <figure id="booked-room" class="booked-room" hidden>
+                <div id="booked-room-photo" class="booked-room-photo"></div>
+                <figcaption><span class="photo-kind">Room photo</span><strong id="booked-room-name"></strong></figcaption>
+              </figure>
+              <dl id="booked-facts" class="booked-facts"></dl>
+              <div class="booked-total"><span>Whole stay</span><strong id="booked-price"></strong></div>
+            </div>
+          </article>
+          <p id="booked-note" class="honest-note"></p>
+          <section id="booked-blocked" class="cannot-start" aria-labelledby="blocked-title" hidden>
+            <span class="cannot-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-6 15L18 6"/></svg></span>
+            <div>
+              <h2 id="blocked-title"></h2>
+              <p id="blocked-text" class="small"></p>
+            </div>
+            <button id="pick-another" class="secondary" type="button">Pick another booking</button>
+          </section>
+          <div id="booked-ready" class="judge-actions">
+            <button id="setup-drop" class="primary" type="button">Set up a drop</button>
+          </div>
+        </section>
+
+        <section id="setup-screen" class="judge-screen" aria-labelledby="setup-title" hidden>
+          <a id="setup-back" class="back" href="#booked"><span aria-hidden="true">‹</span> Your booking</a>
+          <div class="setup-card">
+            <div class="setup-heading">
+              <span class="watch-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11Z"/><path d="M9 14h6"/></svg></span>
+              <div>
+                <p class="eyebrow">Drop Watch</p>
+                <h1 id="setup-title" tabindex="-1">Set up your drop</h1>
+                <p id="setup-booking" class="small muted"></p>
+              </div>
+            </div>
+            <fieldset id="minimum-choices" class="minimum-choices">
+              <legend>Tell me about drops of at least</legend>
+              <div id="minimum-options" class="chip-row"></div>
+            </fieldset>
+            <div class="delivery-field">
+              <label for="delivery-email"><span class="delivery-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M3 6h18v12H3z"/><path d="m3 7 9 6 9-6"/></svg></span>Where should we send your drop? <span class="optional-tag">Optional</span></label>
+              <input id="delivery-email" type="email" inputmode="email" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@example.com" aria-describedby="delivery-problem delivery-consent">
+              <p id="delivery-saved" class="delivery-saved" hidden><span>Saved <strong id="delivery-saved-email"></strong></span><button id="delivery-remove" class="secondary" type="button">Remove</button></p>
+              <p id="delivery-problem" class="field-problem" hidden></p>
+              <p id="delivery-consent" class="delivery-consent">Use this email only to send my drop. Email delivery is not live yet; it is kept only with this 1-hour demo session.</p>
+            </div>
+            <label class="watch-consent-box" for="judge-consent">
+              <input id="judge-consent" type="checkbox">
+              <span>RoomDrop may check this booking for cheaper equivalent rooms and show them to me. Nothing changes without my approval.</span>
+            </label>
+            <p id="setup-message" role="status" class="inline-message"></p>
+            <button id="arm-watch" class="primary" type="button">Arm my Drop Watch</button>
+          </div>
+        </section>
+
+        <section id="checking-screen" class="judge-screen" aria-labelledby="checking-title" hidden>
+          <div class="checking-card">
+            <div class="checking-drops" aria-hidden="true"><span></span><span></span><span></span></div>
+            <span class="handoff-stamp" aria-hidden="true"><span>Drop Watch</span><strong>Armed</strong></span>
+            <h1 id="checking-title" tabindex="-1">Checking for drops</h1>
+            <p id="checking-status" class="checking-status" role="status" aria-live="polite" aria-atomic="true"></p>
+            <div id="handoff" class="handoff-box" hidden>
+              <p id="handoff-text" class="handoff-text"></p>
+              <p id="handoff-email" class="handoff-email" hidden></p>
+              <button id="open-roomdrop" class="primary" type="button"><span id="open-roomdrop-label">Open RoomDrop</span> <span class="handoff-arrow" aria-hidden="true">→</span></button>
+            </div>
+            <p id="checking-replay" class="replay-tag"></p>
+          </div>
+        </section>
+
+        <section id="booking-summary" aria-labelledby="hotel">
+          <article id="current-ticket" class="ticket current-ticket">
             <div class="ticket-caption">
               <div class="ticket-main">
                 <p id="booking-label" class="eyebrow">Your current booking</p>
-                <h1 id="hotel"></h1>
-                <p id="room" class="muted"></p>
+                <h1 id="hotel" tabindex="-1"></h1>
                 <p id="stay" class="muted"></p>
-                <p id="guests" class="muted"></p>
-                <p id="current-booking-summary" class="muted" hidden></p>
               </div>
               <div class="ticket-price">
                 <strong id="booking-total"></strong>
                 <span id="booking-total-caption">Whole stay</span>
               </div>
+              <details id="booking-details" class="booking-details">
+                <summary>Room &amp; guests</summary>
+                <p id="room" class="muted"></p>
+                <p id="guests" class="muted"></p>
+              </details>
             </div>
           </article>
 
@@ -101,6 +188,15 @@
             </details>
           </section>
 
+          <section id="armed-strip" class="armed-strip" aria-labelledby="armed-title" hidden>
+            <span class="armed-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11Z"/><path d="m9 14 2 2 4-4"/></svg></span>
+            <div class="armed-copy">
+              <h2 id="armed-title" tabindex="-1">Drop Watch armed</h2>
+              <p id="armed-detail" class="small muted"></p>
+            </div>
+            <button id="change-minimum" class="secondary" type="button">Change minimum</button>
+          </section>
+
           <section id="deal-list" class="alternatives" aria-labelledby="changes-title">
             <div class="section-heading">
               <div>
@@ -109,19 +205,9 @@
                 <p class="savings-explanation">Potential refund after fees · for the whole stay</p>
               </div>
             </div>
-            <div id="offer-filters" class="offer-filters" role="group" aria-label="Filter offers">
-              <button type="button" data-filter="all" aria-pressed="true">All drops</button>
-              <button type="button" data-filter="match" aria-pressed="false">Same room</button>
-              <button type="button" data-filter="room" aria-pressed="false">Other room</button>
-              <button type="button" data-filter="hotel" aria-pressed="false">New hotel</button>
-            </div>
-            <p id="filter-status" class="sr-only" role="status" aria-live="polite"></p>
             <div id="offers" class="offers"></div>
             <p id="offer-empty" class="empty-offers" hidden></p>
-            <details id="lower-rate" class="lower-rate">
-              <summary>Lower price · no free cancellation</summary>
-              <div id="lower-rate-offer"></div>
-            </details>
+            <button id="lower-minimum" class="secondary lower-minimum" type="button" hidden>Lower my minimum</button>
           </section>
 
           <section id="price-watch" class="price-watch" aria-labelledby="watch-title" aria-busy="false">
@@ -134,17 +220,15 @@
               </div>
             </div>
             <div id="watch-consent" class="watch-consent">
-              <p class="consent-title">Before you turn on the price watch</p>
+              <p class="consent-title">Daily checks. Your choice to switch.</p>
               <ul>
-                <li>Daily simulated checks for these dates and guests</li>
                 <li id="watch-consent-threshold">Offers must meet the saved minimum</li>
                 <li id="watch-consent-frequency">Weekly update previews in this demo</li>
-                <li>Preview records only · no email is sent</li>
-                <li>Nothing switches without your separate approval</li>
+                <li>No email sent. Every switch needs separate approval.</li>
               </ul>
               <label for="watch-consent-check">
                 <input id="watch-consent-check" type="checkbox">
-                <span>I agree to daily simulated price checks and update previews for this demo booking.</span>
+                <span>I agree to daily simulated checks for these dates and guests, and saved update previews.</span>
               </label>
             </div>
             <button id="watch-button" class="watch-button" type="button" disabled>Turn on price watch</button>
@@ -191,6 +275,7 @@
           <section class="change-facts" aria-labelledby="what-changes-title">
             <h2 id="what-changes-title">What changes</h2>
             <div id="change-facts-grid" class="fact-grid"></div>
+            <div id="cancellation-summary" class="cancellation-summary"></div>
           </section>
 
           <details id="price-details" class="price-details">
@@ -200,12 +285,13 @@
           </details>
 
           <section id="flexibility-warning" class="flexibility-warning" aria-labelledby="flexibility-title" hidden>
-            <h2 id="flexibility-title">This rate cannot be cancelled for a refund</h2>
+            <h2 id="flexibility-title">Final drop · Non-refundable</h2>
+            <p class="small">No free cancellation. If your plans change, you may not get your money back.</p>
             <label class="flexibility-consent" for="accept-reduced-flexibility">
               <input id="accept-reduced-flexibility" type="checkbox">
-              <span>I understand this stay has no free cancellation and I may not get money back if my plans change.</span>
+              <span>I understand this stay has no free cancellation and price watch ends when it becomes active.</span>
             </label>
-            <p id="flexibility-watch-note" class="small">Price watch ends if this booking becomes active.</p>
+            <p id="flexibility-watch-note" class="small">This is the final drop. Price watch ends if this booking becomes active.</p>
           </section>
 
           <section class="approval-explainer" aria-labelledby="approval-title">
@@ -219,9 +305,11 @@
           </section>
 
           <p id="review-message" role="status" class="inline-message"></p>
-          <p id="approve-help" class="approve-help" hidden></p>
           <div class="review-actions">
-            <button id="approve-offer" class="primary" type="button">Approve switch</button>
+            <div class="review-total"><span>Drop after fees</span><strong id="review-saving"></strong></div>
+            <button id="approve-offer" class="primary" type="button" aria-describedby="approve-help">Approve switch</button>
+            <p id="approve-help" class="approve-help" hidden></p>
+            <button id="review-consent-link" class="plain consent-jump" type="button" hidden>Review cancellation terms to approve</button>
             <button id="keep-booking" class="plain" type="button">Keep my booking</button>
           </div>
         </section>

@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Direction A · The Statement · RoomDrop UX study</title>
+<style>
+:root{
+  color-scheme: light;
+  --page:#f6f8fa; --surface:#ffffff; --ink:#152838; --muted:#5b6b7c; --line:#dde5ec;
+  --money:#0b6b45; --money-bg:#e4f2ea; --money-line:#bfe0cf;
+  --risk:#7a5200; --risk-bg:#fff4d6; --risk-line:#eed9a4;
+  --focus:#0b6b45;
+  --sans: "DM Sans","Segoe UI",system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box}
+html{background:var(--page);scroll-padding-bottom:240px}
+body{margin:0;background:var(--page);color:var(--ink);font:400 16px/1.5 var(--sans);-webkit-text-size-adjust:100%}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0;text-align:left}
+:focus-visible{outline:3px solid var(--focus);outline-offset:3px;border-radius:6px}
+[hidden]{display:none!important}
+.num{font-variant-numeric:tabular-nums}
+
+.shell{width:min(100%,720px);margin:0 auto;padding:0 16px 48px}
+#view-review,#view-done{padding-bottom:230px}
+@media (min-width:1024px){ .shell{width:min(100%,1080px);display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:32px;align-items:start} }
+
+/* sticky booking strip */
+.strip{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;min-height:52px;
+  padding:8px 16px;background:color-mix(in srgb,var(--page) 88%,white);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line)}
+@media (min-width:1024px){ .strip{grid-column:1/-1;border-radius:0 0 12px 12px} }
+.strip .dot{width:8px;height:8px;border-radius:50%;background:var(--money);flex:0 0 auto}
+.strip strong{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strip .meta{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:430px){ .strip .meta{display:none} }
+.strip .paid{margin-left:auto;flex:0 0 auto;font-size:13px;color:var(--muted)}
+.strip .paid b{display:block;color:var(--ink);font-size:15px;font-weight:700}
+
+.brandline{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:18px 0 4px}
+.brandline .mark{font-weight:800;letter-spacing:-.02em;font-size:17px}
+.brandline .mark i{font-style:normal;color:var(--money)}
+.brandline .tag{font-size:12px;color:var(--muted)}
+
+h1{margin:14px 0 4px;font-size:clamp(24px,6.4vw,32px);line-height:1.12;letter-spacing:-.02em;font-weight:700}
+.lede{margin:0 0 6px;color:var(--muted);font-size:14px}
+.basis{margin:0 0 18px;font-size:12.5px;color:var(--muted)}
+
+/* comparison rows */
+.rows{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.row{border-bottom:1px solid var(--line)}
+.row-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 14px;width:100%;padding:14px 2px;align-items:center}
+.row-head .room{font-weight:650;font-size:16px;line-height:1.25;letter-spacing:-.01em}
+.row-head .chips{grid-column:1;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}
+.row-head .save{grid-row:1/3;grid-column:2;align-self:center;text-align:right}
+.row-head .save b{display:block;color:var(--money);font-weight:750;font-size:19px;letter-spacing:-.02em}
+.row-head .save span{display:block;font-size:12px;color:var(--muted)}
+.row-head .price{grid-column:1;font-size:13.5px;color:var(--muted);margin-top:2px}
+.row-head .price s{opacity:.75}
+.row-head .price b{color:var(--ink);font-weight:650}
+.row-head[aria-expanded="true"]{background:linear-gradient(0deg,rgba(11,107,69,.035),rgba(11,107,69,.035))}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:3px 9px;font-size:12px;color:var(--muted);background:var(--surface)}
+.chip.risk{color:var(--risk);background:var(--risk-bg);border-color:var(--risk-line)}
+.chip.money{color:var(--money);background:var(--money-bg);border-color:var(--money-line)}
+.row-body{padding:2px 2px 16px;display:grid;grid-template-columns:88px minmax(0,1fr);gap:14px}
+.row-body .thumb{width:88px;height:66px;border-radius:8px;overflow:hidden;background:#dfe8ef}
+.row-body .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.row-body p{margin:0 0 8px;font-size:13.5px;color:var(--muted)}
+.row-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:10px 18px;border-radius:10px;font-weight:650;font-size:15px}
+.btn.primary{background:var(--ink);color:#fff}
+.btn.primary:hover{background:#0d1c29}
+.btn.ghost{border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn.link{min-height:44px;color:var(--money);font-weight:650;font-size:14px;padding:10px 6px}
+.btn.wide{width:100%}
+.footnote{margin:16px 0 0;font-size:12.5px;color:var(--muted)}
+
+/* review */
+.back{display:inline-flex;align-items:center;gap:6px;min-height:44px;color:var(--muted);font-size:14px;font-weight:600;margin:14px 0 2px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0}
+.card h2{margin:0 0 10px;font-size:15px;font-weight:700;letter-spacing:-.01em}
+.receipt{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;margin:0;font-size:15px}
+.receipt dt{color:var(--muted)}
+.receipt dd{margin:0;text-align:right;font-weight:600}
+.receipt .drop dt,.receipt .drop dd{color:var(--money);font-weight:750;font-size:17px}
+.receipt .drop{border-top:1px dashed var(--line);padding-top:8px;margin-top:2px}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fact{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface)}
+.fact .k{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.fact .v{font-weight:650;font-size:14px;margin-top:3px}
+.fact .s{margin-top:6px}
+.riskbox{background:var(--risk-bg);border:1px solid var(--risk-line);border-radius:12px;padding:14px;margin:12px 0 0}
+.riskbox h2{margin:0 0 6px;font-size:15px;color:var(--risk)}
+.riskbox p{margin:0 0 10px;font-size:13.5px;color:#5d4300}
+.riskbox label{display:flex;gap:10px;align-items:flex-start;font-size:14px;font-weight:600}
+.riskbox input{width:22px;height:22px;margin:1px 0 0;accent-color:var(--risk);flex:0 0 auto}
+.adviser{border:1px dashed var(--line);border-radius:12px;padding:12px 14px;margin:12px 0 0;background:var(--surface)}
+.adviser p{margin:0;font-size:13.5px;color:var(--muted)}
+.adviser .btn.link{margin-top:4px}
+
+/* action bar: feedback lives here */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(21,40,56,.08)}
+.bar .inner{width:min(100%,720px);margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;align-items:center}
+@media (min-width:1024px){ .bar .inner{width:min(100%,1080px)} }
+.bar .delta b{display:block;color:var(--money);font-size:20px;font-weight:750;letter-spacing:-.02em}
+.bar .delta span{font-size:12px;color:var(--muted)}
+.bar .msg{grid-column:1/-1;font-size:13.5px;font-weight:600;color:var(--risk);background:var(--risk-bg);border:1px solid var(--risk-line);border-radius:8px;padding:8px 10px}
+.bar .keep{grid-column:1/-1;justify-self:center;min-height:40px;color:var(--muted);font-size:13.5px;font-weight:600}
+
+/* desktop rail */
+.rail{display:none}
+@media (min-width:1024px){
+  .rail{display:block;position:sticky;top:76px}
+  .rail .card{margin-top:0}
+  .rail h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .rail .big{font-size:26px;font-weight:750;color:var(--money);letter-spacing:-.02em}
+}
+
+/* confirmation */
+.done-hero{background:var(--money-bg);border:1px solid var(--money-line);border-radius:14px;padding:18px;margin:16px 0}
+.done-hero h1{margin:0 0 6px;color:var(--money)}
+.done-hero p{margin:0;font-size:14px;color:#0d4a31}
+</style>
+</head>
+<body>
+<div class="strip">
+  <span class="dot" aria-hidden="true"></span>
+  <strong>The Meridian Kuala Lumpur</strong>
+  <span class="meta">21–23 Jan · 2 nights · 2 adults</span>
+  <span class="paid num">You paid<b>AED 600</b></span>
+</div>
+
+<div class="shell">
+  <main id="main">
+    <!-- ============ DEALS ============ -->
+    <section id="view-deals">
+      <div class="brandline"><span class="mark">Room<i>Drop</i></span><span class="tag">Design study · fictional data</span></div>
+      <h1 id="h1">Three ways to pay less for the same nights.</h1>
+      <p class="lede">Same hotel, same dates. Each line is a room you could switch to.</p>
+      <p class="basis">Savings are estimates for the whole stay, before final pricing and fees.</p>
+
+      <ul class="rows" id="rows"></ul>
+
+      <p class="footnote">Automatic price checks are coming next. Nothing is booked or charged in this study.</p>
+    </section>
+
+    <!-- ============ REVIEW ============ -->
+    <section id="view-review" hidden>
+      <button class="back" id="back" type="button">‹ All options</button>
+      <h1 id="review-title"></h1>
+
+      <div class="card">
+        <h2>Your price breakdown · whole stay</h2>
+        <dl class="receipt num">
+          <dt>You paid</dt><dd><s id="r-paid">AED 600</s></dd>
+          <dt>New stay</dt><dd id="r-new"></dd>
+          <div class="drop"><dt>Your drop</dt><dd id="r-drop"></dd></div>
+        </dl>
+      </div>
+
+      <div class="card">
+        <h2>What changes</h2>
+        <div class="facts" id="r-facts"></div>
+      </div>
+
+      <div class="adviser">
+        <p><strong>Ask about this room.</strong> Gemini sees your booking, this room, both prices and the cancellation terms — nothing else.</p>
+        <button class="btn link" type="button" id="r-ask">Open the adviser</button>
+      </div>
+
+      <div class="riskbox" id="r-risk" hidden>
+        <h2>Final drop · non-refundable</h2>
+        <p>No free cancellation. If your plans change you may not get your money back, and automatic checks end for this stay.</p>
+        <label for="r-consent"><input type="checkbox" id="r-consent"><span>I understand this room has no free cancellation.</span></label>
+      </div>
+    </section>
+
+    <!-- ============ CONFIRMED ============ -->
+    <section id="view-done" hidden>
+      <div class="done-hero">
+        <h1 id="done-title">Room choice confirmed</h1>
+        <p id="done-copy"></p>
+      </div>
+      <div class="card">
+        <h2>What happens next</h2>
+        <p style="margin:0;font-size:14px;color:var(--muted)">In the real product this is where rebooking, cancellation and refund would be arranged one approved step at a time. Your original booking stays active until cancellation is verified.</p>
+      </div>
+      <button class="btn ghost wide" type="button" id="done-back">Back to all options</button>
+    </section>
+  </main>
+
+  <aside class="rail" aria-label="Summary">
+    <div class="card">
+      <h2>Your booking</h2>
+      <p style="margin:0 0 8px;font-size:14px">Superior Twin · Breakfast<br><span class="num">AED 600 · whole stay</span></p>
+      <h2 style="margin-top:14px">Selected drop</h2>
+      <p class="big num" id="rail-drop">—</p>
+      <p style="margin:0;font-size:13px;color:var(--muted)" id="rail-room">No room selected yet.</p>
+    </div>
+  </aside>
+</div>
+
+<div class="bar" id="bar" hidden>
+  <div class="inner">
+    <div class="delta num"><b id="bar-drop"></b><span>Estimated drop · whole stay</span></div>
+    <button class="btn primary" type="button" id="bar-approve">Choose this room</button>
+    <p class="msg" id="bar-msg" hidden></p>
+    <button class="keep" type="button" id="bar-keep">Keep my booking</button>
+  </div>
+</div>
+
+<script>
+const OPTIONS = [
+  { id:'a', room:'Superior Twin Plus', board:'Breakfast', refundable:false, price:380,
+    note:'A larger twin on a higher floor with the same breakfast. The biggest drop of the three, in exchange for free cancellation.' },
+  { id:'b', room:'Superior Plus Twin', board:'Breakfast', refundable:true, price:570,
+    note:'The closest match to your current room and the only option that keeps free cancellation. The smallest drop.' },
+  { id:'c', room:'Superior Plus Twin with City View and Best Available Rate', board:'Room only', refundable:false, price:410,
+    note:'Adds a city view but drops breakfast and free cancellation. A middle drop with the most trade-offs.' },
+];
+const PAID = 600;
+const save = o => PAID - o.price;
+const money = n => 'AED ' + n;
+const state = { view:'deals', selected:null, consent:{} };
+
+const $ = id => document.getElementById(id);
+const rows = $('rows');
+
+function chip(text, kind){ const s=document.createElement('span'); s.className='chip'+(kind?' '+kind:''); s.textContent=text; return s; }
+
+function renderRows(){
+  rows.replaceChildren();
+  OPTIONS.forEach(o=>{
+    const li=document.createElement('li'); li.className='row';
+    const head=document.createElement('button');
+    head.type='button'; head.className='row-head'; head.setAttribute('aria-expanded','false'); head.setAttribute('aria-controls','body-'+o.id);
+    head.innerHTML =
+      '<span class="room">'+o.room+'</span>'+
+      '<span class="save num"><b>Save '+money(save(o))+'</b><span>was '+money(PAID)+'</span></span>'+
+      '<span class="chips"></span>'+
+      '<span class="price num"><s>'+money(PAID)+'</s> → <b>'+money(o.price)+'</b> · '+o.board+'</span>';
+    const chips=head.querySelector('.chips');
+    chips.append(chip(o.refundable?'Free cancellation':'Non-refundable', o.refundable?'money':'risk'));
+    if(save(o)===Math.max(...OPTIONS.map(save))) chips.append(chip('Biggest drop','money'));
+    const body=document.createElement('div'); body.className='row-body'; body.id='body-'+o.id; body.hidden=true;
+    body.innerHTML =
+      '<span class="thumb"><img src="../assets/illustrative-stays.jpg" alt="" style="object-position:'+({a:'20% 40%',b:'55% 35%',c:'80% 45%'}[o.id])+'"></span>'+
+      '<div><p>'+o.note+'</p><div class="row-actions">'+
+      '<button class="btn primary" type="button" data-review="'+o.id+'">Review this room</button>'+
+      '<button class="btn link" type="button" data-ask="'+o.id+'">Ask about this room</button>'+
+      '</div></div>';
+    head.addEventListener('click',()=>{ const open=body.hidden; body.hidden=open?false:true; head.setAttribute('aria-expanded',String(!body.hidden)); });
+    li.append(head,body); rows.append(li);
+  });
+  rows.addEventListener('click',e=>{
+    const r=e.target.closest('[data-review]'); const a=e.target.closest('[data-ask]');
+    if(r) openReview(r.dataset.review);
+    if(a) alert('Adviser lane: in the product this opens the grounded Gemini adviser inline. No floating pill in this direction.');
+  });
+}
+
+function openReview(id){
+  const o=OPTIONS.find(x=>x.id===id); state.selected=o; state.view='review';
+  $('view-deals').hidden=true; $('view-done').hidden=true; $('view-review').hidden=false; $('bar').hidden=false;
+  $('review-title').textContent=o.room;
+  $('r-new').textContent=money(o.price);
+  $('r-drop').textContent='Save '+money(save(o));
+  $('r-risk').hidden=o.refundable; $('r-consent').checked=!!state.consent[id];
+  $('bar-msg').hidden=true;
+  $('bar-drop').textContent='Save '+money(save(o));
+  $('bar-approve').textContent='Choose this room';
+  const facts=$('r-facts'); facts.replaceChildren();
+  [['Hotel','The Meridian Kuala Lumpur','Same hotel','money'],
+   ['Room',o.room,'Changes',''],
+   ['Meals',o.board,o.board==='Breakfast'?'Kept':'Dropped',o.board==='Breakfast'?'money':'risk'],
+   ['Cancellation',o.refundable?'Free cancellation':'Non-refundable',o.refundable?'Kept':'Lost',o.refundable?'money':'risk']]
+   .forEach(([k,v,s,kind])=>{ const d=document.createElement('div'); d.className='fact';
+     d.innerHTML='<div class="k">'+k+'</div><div class="v">'+v+'</div>';
+     const sc=document.createElement('span'); sc.className='chip'+(kind?' '+kind:''); sc.style.marginTop='6px'; sc.textContent=s; d.append(sc); facts.append(d); });
+  $('rail-drop').textContent='Save '+money(save(o));
+  $('rail-room').textContent=o.room;
+  window.scrollTo(0,0);
+}
+
+function backToDeals(){ state.view='deals'; $('view-review').hidden=true; $('view-done').hidden=true; $('view-deals').hidden=false; $('bar').hidden=true; window.scrollTo(0,0); }
+
+$('back').addEventListener('click',backToDeals);
+$('bar-keep').addEventListener('click',backToDeals);
+$('done-back').addEventListener('click',backToDeals);
+$('r-ask').addEventListener('click',()=>alert('Adviser lane: inline grounded Gemini adviser. No floating pill in this direction.'));
+$('r-consent').addEventListener('change',e=>{ state.consent[state.selected.id]=e.target.checked; if(e.target.checked) $('bar-msg').hidden=true; });
+
+$('bar-approve').addEventListener('click',()=>{
+  const o=state.selected;
+  if(!o.refundable && !state.consent[o.id]){
+    const m=$('bar-msg'); m.hidden=false; m.textContent='Confirm the cancellation terms above to choose this room.';
+    $('r-consent').scrollIntoView({block:'center'}); $('r-consent').focus({preventScroll:true});
+    return;
+  }
+  state.view='done';
+  $('view-review').hidden=true; $('bar').hidden=true; $('view-done').hidden=false;
+  $('done-copy').textContent='You reviewed '+o.room+' and confirmed your choice. Your original booking is unchanged: no reservation, cancellation, payment or refund was made in this study.';
+  window.scrollTo(0,0);
+});
+
+renderRows();
+</script>
+</body>
+</html>

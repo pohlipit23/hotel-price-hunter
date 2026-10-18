@@ -1,8 +1,10 @@
 # B1 customer private release proposal
 
-Prepared 16 October 2026, Asia/Kuala_Lumpur. Local preparation is complete.
-Cloud upload and deployment have not been performed. The user's "Go ahead"
-authorized the release preparation following the proposed deployment approval step.
+Prepared and deployed 16 October 2026, Asia/Kuala_Lumpur. The user explicitly
+approved completion after the exact image and registry approval request. B1 is
+ready as `hotel-price-hunter-00009-hgw`, receiving 100% traffic. See the
+[execution and acceptance record](roomdrop-b1-execution.md). Signed-in live UI
+acceptance remains pending because the browser connection was blocked.
 
 ## Candidate and evidence
 
@@ -21,7 +23,7 @@ and documentation. No backend, permissions, storage or worker behavior changed.
 | Local manifest / image ID | `sha256:b3d1a382767e2d3bf600d270df59aebde63e2f94ddee98b6ff8d00ab7fc43397` |
 | Build config digest | `sha256:6321861de6db89aad45641d528f3c3eadd42b1fda96620252e09941ea212d7c0` |
 | Proposed registry tag | `roomdrop-521fd329db9b-e5dbf6ca5d6c` |
-| Uploaded registry digest | Not observed; upload pending approval |
+| Uploaded registry digest | `sha256:b3d1a382767e2d3bf600d270df59aebde63e2f94ddee98b6ff8d00ab7fc43397` |
 
 [Verification](roomdrop-b1-verification.md): 195/195 emulator-enabled tests,
 zero skips/failures; 12 B1 browser acceptance groups, 96 layout checks and 32
