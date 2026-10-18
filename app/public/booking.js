@@ -77,9 +77,9 @@ function savingLabel(minor, currency = state?.currency?.code || 'USD') {
 }
 function addStamp(target, minor, currency, label, className = '') {
   target.replaceChildren();
-  target.className = 'saving-stamp' + (className ? ' ' + className : '');
   const formatted = money(minor, currency);
   const amount = formatted.startsWith(currency + ' ') ? formatted.slice(currency.length + 1) : formatted;
+  target.className = 'saving-stamp' + (className ? ' ' + className : '') + (amount.length > 5 ? ' stamp-long' : '');
   target.setAttribute('role', 'img');
   target.setAttribute('aria-label', label + ' ' + savingLabel(minor, currency));
   target.append(node('span', label, 'stamp-label'), node('strong', '-' + amount, 'stamp-amount'), node('span', currency, 'stamp-currency'));
@@ -106,7 +106,7 @@ function stayText(record) {
 }
 function guestText(record) {
   const o = record.occupancy;
-  return o.adults + ' adults' + (o.childAges.length ? ' + ' + o.childAges.length + (o.childAges.length === 1 ? ' child' : ' children') : '')
+  return o.adults + (o.adults === 1 ? ' adult' : ' adults') + (o.childAges.length ? ' + ' + o.childAges.length + (o.childAges.length === 1 ? ' child' : ' children') : '')
     + (o.infantAges.length ? ' + ' + o.infantAges.length + (o.infantAges.length === 1 ? ' infant' : ' infants') : '');
 }
 function roomText(record) { return record.room.name.split(',')[0]; }

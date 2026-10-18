@@ -1,5 +1,5 @@
 /** One conversation shared by the compact adviser and the floating Gemini dialog. */
-export function createStayAdviser({ parent, before, getData }) {
+export function createStayAdviser({ parent, before, getData, chatUrl = () => '/api/booking-demo/chat' }) {
   const el = (tag, text, className) => {
     const item = document.createElement(tag);
     if (text) item.textContent = text;
@@ -108,7 +108,7 @@ export function createStayAdviser({ parent, before, getData }) {
     refresh();
     const timeout = setTimeout(() => requestController.abort(), 25000);
     try {
-      const response = await fetch('/api/booking-demo/chat', { method: 'POST', credentials: 'same-origin', signal: requestController.signal,
+      const response = await fetch(chatUrl(), { method: 'POST', credentials: 'same-origin', signal: requestController.signal,
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': data.csrfToken },
         body: JSON.stringify({ snapshotVersion: data.snapshotVersion, pageContext: current.pageContext, intent,
           ...(current.optionId ? { optionId: current.optionId } : {}), ...(intent === 'question' ? { message } : {}) }) });

@@ -3,7 +3,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
 COPY app ./app
-COPY booking-demo.json ./release/booking-demo.json
+# The release context holds exactly one of booking-demo.json or booking-catalogue.json.
+COPY booking-*.json ./release/
 ENV NODE_ENV=production PORT=8080
 USER node
 EXPOSE 8080

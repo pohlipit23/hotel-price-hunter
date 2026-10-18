@@ -1,109 +1,197 @@
 # First milestone tasks
 
-## Public demo Firestore persistence — 18 October
+## Curated RoomDrop judge flow and Firestore persistence - 18 October
 
-Design agreed in chat: import one sanitised immutable starting quotation/options
-snapshot into Firestore and link durable visitor sessions to it. Contract:
-`docs/public-demo-firestore-spec.md`; implementation plan: `tasks/plan.md`.
-Status: tasks prepared for review; all implementation and live acceptance below
-remain unverified. Existing open project tasks below are preserved.
+Contract: `docs\public-demo-firestore-spec.md`. Approved judge decisions:
+`docs\roomdrop-booking-setup-handoff.md`. Plan: `tasks\plan.md`.
+Status: proposed tasks awaiting plan approval; no implementation is claimed.
+These F0-F11 tasks replace the earlier unimplemented public-intake/shared-watch
+schedule. All historical project tasks below remain preserved.
 
-### F1: Import and read the immutable demo snapshot
+### F0: Audit available captures and existing scaffolding
 
-- [ ] Acceptance: default-offline importer validates the approved display
-  projection, creates only the designated snapshot, accepts identical replay and
-  rejects conflicting content/private fields. Separate clients read the same
-  validated version; no supplier request or production startup seeding occurs.
-- Verify: `node --test tests/quotation-snapshot-storage.test.mjs tests/quotation-snapshot-import.test.mjs`
-  with the real emulator enabled; include corrupted, missing and duplicate imports.
-- Depends on: approved implementation plan. Medium, four files:
-  `app/quotation-snapshot-storage.mjs`, `scripts/import-demo-snapshot.mjs`,
-  `tests/quotation-snapshot-storage.test.mjs`, `tests/quotation-snapshot-import.test.mjs`.
+- [ ] Acceptance: inventory the two ignored air1 projections, any captured Gateway
+  results, concurrent catalogue/runtime/UI changes and their ownership, and the remaining
+  six-card scenario needs. Record source/tenant provenance and missing evidence
+  without printing private payloads or changing current application behavior.
+- Verify: local schema/key/provenance inspection, `.local\` ignore checks and
+  capture integrity hashes. No live call or Firestore write.
+- Depends on: plan approval. Small, two documentation files:
+  `docs\public-demo-firestore-verification.md`, `tasks\todo.md`.
 
-### F2: Persist isolated anonymous sessions
+### F1: Validate the Altovo catalogue adapter and capture preparation
 
-- [ ] Acceptance: hashed session identities retain one-hour expiry, snapshot
-  references, atomic receipts and bounded context; a private capacity record caps
-  live sessions across instances. No raw cookie is stored; no production fallback.
-- Verify: `node --test tests/quotation-session-storage.test.mjs` with real-emulator
-  two-client concurrency, expiry, capacity contention and failed-write coverage.
-- Depends on: F1. Small, two files: `app/quotation-session-storage.mjs`,
-  `tests/quotation-session-storage.test.mjs`.
+- [ ] Acceptance: review/extend existing scaffolding for the actual projection
+  shape, UTC cancellation schedules and explicit agency search defaults. Prepare
+  display-safe per-code bundles/card metadata; private supplier/raw fields remain
+  private. Dry-run performs no upstream calls; live capture remains separately gated.
+- Verify: `node --test .\tests\altovo-catalogue.test.mjs` with sanitised fixtures
+  and injected Gateway responses, covering sentinel/naive/conflicting deadlines,
+  missing facts, money/currency bindings, cannot-start and valid-empty captures.
+- Depends on: F0. Medium, three files: `app\domain\altovo-quotation.mjs`,
+  `scripts\prepare-altovo-catalogue.mjs`, `tests\altovo-catalogue.test.mjs`.
 
-### Checkpoint F1–F2: Storage contract
+### F2: Import and read immutable catalogue bookings and Drops
 
-- [ ] Emulator tests prove immutable baseline and session isolation/retry behavior.
-- [ ] No existing simulation/agency/watch data or shared emulator state is erased.
+- [ ] Acceptance: default-dry-run importer creates reviewed air1 booking records
+  and captured Drops, with explicit manifest/card metadata. Identical concurrent
+  import replays safely; changed facts return `BOOKING_CHANGED`. Publish no partial
+  bundle, duplicate Drop or missing-capture-as-empty result. No visitor choices
+  appear on shared records; no other data is changed.
+- Verify: `node --test .\tests\booking-storage.test.mjs` against two emulator
+  clients; include private-field rejection, interrupted import, conflict, content
+  versions and code/capture mismatch. Confirm only test-owned documents change.
+- Depends on: F1 and a valid captured bundle (injected for automated tests).
+  Medium, four files: `app\booking-storage.mjs`,
+  `scripts\import-altovo-catalogue.mjs`, `tests\booking-storage.test.mjs`,
+  `tests\fixtures\curated-bookings.json` (synthetic and sanitised only).
 
-### F3: Restore and confirm selections through durable sessions
+### Checkpoint F0-F2: Validated catalogue storage
 
-- [ ] Acceptance: booking and quotation factories accept explicit storage;
-  bootstrap recovers current receipts, rotates expired/stale sessions and retains
-  existing origin/CSRF/consent guards. Same-choice retries return one committed
-  receipt; independent instances observe it with unchanged selection-only flags.
-- Verify: `node --test tests/quotation-demo-server.test.mjs tests/booking-live.test.mjs`
-  plus F2 tests. Inject test storage explicitly; prove restart via emulator adapters.
-- Depends on: F2. Medium, four files: `app/quotation-demo-server.mjs`,
-  `app/booking-demo-server.mjs`, `tests/quotation-demo-server.test.mjs`,
-  `tests/booking-live.test.mjs`.
+- [ ] Adapter/import tests pass with the emulator. Raw responses, source tokens,
+  supplier references and `.local\` captures are absent from tracked fixtures.
+- [ ] Coverage reports distinguish two source projections, actual captured Drops
+  and remaining owner-created catalogue entries. No additional live calls implied.
 
-### F4: Preserve guarded Gemini context across instances
+### F3: Persist isolated sessions with per-code choices
 
-- [ ] Acceptance: atomically reserve per-session allowance, invoke the provider
-  outside transactions, and merge bounded context only into a current live
-  session. Concurrent confirmation survives the merge; expired late responses
-  cannot resurrect sessions. Existing per-instance throttles remain bounded.
-- Verify: `node --test tests/quotation-advice-server.test.mjs tests/booking-advice.test.mjs`
-  with injected provider counters, concurrent writes and delayed-response cases;
-  no real model requests.
-- Depends on: F3. Medium, four files: `app/quotation-demo-server.mjs`,
-  `app/quotation-session-storage.mjs`, `tests/quotation-advice-server.test.mjs`,
-  `tests/booking-advice.test.mjs`.
+- [ ] Acceptance: hashed cookie-keyed sessions retain one-hour expiry, CSRF and
+  `byCode[code]` setup/replay/receipt/context. Two judges sharing a code and one judge
+  visiting two codes remain isolated. Maintain the transactional 64-session cap;
+  no code outside the bounded catalogue may allocate state.
+- Verify: `node --test .\tests\quotation-session-storage.test.mjs` using separate
+  emulator clients; cover restart, expiry, capacity contention, per-code version
+  invalidation, failed writes and no production memory fallback.
+- Depends on: F2. Small, two files: `app\quotation-session-storage.mjs`,
+  `tests\quotation-session-storage.test.mjs`.
 
-### Checkpoint F3–F4: Integrated API
+### F4: Serve catalogue and per-code bootstrap APIs
 
-- [ ] Complete emulator-backed Node suite passes with explicit failure/skip counts.
-- [ ] Restart/isolation and model-call-count evidence matches the spec; all
-  transaction/consent boundaries remain enforced.
+- [ ] Acceptance: expose bounded path-based catalogue/per-code reads backed by
+  Firestore and the reviewed manifest. Create/restore private sessions; preserve
+  canonical Host/Origin/CSRF and query rejection. No public import/share-link input,
+  arbitrary-code lookup, capture-file access or Altovo/Gateway call exists.
+- Verify: `node --test .\tests\booking-catalogue-server.test.mjs .\tests\quotation-demo-server.test.mjs`;
+  test unknown/encoded/malformed codes, projection guards, cross-session isolation,
+  stale Drop versions and database unavailability using actual emulator storage.
+- Depends on: F3. Medium, four files: `app\booking-demo-server.mjs`,
+  `app\quotation-demo-server.mjs`, `tests\booking-catalogue-server.test.mjs`,
+  `tests\quotation-demo-server.test.mjs`.
 
-### F5: Load the pinned Firestore snapshot in the hosted image
+### F5: Arm and replay the first check atomically per session/code
 
-- [ ] Acceptance: hosted booking/quotation startup requires the exact imported
-  snapshot version and closes storage cleanly. The booking release exporter
-  includes the dependency closure and pin, with no production snapshot-file or
-  memory fallback. Packaged missing/corrupt database states fail safely.
-- Verify: `node --test tests/quotation-cloud.test.mjs tests/public-demo-release.test.mjs`;
-  frozen-context build, network-disabled failure smoke and emulator-backed
-  successful packaged startup. Do not run the separate pitch deploy command.
-- Depends on: F4. Medium, five files: `app/booking-cloud.mjs`,
-  `app/quotation-cloud.mjs`, `scripts/prepare-booking-release.mjs`,
-  `tests/quotation-cloud.test.mjs`, `tests/public-demo-release.test.mjs`.
-  Keep the Dockerfile's existing app-copy pattern unless dependency evidence
-  demonstrates a necessary separately scoped packaging adjustment.
+- [ ] Acceptance: validate actual-time cancellation eligibility, explicit consent
+  and a minimum of 10.00 in the booking currency. Commit one armed setup/replay
+  filtered by `isDisplayedDrop` and the threshold. Identical retries preserve the
+  receipt; deliberate rearming affects only that session/code. Confirm only a
+  current qualifying Drop for an armed watch, retaining acknowledgements and
+  `reservationCreated:false`, `quoteModified:false`, `customerRefund:null`.
+- Verify: `node --test .\tests\booking-drop-watch.test.mjs` with emulator races,
+  lost acknowledgements, raised minima, mixed currency, changing cancellation
+  windows, missing versus empty captures and changed Drop sets; zero upstream calls.
+- Depends on: F4. Medium, four files: `app\domain\booking-drop-watch.mjs`,
+  `app\quotation-session-storage.mjs`, `app\quotation-demo-server.mjs`,
+  `tests\booking-drop-watch.test.mjs`.
 
-### F6: Verify the durable browser journey and prepare release evidence
+### Checkpoint F3-F5: Durable judge actions
 
-- [ ] Acceptance: local launcher reads the imported emulator snapshot; a browser
-  harness proves mobile/desktop behavior, reload and process restart recovery,
-  second-visitor isolation and explicit consent. The final release document
-  names all live gates and exact import/configuration/TTL/rollback commands.
-- Verify: run `node tests/booking-firestore.browser.mjs` with the emulator-only
-  environment; run the current `tests/booking-live.browser.mjs` regression using
-  the accepted capture; complete `node --test tests/*.test.mjs` and
-  `git diff --check`. Capture counts/screenshots and review the final diff.
-- Depends on: F5. Medium, four files:
-  `scripts/serve-booking-firestore-demo.mjs`, `tests/booking-firestore.browser.mjs`,
-  `docs/public-demo-firestore-verification.md`, `docs/public-demo-firestore-release.md`.
+- [ ] Emulator/API evidence proves isolation, one committed first replay, guarded
+  confirmation and restart recovery across independent app/storage instances.
+- [ ] A replay is labelled as captured data, never a fresh rate search; expired
+  sessions and non-armable bookings cannot mutate/confirm. Relevant tests run.
 
-### Checkpoint F5–F6: Ready for release review
+### F6: Build the start grid and Original Booking confirmation page
 
-- [ ] Test, browser, packaged-entrypoint and source/context evidence is complete;
-  existing unrelated dirty changes are preserved and excluded from the artifact.
-- [ ] Present the concrete production snapshot import, TTL and image/env change
-  bundle for approval. No production mutation is part of local acceptance.
-- [ ] After separately approved execution, verify real imported-snapshot reads,
-  anonymous persistence/isolation, preserved private services/data and rollback
-  readiness. Keep this live gate unchecked until proven.
+- [ ] Acceptance: use the Ticket and Stamp design for curated photo/city/dates/
+  price/scenario cards, then "Your agency booked this" and one "Set up a drop"
+  action. Show staging quotation/capture-date note, cannot-start reason and honest
+  image fallbacks. No Altovo/AirBorneo branding, arbitrary code or share-link input.
+- Verify: `node --test .\tests\booking-setup-ui.test.mjs` and the proposed
+  `node .\tests\booking-firestore.browser.mjs`; inspect mobile/desktop and keyboard
+  screenshots, dynamic scenario status and direct navigation/refresh.
+- Depends on: F4, F5. Medium, five files: `app\public\booking.html`,
+  `app\public\booking.css`, `app\public\booking-judge.js`,
+  `tests\booking-setup-ui.test.mjs`, `tests\booking-firestore.browser.mjs`.
+
+### F7: Connect setup and replay to Deals, Review and Confirmed
+
+- [ ] Acceptance: explicit consent/minimum setup shows armed/replayed results with
+  capture and replay times. Feed only the session's qualifying captured Drops to
+  existing screens, ranking and labels; preserve reduced-flexibility consent,
+  empty/unavailable states, navigation, refresh and idempotent confirmation.
+- Verify: `node --test .\tests\booking-live.test.mjs` plus the browser harness;
+  prove two judges on one quotation and one judge across two quotations cannot
+  leak or overwrite choices. A changed minimum cannot confirm an excluded Drop.
+- Depends on: F6. Medium, five files: `app\public\booking-judge.js`,
+  `app\public\booking-live.js`, `app\public\booking-live-data.js`,
+  `tests\booking-live.test.mjs`, `tests\booking-firestore.browser.mjs`.
+
+### F8: Preserve grounded Gemini context per judge and code
+
+- [ ] Acceptance: use the authorised code's current replayed facts and bounded
+  context. Atomically reserve session allowance before external inference; late
+  replies cannot overwrite another code, a changed watch or newer confirmation.
+  Keep existing per-instance throttles and current unavailable behavior.
+- Verify: `node --test .\tests\quotation-advice-server.test.mjs .\tests\booking-advice.test.mjs`;
+  injected-provider counters prove transaction retries cause no extra inference,
+  and cross-code navigation/concurrent writes remain safe. No real model calls.
+- Depends on: F7. Medium, five files: `app\quotation-demo-server.mjs`,
+  `app\quotation-session-storage.mjs`, `app\public\stay-advice.js`,
+  `tests\quotation-advice-server.test.mjs`, `tests\booking-advice.test.mjs`.
+
+### Checkpoint F6-F8: Complete local judge journey
+
+- [ ] Start grid, Original Booking confirmation, cannot-start, consent/minimum,
+  armed/replayed check, Deals, Review and Confirmed pass mobile/desktop inspection.
+- [ ] Catalogue facts and replay labels stay honest; two-session/multi-code
+  isolation, keyboard navigation and model-unavailable paths have raw evidence.
+
+### F9: Wire the hosted Firestore entrypoints
+
+- [ ] Acceptance: inject real Firestore at hosted startup and load the bounded
+  reviewed catalogue manifest, without a single-booking file fallback. Remove
+  the mandatory snapshot copy, close storage cleanly and keep production
+  emulator/credential/origin guards intact. Startup never seeds or imports data.
+- Verify: `node --test .\tests\quotation-cloud.test.mjs`; exercise the exact
+  entrypoints with injected test dependencies and bounded missing-storage failure.
+- Depends on: F8. Medium, four files: `app\booking-cloud.mjs`,
+  `app\quotation-cloud.mjs`, `Dockerfile.booking`, `tests\quotation-cloud.test.mjs`.
+
+### F10: Export and verify the frozen curated runtime
+
+- [ ] Acceptance: release preparation includes the new dependency closure and
+  reviewed code/version catalogue manifest, excluding credentials and private
+  captures. Keep the exact-commit source/context lineage and static allowlists.
+- Verify: `node --test .\tests\public-demo-release.test.mjs`; exact-context
+  Docker build, packaged emulator/test-harness success and bounded failure smoke.
+  Public browsing, arming and confirming make zero Altovo/Gateway requests.
+- Depends on: F9. Small, two files: `scripts\prepare-booking-release.mjs`,
+  `tests\public-demo-release.test.mjs`.
+
+### F11: Record final acceptance and prepare the release bundle
+
+- [ ] Acceptance: an emulator-only launcher seeds only explicit reviewed test
+  captures via the guarded importer. Record full regression/browser/restart
+  coverage and remaining content gaps, with exact build/start/import/rollback
+  commands. Prepare session TTL and preservation checks for later release review.
+- Verify: `node .\tests\booking-firestore.browser.mjs`, `npm test`, packaged smoke
+  and `git diff --check`. Run the existing booking browser regression where its
+  historical single-snapshot contract still applies; label its evidence separately.
+- Depends on: F10. Medium, four files: `scripts\serve-booking-demo.mjs`,
+  `docs\public-demo-firestore-verification.md`,
+  `docs\public-demo-firestore-release.md`, `tasks\todo.md`.
+
+### Checkpoint F9-F11: Ready for a separate release decision
+
+- [ ] Plan approval precedes coding; local checks and raw acceptance evidence are
+  complete. The full catalogue content matrix remains unchecked until supplied
+  and captured; storage mechanics alone do not complete it.
+- [ ] Present exact production import, image/configuration, session TTL and rollback
+  commands for approval. Preserve existing visitor/agency/watch data and private
+  access boundaries; never commit `.local\` or merge the research branches.
+- [ ] After separately approved execution, verify public curated reads, replay
+  labels, live eligibility, restart persistence and two-judge isolation, with
+  before/after private-service checks. Liveness alone cannot close acceptance.
 
 ## Hackathon AI restoration, 17 October
 

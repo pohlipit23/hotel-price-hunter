@@ -1,366 +1,353 @@
-# Spec: RoomDrop Original Booking and Drops Firestore persistence
+# Spec: RoomDrop curated booking demo and Firestore persistence
 
-Status: revised 18 October from the design approved earlier that day. The single
-immutable demo snapshot is superseded by per-booking records created from an
-Altovo share link. Open items are marked and tracked on the wayfinder map.
-Implementation planning is pending review; implementation has not started.
-Date: 18 October 2026, Asia/Kuala_Lumpur.
+Status: approved judge-flow decisions from `roomdrop-booking-setup-handoff.md`
+incorporated on 18 October 2026. The implementation plan still requires approval
+before coding. No persistence implementation or release is claimed by this spec.
 
-Terms follow [GLOSSARY.md](../GLOSSARY.md): Original Booking, Current Booking,
-Drop Watch and Drop.
+Terms follow `GLOSSARY.md`: Original Booking, Current Booking, Drop Watch and Drop.
 
-## Objective
+## Objective and approved judge journey
 
-Store each Original Booking that arrives from an Altovo share link, the Drops
-found for it and the customer's Drop Watch setup in Firestore. Retain each
-visitor's anonymous session and confirmed Drop choice across application restarts
-and Cloud Run instances.
-Preserve the current RoomDrop interface, explicit acknowledgements and
-selection-only behavior. This is one capability: a durable journey from an
-Altovo quotation to an armed Drop Watch, with sessions referencing the booking.
+Give hackathon judges a durable, isolated RoomDrop journey through curated
+Original Bookings captured from real Altovo staging quotations. Persist the
+shared booking facts and captured Drops in Firestore; persist each judge's
+choices in their own anonymous session.
 
-Agreed scope and defaults:
+The approved journey is:
+
+1. Start page: a RoomDrop card grid of about six curated quotations.
+2. Original Booking confirmation page: "Your agency booked this", one primary
+   "Set up a drop" action, and a visible small note that a staging quotation
+   stands in for a confirmed booking, including the Altovo capture date.
+3. Setup: explicit consent and minimum saving, followed by the armed state.
+4. Immediate first check: replay the captured Drops, clearly labelled as replay.
+5. Existing Deals, Review and Confirmed screens, retaining the selection-only
+   acknowledgement and explicit cancellation-flexibility consent.
+
+Use RoomDrop's Ticket and Stamp style, short copy and existing brand assets.
+Show no Altovo or AirBorneo logo or co-branding; the factual staging-source note
+remains visible. A judge never supplies a share link or an arbitrary booking code.
+
+## Scope and existing work
 
 - Reuse project `sincere-apex-511418-p0` and its existing `(default)` Firestore
-  database. Verify the actual database and runtime identity before live work;
-  do not create a second database or change the existing database location.
-- Retain the existing fixed one-hour session lifetime and cookie contract.
-- The Original Booking comes from a real quotation that a B2B agent creates in
-  the Altovo storefront at `trave10.app.altovostaging.com`. The Altovo app is used
-  unchanged. RoomDrop receives it through an Altovo share link and reads it once.
-- The record remains an Altovo quotation; it is never converted into a supplier
-  booking. RoomDrop treats it as the Original Booking.
-- Persist the booking facts, Drops, Drop Watch setup, the confirmed Drop, session
-  guards, per-session advice counters and the existing bounded conversation
-  context. Preserve the current behavior that a deliberate confirmation of
-  another Drop replaces the current receipt.
-- Arming the Drop Watch and recording when the first check is due is in scope.
-  Running checks on a schedule, live rate searches, notifications, sign-in,
-  Firebase Hosting and submission publication stay outside this capability.
+  database after verifying current identity, permissions and database metadata.
+- Tenant is `air1.app.altovostaging.com`. Never use production Altovo or trave10.
+  The separate Altovo booking application and tenant settings remain unchanged.
+- The owner creates quotations through the Altovo B2B storefront. A quotation
+  remains `status='quote'`; no supplier reservation, payment or conversion occurs.
+  The quotation stands in for the Original Booking throughout this demo.
+- Captures currently available under ignored `.local\altovo-sample\` are
+  `AIRB000179.projection.json` (non-refundable) and
+  `AIRB000180.projection.json` (refundable). The handoff records live share-read
+  verification, not verification performed by this specification update.
+- Grow the curated catalogue to about six owner-created quotations, covering
+  armable, non-refundable/cannot-start, cancellation closing soon, and variation
+  in city, currency or board. Importing two records does not complete that target.
+- Existing untracked `app\domain\altovo-quotation.mjs` and
+  `scripts\prepare-altovo-catalogue.mjs` are scaffolding to review and extend.
+  Their presence is not proof of a verified adapter, captured Drops or persistence.
+- The separate simulation runtime, agency case data and existing watch jobs remain
+  outside this data model. Preserve their behavior and stored records.
+- Public share-link intake, customer accounts/invitations, scheduled checks, live
+  runtime rate searches, email, Firebase Hosting and submission publication are
+  deferred. Admin capture and Firestore import are separate guarded operations.
 
-## Current contract and tech stack
+## Tech stack and current seams
 
-Node.js ES modules, built-in HTTP server and `node:test`.
-`@google-cloud/firestore` is already pinned to `9.3.1`; no new dependency is needed.
-The current `app/booking-cloud.mjs` entrypoint uses `app/booking-demo-server.mjs`,
-which delegates API calls to `app/quotation-demo-server.mjs`.
-The latter currently owns an in-memory session map and reads one packaged
-quotation prepared offline by `scripts/prepare-quotation-demo.mjs`.
+Node.js ES modules, the built-in HTTP server and `node:test` remain the stack.
+Use the already pinned `@google-cloud/firestore` dependency (`9.3.1`).
+`app\booking-cloud.mjs` uses `app\booking-demo-server.mjs`, delegating its booking
+APIs to `app\quotation-demo-server.mjs`. During this documentation pass, concurrent
+changes added file-backed catalogue routes and per-code state while sessions still
+use a process-local Map. Those changes are unreviewed existing work, not completed
+Firestore persistence. Reconcile them first; replace hosted session authority and
+catalogue payload loading with Firestore, without a file or memory fallback.
 
-The separate `app/server.mjs` / `app/storage.mjs` simulation runtime already uses
-Firestore, including visitor, agency and watch collections. Those data models and
-their existing records are outside this change. Reuse established configuration,
-transaction conventions and the eligibility rules in `app/domain/price-watch.mjs`
-without attaching new records to simulation data.
+The current `quotationBaseline()` cannot parse the Altovo share response: it has
+no `cart_items`, nationality, residency or child ages. Use an explicit Altovo
+adapter. Existing hosted guards forbid emulator and credential-file environment
+activation; keep that protection. Use a separate explicit local emulator harness.
+The current deployment projection accepts at most three displayed Drops and rejects
+private-looking keys. Add narrow typed catalogue projections and route allowlists;
+do not disable the recursive private-field checks or expose the capture bundle.
 
-Altovo facts this spec relies on (from the Altovo repository, staging only):
+## Administrative capture and import
 
-- A quotation is an Altovo booking with `status='quote'`; no payment or supplier
-  call is made, and its stored total is retail (net plus agent markup).
-- An agent who can read the booking mints a capability token with
-  `GET /bookings/share-token?code=`. It is valid for 7 days by default.
-  `GET /v2/bookings/json?code&token` then reads that booking without login.
-- The payload is compatible with the EasyGDS shape that `quotationBaseline()`
-  already parses (`travel_start_date`, `cart_items[0].product.selected_offer`,
-  `search.payload.travelers`).
+### Source capture
 
-## Behavior and data requirements
+The handoff records these air1 staging routes:
 
-### Intake from an Altovo share link
+- `GET /api/bookings/share-token?code=` requires the agent session and returns a
+  seven-day unrevocable capability token.
+- `GET /api/v2/bookings/json?code&token` reads the quotation without login.
 
-A public intake request carries one Altovo share link. The server:
+Share tokens are transient capture credentials. Never store them in Firestore,
+public assets, logs, source or reports. The response is unmasked and may include
+contacts, supplier costs and a tenant-wide legacy JSON token; retain only explicit
+allowlisted fields. Never persist the raw response. Hostname alone does not prove
+quotation tenancy because share-token lookup crosses tenants: require the owner's
+approved air1 code list and recorded provenance for each curated record. Do not
+invent a response field as tenant proof.
 
-1. Accepts only links whose host is the trave10 staging tenant
-   (`trave10.app.altovostaging.com` or its staging API host). Any other host,
-   tenant or production URL is rejected before a network call.
-2. Reads `/v2/bookings/json` once with the code and token, server-side, with a
-   bounded timeout. The browser never calls Altovo.
-3. Requires `status='quote'` and a single standalone hotel item, consistent with
-   the standalone single-room policy in `tasks/plan.md`.
-4. Normalises the display-safe Original Booking facts: hotel, room, board,
-   dates, occupancy, nationality, retail total and currency, free-cancellation
-   flag and deadline, and the cancellation schedule where present.
-   (Open: the exact required fields and their fallbacks are decided by the
-   ticket "Booking facts contract and when a watch can't start".)
-5. Evaluates Drop Watch eligibility and stores the reason when it cannot start.
-   Existing reasons from `price-watch.mjs` apply: non-refundable, cancellation
-   facts unknown, free-cancellation window passed. (Open: final list, same ticket.)
+Capture is an owner-run local operation, defaulting to dry-run. Capture new
+quotations or make bounded Gateway requests only after explicit authorization.
+The public Cloud Run image exposes neither capture nor import endpoints and makes
+zero Altovo or Gateway requests while judges browse, arm or confirm.
 
-Never store the raw Altovo response, the share-link token, booking contacts
-(encrypted in Altovo), traveller names, supplier `confirmation_number` or
-`bk_ref`, credentials or other actionable supplier references, unless the
-booking facts ticket decides a specific field is required.
+### Booking facts contract
 
-### Original Booking record
+For curated records require a valid quotation code/status, one standalone hotel
+and room, Gateway hotel id, hotel display name, consistent stay dates, room/board
+facts, `pax_count`, original retail amount/currency, and source provenance/time.
+Keep retail and supplier/source amount-currency pairs distinct. Reject malformed
+core facts; label genuinely absent optional display fields as not supplied.
 
-Store the normalised facts in `roomdropBookingsV1/{altovoBookingCode}`, with the
-source system (`altovo-staging`), tenant (`trave10`), Altovo read time, intake
-time, schema version and selection-only flags. The Altovo read time is distinct
-from the intake time; neither makes observed rates fresh.
+Nationality, residency and detailed guest ages are absent from the share read.
+Preserve that absence. For the approved demo capture only, use `my`/`my` and
+adults-only search occupancy, explicitly recorded as agency defaults, including
+`searchContextSource: agency-default`. Do not present the adult/child composition
+as verified source data or apply this assumption to general live bookings.
 
-The booking facts are immutable after intake. A repeated intake of the same code
-with identical normalised facts is accepted and returns the existing record. A
-repeated intake whose facts differ is rejected with `BOOKING_CHANGED`; it never
-overwrites the record. Booking records have no session TTL.
+Trust the explicit `non_refundable` flag and the `cancellations[].utc_*`
+schedule for cancellation assessment. Do not use the 1970 sentinel or infer a
+timezone for a naive offer-level deadline. Validate schedule ordering, current
+coverage and bound penalty money/currency. Unknown or conflicting facts remain
+unknown; a bare free-cancellation flag does not make a booking armable.
 
-The record also holds the Drop Watch setup, written by the customer:
+### Firestore layout and immutability
 
-- consent, given explicitly, with its timestamp and the wording version shown;
-- minimum saving, never below the agency minimum saving;
-- notification frequency, stored for later use;
-- armed time and the time the first check is due.
-  (Open: how the first check is recorded without a scheduler.)
+| Location | Data and authority |
+| --- | --- |
+| `roomdropBookingsV1/{code}` | Immutable normalised Original Booking, retail/currency, provenance, capture time, scenario/card metadata and content version |
+| `roomdropBookingsV1/{code}/drops/{dropId}` | Immutable captured Drop facts, capture time, booking/version binding, pricing limitations and provenance |
+| `roomdropPublicSessionsV1/{sha256(cookieToken)}` | Private anonymous session, guards/counters and `byCode[code]` entries containing that judge's setup, replay receipt, confirmation and context |
 
-A booking whose eligibility check failed can be shown to the customer but cannot
-arm a Drop Watch.
+An explicit admin-import command validates existing captures and creates records
+only. It defaults to dry-run, accepts an identical retry, and rejects changed
+Original Booking facts under the same code with `BOOKING_CHANGED`. Replayed Drop
+imports cannot duplicate or overwrite earlier Drops. Include only reviewed local
+photo assets, card ordering and scenario labels. The public catalogue is an
+explicit bounded allowlist; arbitrary document/code lookup is not exposed.
 
-### Drops
+Publish a booking's display entry only once its required facts and complete
+captured Drop-set manifest validate together. A valid zero-result capture is
+explicitly different from a missing/failed capture. Adding later captures records
+a new Drop-set version; earlier documents remain immutable. Content comparisons
+exclude incidental import timestamps and all visitor state. Import never changes
+sessions, existing simulation data, agency records or watch jobs.
 
-Each Drop found for a booking is a document in
-`roomdropBookingsV1/{altovoBookingCode}/drops/{dropId}`. A Drop records when and
-how it was found, the display-safe offer facts, its price against the Current
-Booking, its eligibility and its display label (Best drop, More flexibility,
-Another drop). New findings are added as new Drop documents; they never modify
-the booking facts or earlier Drops.
+Source read time, Gateway capture time and admin import time are separate facts.
+None is a new live price check. Booking/Drop records have no session TTL.
 
-For the current demo, the Drops come from the existing captured Gateway search
-for that booking. Live rate searches stay outside this capability.
-(Open: whether and when a chosen Drop becomes an Altovo quotation is decided by
-the ticket "When a Drop becomes an Altovo quotation".)
+## Catalogue, confirmation and access
 
-### Private durable session
+The start page lists only imported approved entries, with photo, city, dates,
+retail price/currency and a scenario label. Combine a curated scenario label with
+current eligibility so a formerly armable entry cannot advertise expired consent
+eligibility. Missing images have an honest fallback. All catalogue facts are
+intentionally public demo data; private session choices are never public.
 
-Use a dedicated versioned collection, proposed name `roomdropPublicSessionsV1`.
-Derive its document identifier from a SHA-256 digest of the server-generated
-cookie token; do not store the raw cookie token or expose document identifiers.
-The client cannot choose a document path, project or database.
+Use path-based routes, proposed as `/api/booking-demo/catalogue` and
+`/api/booking-demo/q/<code>` with narrow action suffixes. Update the current
+exact-URL rewrite/static-asset allowlists deliberately. Retain query-string
+rejection and strict code validation. Public routes cannot create or refresh
+catalogue entries, read private captures or trigger upstream calls.
 
-A session contains a schema version, revision, creation and expiry timestamps,
-the booking code it belongs to, CSRF material, current confirmation (a Drop id),
-minute-window advice count and the bounded conversation context already used by
-the server. Retain the current maximum of four chat turns and two advice turns
-per displayed Drop. Do not persist provider credentials, supplier references,
-raw provider responses, IP addresses or additional identity fields.
-Free-text questions remain private session context and must not enter logs,
-fixtures or public exports.
-(Open: the customer identity tied to a session is decided by the ticket "How the
-customer receives the RoomDrop invitation, and what identity they need".)
+Opening an approved card shows the Original Booking confirmation page. Ineligible
+bookings remain viewable with their reason and a disabled setup action. Selecting
+a different catalogue entry returns its shared facts and only the current session's
+`byCode[code]` state. No invitation token or login is needed for this judge flow.
 
-Bootstrap restores a live session using the existing HttpOnly, SameSite=Strict
-cookie, with Secure retained in production. Missing or expired sessions receive
-a new server-generated identity. A known session whose booking or Drop set has
-changed must not restore an old receipt or conversation against different Drops:
-bootstrap rotates the session, and stale mutation requests return `DROPS_CHANGED`.
+## Session, setup and replay contract
 
-The browser projection stays allowlisted. Only its own session's public receipt,
-CSRF token, booking facts, Drops and existing display/model fields are returned.
-This slice does not introduce a conversation-history API or promise to redraw
-prior chat after reload.
+Keep the fixed one-hour session lifetime, HttpOnly SameSite=Strict cookie, Secure
+in production, no-store responses and exact Host/Origin/CSRF guards. Store only
+the cookie's SHA-256 digest as the document id, not its raw bearer value.
 
-### Atomic updates and failure behavior
+Each session entry binds the booking content version and Drop-set version.
+Use `session.byCode[code]` for explicit consent/time/wording version, minimum saving,
+watch revision, armed time, first-check receipt, confirmed Drop and bounded
+conversation context. A judge may visit multiple entries independently. Two judges
+opening one quotation must never overwrite or read each other's setup or receipt.
 
-- Intake is idempotent: concurrent intakes of the same code create one booking
-  record. The Altovo read happens outside the transaction; the transaction only
-  creates the record or compares it with the existing one.
-- Arming the Drop Watch validates the session, expiry, origin, CSRF, booking
-  eligibility, consent and minimum saving in one transaction. Repeating the same
-  setup returns the same armed state.
-- Confirm a Drop only after validating the current session, expiry, origin,
-  CSRF, that the Drop belongs to the session's booking, and required
-  acknowledgements.
-- Repeated confirmations of the current Drop return the same committed receipt,
-  including after a lost HTTP response or server restart. Concurrent identical
-  confirmations create one receipt. Competing different selections serialize;
-  the last committed deliberate selection is the current receipt.
-- Transaction callbacks must be retry-safe. Generate candidate identifiers
-  outside callbacks. Never call Altovo, Gemini or a supplier inside a transaction.
-- Reserve the existing four-advice-requests-per-minute allowance atomically per
-  session before invoking Gemini. Preserve the current per-instance limits of
-  twenty requests per minute and two concurrent calls; do not describe these
-  per-instance limits as a project-wide inference budget.
-- A model response may append only its bounded context, after rechecking the
-  session, expiry and Drop set. It cannot overwrite a newer selection or restore
-  expired state. Concurrent updates must not lose committed fields.
-- Preserve bounded session creation, including the existing capacity of 64 live
-  sessions, with a shared concurrency-safe policy. Bound intake the same way so
-  the public endpoint cannot create unbounded booking records. Expired sessions
-  do not consume live capacity. Do not scan an unbounded collection on every
-  request.
-- A failed or timed-out storage or Altovo operation produces a sanitized
-  unavailable response. Never return a successful intake, armed watch or receipt
-  before its write commits, or silently switch production to memory storage.
-  Retrying is safe even if the earlier write committed but its acknowledgement
-  was lost.
+The demo agency minimum is 10.00 in the booking currency, converted using that
+currency's minor-unit precision. The judge may raise it. Never use mixed-currency
+thresholds or an implicit FX conversion. No notification-frequency input is required
+by this judge-flow slice; notifications and scheduling remain deferred.
 
-### Expiry, access and retention
+Evaluate eligibility at arming time using actual UTC time, with an injectable clock
+in tests. Block non-refundable bookings, unknown/conflicting cancellation facts,
+no current zero-penalty cancellation window and a reached free deadline. Store
+the reason with the session's evaluated result, not as permanent booking eligibility.
+A passing eligibility result never grants supplier transaction authority.
 
-Reject expired sessions in application reads and writes, independent of physical
-deletion. Store a Firestore timestamp usable for TTL, and prepare the session
-collection's TTL policy as an explicit release configuration change. Expired
-records may await asynchronous deletion; they never regain access or capacity.
+Arming and first-check replay are one committed session action:
 
-Booking records and Drops do not expire with sessions. The Altovo share link
-expires after 7 days; RoomDrop keeps the facts captured at intake and never
-re-reads Altovo with an expired or stored token.
-(Open: what a running Drop Watch does once the share link has expired.)
+- Validate the session, consent, minimum, current versions and eligibility.
+- Run the pure replay over that booking's valid captured set. Use
+  `isDisplayedDrop` plus an indicative difference at or above the judge's minimum;
+  bind currency and booking/Drop versions. Preserve the existing three-card ranking
+  and labels without certifying room equivalence or a final customer refund.
+- Persist armed time and one completed replay receipt with replay time, original
+  capture time(s), mode `captured-replay`, threshold and qualifying Drop ids.
+  Label it "Replayed check" in the UI; do not claim a fresh search or live rate.
+- A valid capture with no qualifying result produces an honest empty state. Missing
+  or malformed capture data produces unavailable, never a successful empty search
+  or a successful armed/replayed response without a commit.
 
-Use the Cloud Run attached identity and server SDK credentials. No browser
-Firestore SDK, public database rule, service-account key or new login is needed.
-The Altovo read needs no Altovo credentials beyond the share-link token supplied
-in the request. Verify effective server access before release and identify any
-missing exact permission; do not broaden IAM silently. Existing agency/watch
-access and data must remain intact.
+Identical request retries return the same committed setup and replay. A deliberate
+new minimum replaces only that session/code's setup with a new watch revision and
+recomputed replay. Reject stale retries rather than restoring an older setup.
+Invalidate a confirmation that no longer belongs to the current armed setup.
+Shared booking facts and Drops are never modified by arming or confirming.
 
-## Commands
+A Drop cannot be confirmed without this session's armed watch, membership in its
+current qualifying set and the existing explicit acknowledgements. Revalidate
+session/version/eligibility guards at mutation time. Same-Drop concurrent requests
+and lost-response retries return one selection receipt. Different deliberate
+selections serialize; the last committed selection is current. Receipt fields stay
+`reservationCreated:false`, `quoteModified:false`, `customerRefund:null`.
+The Current Booking stays the Original Booking throughout this tranche.
 
-Commands run from `C:/Users/pohli/Sites/hotel-price-hunter` in PowerShell.
-These are acceptance commands for the later implementation, not proof of a run.
+Changed booking/Drop bindings invalidate only the affected per-code state and
+stale mutations return `DROPS_CHANGED`; other catalogue choices remain isolated.
+Expired sessions cannot read or mutate state. A new session starts fresh; expiry
+does not delete the shared booking records or captured Drops.
+
+## Atomicity, Gemini, limits and failure behavior
+
+Use retry-safe Firestore transactions for session changes and create-only imports.
+Generate candidate identifiers/times before retryable callbacks. No transaction
+callback may call Altovo, Gateway or Gemini. Commit before reporting success;
+a timeout with unknown acknowledgement remains safe to retry.
+
+Reserve the existing four-advice-requests-per-minute allowance per session across
+instances. Preserve the existing per-instance limits of twenty requests/minute
+and two concurrent calls, without describing these as a global inference budget.
+Gemini receives only the allowlisted context for the selected catalogue code and
+current qualifying Drops. Merge at most four chat turns and two advice turns per
+Drop into the matching session/code after rechecking live guards. A late response
+cannot overwrite confirmation, another code's context or expired state.
+
+Preserve the 64-live-session capacity with shared concurrency-safe accounting and
+bounded cleanup/reads. Catalogue size is admin-bounded. Never silently fall back
+to memory storage in production, leak SDK errors, log free-text questions or
+report successful setup/confirmation before its commit.
+
+## Expiry and deployment boundaries
+
+Reject expired sessions in application code independently of asynchronous TTL
+cleanup. Prepare TTL only for the session collection, separately approved before
+activation. The source share link's expiry does not affect captured Firestore
+records or cause re-reading. Dynamic cancellation eligibility still expires at
+the captured free deadline. No running schedule is introduced by this decision.
+
+Use the Cloud Run attached identity and server SDK. No browser Firestore SDK,
+public database rule or service-account key is needed. Verify current runtime
+access before release; request any exact missing permission instead of broadening
+IAM silently. Preserve current private services, saved data and access policies.
+
+## Commands and project structure
+
+Commands below are proposed acceptance commands, not completed test evidence.
+Use Windows PowerShell from the project directory. New test/script names are
+planned outputs; `.local\` remains ignored and must never be committed.
 
 ```powershell
-# Start only if the intended local emulator is not already running.
+Set-Location 'C:\Users\pohli\Sites\hotel-price-hunter'
+# Start only if the intended emulator is not already available.
 gcloud emulators firestore start --host-port=127.0.0.1:8081 --project=demo-roomdrop-iap-qa
-
-# In a separate shell: emulator-only focused and complete regression suites.
+# In another PowerShell session:
 $env:GOOGLE_CLOUD_PROJECT='demo-roomdrop-iap-qa'
 $env:FIRESTORE_EMULATOR_HOST='127.0.0.1:8081'
 $env:RUN_FIRESTORE_INTEGRATION='1'
 $env:NODE_ENV='test'
 Remove-Item Env:K_SERVICE,Env:CLOUD_RUN_JOB,Env:STORAGE_MODE,Env:GEMINI_MODEL,Env:GOOGLE_CLOUD_LOCATION,Env:QUOTATION_ADVICE_ENABLED -ErrorAction SilentlyContinue
-node --test tests/booking-intake.test.mjs tests/booking-storage.test.mjs tests/quotation-session-storage.test.mjs tests/quotation-demo-server.test.mjs tests/quotation-advice-server.test.mjs tests/quotation-cloud.test.mjs
-node --test tests/*.test.mjs
-
-# Syntax, patch integrity and current booking browser regression.
-node --check app/quotation-demo-server.mjs
+node --test .\tests\altovo-catalogue.test.mjs .\tests\booking-storage.test.mjs .\tests\quotation-session-storage.test.mjs .\tests\booking-drop-watch.test.mjs
+npm test
+node .\tests\booking-firestore.browser.mjs
 git diff --check
-node tests/booking-live.browser.mjs --snapshot=.local/quotation-demo/ACCEPTED-CAPTURE.json
 ```
 
-The intake, booking-storage and session-storage tests are proposed new files.
-Intake tests use a recorded, sanitised trave10 share-link response stored under
-`.local/` and an injected HTTP client; they make no live Altovo calls.
-`ACCEPTED-CAPTURE.json` must be replaced with the actual accepted ignored capture
-path. The existing browser regression establishes UI behavior only; add an
-emulator-backed restart and isolation harness for persistence evidence.
-`npm run build` builds the separate pitch Worker and is not verification of this
-Cloud Run entrypoint.
+- `app\domain\altovo-quotation.mjs`: validate/map the distinct Altovo projection.
+- `scripts\prepare-altovo-catalogue.mjs`: owner-only capture/preparation, not a
+  runtime source. Review existing scaffolding with injected HTTP before live use.
+- New booking/session storage and guarded admin import modules: Firestore authority.
+- Existing booking/quotation server seams and `app\public\`: catalogue, confirmation,
+  setup and existing Deals/Review/Confirmed UI, using explicit test injection.
+- `tests\`: Node, actual emulator and real-browser coverage; evidence in `.local\`.
+- `tasks\plan.md`, `tasks\todo.md`: reviewable implementation order and acceptance.
 
-## Project structure and code style
-
-- `app/quotation-demo-server.mjs`: session integration and guarded API behavior.
-- `app/booking-demo-server.mjs`, `app/booking-cloud.mjs`,
-  `app/quotation-cloud.mjs`: dependency injection and executable storage setup.
-- A small Altovo share-link reader in `app/`: host allowlist, single read,
-  normalisation into Original Booking facts.
-- Small dedicated booking/Drop/session-storage modules in `app/`.
-- `tests/*.test.mjs`: Node unit, HTTP and real-emulator integration checks.
-- `tests/booking-live.browser.mjs`: current booking UI regression.
-- Existing release-preparation scripts and Docker files: package the real
-  entrypoint and required dependency closure.
-- `docs/`: contract, verification and release evidence.
-
-Follow existing two-space indentation, named exports and injected dependencies.
-Keep SDK-specific work in storage code. Example of the existing transaction style:
+Follow the existing two-space indentation, named exports and dependency injection:
 
 ```js
-return this.database.runTransaction(async transaction => {
-  const snapshot = await transaction.get(reference);
-  if (!snapshot.exists) throw new Error('Visitor not found.');
-  const previous = snapshot.data();
-  const next = change(copy(previous));
-  transaction.set(reference, next);
-  return next;
-});
+export function replayCapturedDrops({ baseline, drops, minimumSavingMinor }) {
+  return drops.filter(drop => isDisplayedDrop(baseline, drop)
+    && drop.indicativeDifferenceMinor >= minimumSavingMinor);
+}
 ```
 
-This is a style example from `app/storage.mjs`, not the complete session validator.
+The snippet illustrates style and the pure filter, not the full currency, version,
+authority or capture validator. `npm run build` targets the separate pitch Worker
+and is not evidence that this Cloud Run entrypoint works.
 
-## Testing strategy and success criteria
+## Verification and success criteria
 
-Use `node:test`, the actual local Firestore emulator, a recorded Altovo response
-and injected Gemini responses. An in-memory test double alone cannot satisfy
-persistence acceptance.
+1. Admin import accepts only approved sanitised air1 captures. Identical and
+   concurrent imports are safe; changed facts/private fields fail. Shared booking
+   facts, catalogue metadata and captured Drops remain immutable.
+2. Two real Firestore clients and two app instances recover a session across restart;
+   two judges on one code and one judge across two codes retain isolated choices.
+3. Arming checks dynamic cancellation and the 10.00 currency-bound floor, commits
+   one replay, filters by `isDisplayedDrop` and the raised threshold, and handles
+   zero results versus missing capture honestly. Retries and changed-minimum races
+   cannot duplicate or revert state. No upstream request occurs.
+4. Confirming requires an armed watch and current qualifying Drop/acknowledgements;
+   selection receipts are idempotent and retain all selection-only flags.
+5. Start/card grid, Original Booking confirmation, cannot-start, setup, replay,
+   Deals, Review and Confirmed work on mobile and desktop with keyboard access.
+   Source and replay labels are visible; agency/provider branding is absent.
+6. Expiry, capacity, stale bindings, database failure and late model responses fail
+   safely. Unit/HTTP/emulator tests use injected model and upstream responses.
+   Report full-suite pass/failure/skip counts; relevant emulator tests must run.
+7. The exact packaged hosted entrypoint works against the emulator and retains
+   strict production guards. Later separately approved cloud acceptance proves
+   imported catalogue reads, restart persistence and session isolation. A health
+   label alone does not establish these facts.
 
-1. Intake accepts a recorded trave10 share-link response, stores only approved
-   display facts and records the eligibility result. It rejects other hosts,
-   tenants and production URLs before any network call, rejects non-quote and
-   multi-item bookings, and never stores the token, contacts or traveller names.
-2. Repeated identical intakes return one record; concurrent intakes create one
-   record; an intake with different facts for an existing code is rejected with
-   `BOOKING_CHANGED`. Adding a Drop never changes the booking facts or earlier
-   Drops.
-3. Arming requires explicit consent and a minimum saving at or above the agency
-   minimum, and is refused for an ineligible booking.
-4. Two independent storage clients and two app instances observe the same live
-   session, booking and committed receipt. Restarting the app preserves them
-   with the same cookie. Another visitor cannot read or mutate that session.
-5. Same-Drop concurrent requests and lost-acknowledgement retries return one
-   receipt. Competing updates preserve committed selection, counters and context.
-   Transaction retries make zero additional Altovo or model calls.
-6. Expiry, Drop set changes, stale CSRF, missing acknowledgements, capacity,
-   database failure, Altovo failure and late model responses fail safely, with no
-   memory fallback. One session's rate allowance is enforced across instances.
-7. The booking browser journey works at mobile and desktop sizes; consent
-   remains explicit. Confirmation still reports `reservationCreated:false`,
-   `quoteModified:false`, `customerRefund:null`.
-8. The complete emulator-backed regression suite finishes with recorded pass,
-   failure and skip counts. Relevant integration tests must run, not be skipped.
-   The packaged production entrypoint starts and serves its expected assets;
-   tests must not make live Altovo, supplier or model calls.
-9. Later cloud acceptance proves a real trave10 share link is taken in, the
-   Drop Watch is armed, and anonymous-session persistence holds across
-   independent app instances or a controlled restart, plus session isolation.
-   Liveness and a configured storage label alone do not prove persistence.
+## Boundaries and remaining prerequisites
 
-## Boundaries
+- Always: curated air1 staging data only; admin capture/import separate from public
+  runtime; explicit projections, session guards and transactions; preserve unrelated
+  work and existing services/data; distinguish local from live evidence.
+- Ask first: obtain approval of the implementation plan before coding. Ask before
+  new live quotation/Gateway captures, additional live Gemini checks, production
+  Firestore imports, deployment, IAM/TTL changes or source publication. Present
+  concrete reviewed commands/artifacts before a release decision.
+- Never: commit `.local\`, tokens, raw responses or credentials; merge the research
+  branches; change Altovo code/settings; call confirm-quote; create a reservation,
+  convert/requote the chosen Drop, change the Original Booking, move money, cancel,
+  refund, deliver email, start Scheduler or use production Altovo.
 
-- Always: accept only trave10 staging share links; read Altovo server-side only;
-  validate session ownership and inputs; keep updates atomic; test against the
-  real emulator; preserve unrelated dirty work; report local and live proof
-  separately; keep existing public/private service boundaries.
-- Ask first: obtain approval of the implementation plan before coding; present
-  the concrete tested release before deployment, IAM/TTL policy changes or
-  source publication. Any live Altovo intake beyond the recorded sample, and any
-  additional live Gemini check, needs its own bounded allowance.
-- Never: convert the quotation into a supplier booking, create real reservations,
-  modify the source quotation, change Altovo code or tenant settings, use
-  production Altovo, cancel bookings, issue refunds, send email, start Scheduler,
-  copy private source references or share-link tokens into stored or public
-  state, commit credentials, or delete existing visitor/agency/watch data.
+The approved handoff settles public entry/identity (anonymous curated catalogue),
+per-session watch ownership, replayed first check and Deals handoff for this
+tranche. Broader invitation/identity and Drop-to-quotation work is deferred.
+Wayfinder map is GitHub issue #2; the handoff records research #3/#4/#5 as closed
+and decisions/prototype #6/#7/#8/#9 as open. Do not infer remote ticket closure
+from this local spec update. Exact field mapping, tenant provenance, catalogue
+coverage and the new screens must be verified during the proposed work.
 
-## Open questions and live prerequisites
+Owner-created additional quotations and their bounded captures are prerequisites
+for the full six-entry catalogue. Existing captures are not evidence of Gateway
+results for every record. Verify these locally before requesting further calls.
+Before live release verify database, identity/configuration, reviewed import set,
+current scenario eligibility, rollback and preservation of unrelated data. Existing
+memory-only visitor sessions may require a reset at the first persistent release.
 
-Open decisions, tracked as wayfinder tickets:
-
-- Booking facts contract and when a watch can't start: required Altovo fields,
-  fallbacks and the final eligibility reasons.
-- How the customer receives the RoomDrop invitation, and what identity they need.
-- When a Drop becomes an Altovo quotation.
-
-Not yet specified:
-
-- How the first check is recorded without a scheduler.
-- What a running Drop Watch does once the 7-day share link has expired.
-- How an armed booking record feeds the existing Deals screen.
-
-Before live execution, verify database identity/location, attached runtime
-permissions, the current service configuration and that the trave10 tenant
-serves share-token reads. Decide the exact TTL activation command and rollback
-behavior in the reviewed release bundle. Existing in-memory sessions cannot be
-migrated after their process disappears; the first persistent release may
-require a fresh anonymous session; that limitation remains explicit in the
-release review.
-
-## Primary references
-
-- [Firestore server IAM](https://docs.cloud.google.com/firestore/docs/security/iam):
-  the server SDK uses IAM; client rules do not establish server permissions.
-- [Firestore transactions](https://firebase.google.com/docs/firestore/manage-data/transactions):
-  transaction functions may execute more than once under concurrent changes.
-- [Firestore TTL](https://firebase.google.com/docs/firestore/ttl): physical expiry
-  deletion is asynchronous, so access expiry must be enforced by the application.
-
-Related local contracts: `quotation-demo-contract.md`,
-`quotation-gemini-contract.md`, `gemini-chat-ui.md`, `data-contract.md` and
-`price-watch-contract.md`. Altovo references (in the Altovo repository):
-`docs/knowledge-base/quotations-feature.md` and the share-token routes in
-`services/platform` `bookings.py`.
+References: `docs\roomdrop-booking-setup-handoff.md`, `GLOSSARY.md`,
+`docs\quotation-demo-contract.md`, `docs\quotation-gemini-contract.md`,
+`docs\gemini-chat-ui.md` and `docs\price-watch-contract.md`. Authoritative Firestore
+semantics: https://docs.cloud.google.com/firestore/docs/security/iam,
+https://firebase.google.com/docs/firestore/manage-data/transactions and
+https://firebase.google.com/docs/firestore/ttl.
