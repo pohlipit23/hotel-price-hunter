@@ -4,7 +4,7 @@ import { altovoBaseline, watchBlocker } from '../app/domain/altovo-quotation.mjs
 import { mkdtemp, mkdir, writeFile, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { main as prepareCatalogue } from '../scripts/prepare-altovo-catalogue.mjs';
+import { main as prepareCatalogue, parseContrasts } from '../scripts/prepare-altovo-catalogue.mjs';
 import { deploymentCatalogue } from '../app/quotation-demo-server.mjs';
 import { grandHyattProjection, siamKempinskiProjection } from './fixtures/altovo-catalogue.mjs';
 
@@ -166,6 +166,24 @@ test('preparation refuses projections outside the owner-approved code list and n
   assert.equal((await prepareCatalogue(['--approved-codes=AIRB000179,AIRB000999'], { root: renamed, fetchImpl: refuseNetwork, now: NOW, env: {} })).reason, 'ALTOVO_PROJECTION_MISMATCH');
 });
 
+test('--contrast names one difference per approved code and anything else is refused before any read', async t => {
+  const root = await workspace(t);
+  const run = args => prepareCatalogue([APPROVED, ...args], { root, fetchImpl: refuseNetwork, now: NOW, env: {} });
+  const planned = await run(['--contrast=AIRB000180:cancellation']);
+  assert.equal(planned.status, 'validated', planned.reason);
+  assert.deepEqual(planned.entries.map(entry => [entry.code, entry.contrast]), [['AIRB000179', undefined], ['AIRB000180', 'cancellation']]);
+  assert.deepEqual(parseContrasts('AIRB000179:meals,AIRB000180:room', ['AIRB000179', 'AIRB000180']), { AIRB000179: 'meals', AIRB000180: 'room' });
+  assert.deepEqual(parseContrasts(undefined, ['AIRB000180']), {});
+  for (const list of ['', 'AIRB000180', 'AIRB000180:', 'AIRB000180:view', 'AIRB000180:Meals', 'airb000180:meals', 'AIRB000181:meals', 'AIRB000180:meals:room',
+    'AIRB000180:meals,AIRB000180:room', 'AIRB000180:meals,', ' AIRB000180:meals']) {
+    const refused = await run([`--contrast=${list}`]);
+    assert.deepEqual([refused.status, refused.reason, refused.entries], ['blocked', 'CONTRAST_INVALID', undefined], list);
+  }
+  // Like every flag, it may appear once.
+  assert.equal((await run(['--contrast=AIRB000180:meals', '--contrast=AIRB000180:room'])).reason, 'ALTOVO_CATALOGUE_PREPARATION_FAILED');
+  assert.match((await prepareCatalogue([], { root, fetchImpl: refuseNetwork, now: NOW, env: {} })).requirements.join('\n'), /--contrast=CODE:meals\|room\|cancellation/);
+});
+
 // Injected Gateway: records every request and answers login and search-by-id from test data only.
 function fakeGateway(searchBody) {
   const calls = [];
@@ -200,6 +218,24 @@ test('execute searches only armable quotations with the agency defaults and reco
     nationality: 'my', countryResidence: 'my', occupancy: 'agency-default-adults-only', source: 'agency-default' } });
   assert.deepEqual(report.entries.map(entry => [entry.code, entry.capture]), [['AIRB000179', 'not-searched'], ['AIRB000180', 'observed']]);
   assert.doesNotMatch(JSON.stringify(report), /PRIVATE|fixture-token|fixture-password/);
+});
+
+test('execute builds each third Drop with its code\'s --contrast, meals first otherwise', async t => {
+  // The Siam booking is a refundable Executive Suite with breakfast at USD 573.81: two perfect matches, then one-way near-matches.
+  const response = searchResult([rate(480)]);
+  response.data[0].rooms = [{ idx: 1, room_name: 'Executive Suite', room_type_id: 'suite-a',
+    rates: [rate(480), rate(540, { board_basis: 'Room Only' }), rate(545, { free_cancellation: false, free_cancellation_deadline: null })] },
+  { idx: 1, room_name: 'Executive, Suite', room_type_id: 'suite-b', rates: [rate(490)] }];
+  const third = async args => {
+    const root = await workspace(t);
+    const report = await prepareCatalogue([...EXECUTE, ...args], { root, fetchImpl: fakeGateway(response).fetchImpl, now: NOW, env: {} });
+    assert.equal(report.status, 'prepared', report.reason);
+    const options = JSON.parse(await readFile(report.privateCatalogue, 'utf8')).entries.find(entry => entry.code === 'AIRB000180').bundle.options;
+    return [report.entries.map(entry => entry.contrast), options.map(option => [option.roomName, option.board, option.freeCancellation, option.sourcePrice.amount])];
+  };
+  const best = [['Executive Suite', 'Breakfast', true, '480.00'], ['Executive, Suite', 'Breakfast', true, '490.00']];
+  assert.deepEqual(await third([]), [[undefined, undefined], [...best, ['Executive Suite', 'Room Only', true, '540.00']]]);
+  assert.deepEqual(await third(['--contrast=AIRB000180:cancellation']), [[undefined, 'cancellation'], [...best, ['Executive Suite', 'Breakfast', false, '545.00']]]);
 });
 
 test('a valid zero-result search is recorded as empty, while a failed search publishes nothing', async t => {

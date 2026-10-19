@@ -77,6 +77,15 @@ test('the Best drop is the best matched Drop: same room type, then meals, then r
  const data=bundle();data.options.push({optionId:'option-3',roomName:'ORIGINAL ROOM (city view)',board:'Room only',freeCancellation:false,estimate:{totalMinor:49000,currency:'AED',isEstimate:true},indicativeDifferenceMinor:1000});
  assert.deepEqual(bookingView(data).highlights.map(h=>[h.offer.offerId,h.label]),[['option-3','Best drop'],['option-1','More flexibility'],['option-2','Another drop']]);
 });
+test('a contrast Drop that differs in one way stays third behind two perfect matches, even with the biggest saving',()=>{
+ const data=bundle();data.baseline.freeCancellation=true;
+ const option=(optionId,roomName,totalMinor,extra={})=>({optionId,roomName,board:'Breakfast',freeCancellation:true,estimate:{totalMinor,currency:'AED',isEstimate:true},indicativeDifferenceMinor:50000-totalMinor,...extra});
+ for(const contrast of [option('option-c','Original room',40000,{freeCancellation:false}),option('option-c','Original room',40000,{board:'Room only'}),option('option-c','Twin',40000)]){
+  data.options=[contrast,option('option-b','ORIGINAL ROOM',47000),option('option-a','Original room',45000)];
+  assert.deepEqual(bookingView(data).highlights.map(h=>[h.offer.offerId,h.label]),[['option-a','Best drop'],['option-b','More flexibility'],['option-c','Another drop']]);
+  assert.equal(Object.values(comparisonLabels(data.baseline,contrast)).filter(cue=>cue==='Different').length,1);
+ }
+});
 test('booking entry serves the existing interface and session-protected selection using booking routes',async t=>{
  const server=createBookingDemoServer({bundle:bundle()});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>{server.closeAllConnections();server.close(r)}));const origin='http://127.0.0.1:'+server.address().port;
  const root=await(await fetch(origin)).text();assert.match(root,/data-live-booking="true"/);assert.match(root,/id="offers"/);assert.match(root,/id="comparison-saving-stamp"/);assert.doesNotMatch(root,/quotation|quote-|fonts.googleapis/i);

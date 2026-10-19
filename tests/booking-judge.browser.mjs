@@ -171,6 +171,11 @@ try {
     assert.equal(await page.locator('#app-frame').evaluate(frame => frame.classList.contains('launching')), false);
     await focused('changes-title'); await step(3); await site('roomdrop');
     assert.equal(await page.locator('#changes-title').innerText(), 'Find your next drop');
+    // The Drops page opens on the cards: the heading is for screen readers only, with no eyebrow, subline or Change minimum.
+    assert((await page.locator('#deal-list .section-heading').boundingBox()).width <= 1, width + ' Drops heading is visually hidden');
+    assert.deepEqual(await page.locator('#deal-list .section-heading').evaluate(heading => [...heading.children].map(child => child.id)), ['changes-title']);
+    assert.equal(await page.locator('#deal-list button:visible').filter({ hasText: /minimum/i }).count(), 0);
+    assert.doesNotMatch(await page.locator('#deal-list').innerText(), /Fresh options|Estimated savings for the whole stay/);
     assert.deepEqual([await page.locator('#armed-strip').isVisible(), await page.locator('footer').isVisible()], [false, false], 'no armed strip or footer on Drops');
     assert.deepEqual([receipt.watch.revision, receipt.watch.minimumSavingMinor, receipt.dropOptionIds.length], [1, 5000, 2]);
     assert.equal(new URL(page.url()).hash, '#drops-' + SIAM);
@@ -199,8 +204,8 @@ try {
     await page.reload(); await drops();
     // Re-arm with new minima (existing Drops screens consume the receipt); the saved address shows masked and is kept.
     await page.goBack(); await page.goForward(); await drops();
-    // With drops showing, "Change minimum" under the Drops heading is the way back to setup.
-    await page.locator('#drops-minimum').click(); await visible('setup-screen');
+    // With drops showing, the setup route is the way back to the minimum (the Drops page has no Change minimum).
+    await page.evaluate(code => { location.hash = '#setup-' + code; }, SIAM); await visible('setup-screen');
     assert.equal(new URL(page.url()).hash, '#setup-' + SIAM);
     assert.equal(await page.locator('#delivery-saved-email').innerText(), 'j***@example.test');
     assert.equal(await page.locator('input[name="minimum-saving"][value="5000"]').isChecked(), true);

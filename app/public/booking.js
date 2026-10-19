@@ -109,7 +109,8 @@ function guestText(record) {
   return o.adults + (o.adults === 1 ? ' adult' : ' adults') + (o.childAges.length ? ' + ' + o.childAges.length + (o.childAges.length === 1 ? ' child' : ' children') : '')
     + (o.infantAges.length ? ' + ' + o.infantAges.length + (o.infantAges.length === 1 ? ' infant' : ' infants') : '');
 }
-function roomText(record) { return record.room.name.split(',')[0]; }
+// The fictional demo puts the view after a comma ("Deluxe King, city view"); real supplier names keep every word ("Executive, Suite").
+function roomText(record) { return state?.bookingDemo ? record.room.name.trim() : record.room.name.split(',')[0]; }
 function offerIntent(offer) { return state.simulation?.offerApprovalIntents?.[offer?.offerId]; }
 function verifiedSaving(offer) {
   const refund = refundPresentation(offer);
@@ -276,7 +277,7 @@ function offerCard(offer, highlight, overlap) {
   const detail = node('p', detailText, 'offer-caption');
   detail.id = 'offer-detail-' + suffix;
   const refundable = offer.cancellation?.refundability === 'refundable';
-  const conditionText = refundable ? (state.bookingDemo ? 'Free cancellation flag · check terms' : 'Free cancellation') : offer.cancellation?.refundability === 'non-refundable'
+  const conditionText = refundable ? (state.bookingDemo ? 'Free cancellation*' : 'Free cancellation') : offer.cancellation?.refundability === 'non-refundable'
     ? 'Final drop · Non-refundable' : 'Cancellation terms not verified';
   const condition = node('p', conditionText,
     'offer-condition' + (refundable ? '' : ' warning'));

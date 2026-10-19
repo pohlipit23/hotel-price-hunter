@@ -58,7 +58,8 @@ function estimate(amount, fx) {
   return { totalMinor: Number(rounded), currency: fx.to, isEstimate: true, basis: 'quotation-fx-before-final-pricing-and-fees' };
 }
 
-export function buildQuotationDemo(baseline, observation) {
+// contrast: which one difference the third Drop shows ('meals' | 'room' | 'cancellation'); unset uses the default order.
+export function buildQuotationDemo(baseline, observation, { contrast } = {}) {
   const context = observation?.context;
   if (context?.hotelId !== baseline.hotel.id || !same(context.stay, baseline.stay) || !same(context.occupancy, baseline.occupancy)
     || context.nationality !== baseline.searchContext.nationality || context.countryResidence !== baseline.searchContext.countryResidence) fail('QUOTATION_GATEWAY_CONTEXT_MISMATCH');
@@ -81,7 +82,7 @@ export function buildQuotationDemo(baseline, observation) {
   // Cheaper options only; with none, the closest dearer ones stay, ranked the same way (the cap limits savings only).
   const plausible = candidates.filter(option => withinSavingCap(baseline, option));
   const lower = plausible.filter(option => option.indicativeDifferenceMinor > 0);
-  const chosen = topDrops(baseline, lower.length ? lower : plausible);
+  const chosen = topDrops(baseline, lower.length ? lower : plausible, undefined, contrast);
   const privateReferences = Object.fromEntries(chosen.map(option => [option.optionId, option.privateReference]));
   const options = chosen.map(({ privateReference, ...option }) => option);
   const view = { schemaVersion: 1, transactionMode: 'selection-only', baseline, options, checkedAt: context.checkedAt,

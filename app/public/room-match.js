@@ -39,12 +39,31 @@ export function withinSavingCap(baseline, option) {
   return sameRoomType(baseline.room?.name, option.roomName)
     || option.indicativeDifferenceMinor * 100 <= baseline.quotedRetail.totalMinor * OTHER_ROOM_MAX_SAVING_PERCENT;
 }
-// At most three, best matched first and one per room name, meal plan and cancellation flag.
-export function topDrops(baseline, candidates, optionOf = candidate => candidate) {
+// The third Drop differs from the booking in one way so the Drop details show a real change; this order when none is asked for.
+export const CONTRAST_KINDS = Object.freeze(['meals', 'room', 'cancellation']);
+// A near-match, not a token cent difference.
+export const CONTRAST_MIN_SAVING_PERCENT = 3;
+const dropKey = option => JSON.stringify([option.roomName.trim().toLowerCase(), option.board.trim().toLowerCase(), option.freeCancellation]);
+// At most three, one per room name, meal plan and cancellation flag: the two best matched, then the nearest-priced Drop
+// (smallest saving of at least 3%, within the cap) that differs in exactly one way, the asked kind first. Without one, the third best matched.
+export function topDrops(baseline, candidates, optionOf = candidate => candidate, contrast) {
+  if (contrast !== undefined && !CONTRAST_KINDS.includes(contrast)) throw RangeError('Unknown Drop contrast.');
   const order = compareDrops(baseline); const seen = new Set();
-  return candidates.toSorted((a, b) => order(optionOf(a), optionOf(b))).filter(candidate => {
+  const ranked = candidates.toSorted((a, b) => order(optionOf(a), optionOf(b))).filter(candidate => {
+    const key = dropKey(optionOf(candidate)); if (seen.has(key)) return false; seen.add(key); return true;
+  });
+  const best = ranked.slice(0, 2); const taken = new Set(best.map(candidate => dropKey(optionOf(candidate))));
+  const near = candidates.filter(candidate => {
     const option = optionOf(candidate);
-    const key = JSON.stringify([option.roomName.trim().toLowerCase(), option.board.trim().toLowerCase(), option.freeCancellation]);
-    if (seen.has(key)) return false; seen.add(key); return true;
-  }).slice(0, 3);
+    return !taken.has(dropKey(option)) && option.indicativeDifferenceMinor * 100 >= baseline.quotedRetail.totalMinor * CONTRAST_MIN_SAVING_PERCENT
+      && withinSavingCap(baseline, option);
+  }).toSorted((a, b) => optionOf(a).indicativeDifferenceMinor - optionOf(b).indicativeDifferenceMinor || order(optionOf(a), optionOf(b)));
+  for (const kind of new Set([contrast ?? CONTRAST_KINDS[0], ...CONTRAST_KINDS])) {
+    const found = near.find(candidate => {
+      const match = dropMatch(baseline, optionOf(candidate));
+      return !match[kind] && CONTRAST_KINDS.every(other => other === kind || match[other]);
+    });
+    if (found) return [...best, found];
+  }
+  return ranked.slice(0, 3);
 }

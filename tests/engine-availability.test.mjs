@@ -69,6 +69,22 @@ test('engine Drops put the booked room type first and keep another room type onl
   assert.deepEqual(imageSources.drops.map(drop => drop.optionId), bundle.options.map(option => option.optionId));
 });
 
+test('engine Drops end on the asked one-way contrast, meals first when none is asked', () => {
+  const rates = engineRates('3135840', [
+    engineOffer({ id: 'a', room: 'Executive Suite', total: 2000, tiers: FREE_THEN_CHARGED }), engineOffer({ id: 'b', room: 'Executive, Suite', total: 2100, tiers: FREE_THEN_CHARGED }),
+    engineOffer({ id: 'c', room: 'Executive Suite', board: 'Room Only', total: 2200, tiers: FREE_THEN_CHARGED }), // 5.8% below
+    engineOffer({ id: 'd', room: 'Executive Suite', total: 2250, nonRefundable: true }), // 3.7% below
+  ]);
+  const third = contrast => {
+    const { bundle, imageSources } = engineDropBundle(siam(), rates, { checkedAt: CHECKED_AT, source: SOURCE, host: HOST, contrast });
+    assert.deepEqual(imageSources.drops.map(drop => drop.optionId), bundle.options.map(option => option.optionId));
+    return bundle.options.map(option => [option.roomName, option.board, option.freeCancellation]);
+  };
+  const best = [['Executive Suite', 'Breakfast', true], ['Executive, Suite', 'Breakfast', true]];
+  assert.deepEqual(third(), [...best, ['Executive Suite', 'Room Only', true]]);
+  assert.deepEqual(third('cancellation'), [...best, ['Executive Suite', 'Breakfast', false]]);
+});
+
 const SIAM_CARD = { code: 'AIRB000180', order: 1, cityName: 'Bangkok', scenarioLabel: 'Free cancellation', photo: null };
 const engineEntry = (offers = [engineOffer({ total: 1998, tiers: FREE_THEN_CHARGED })]) => {
   const { bundle, imageSources, capture } = engineDropBundle(siam(), engineRates('3135840', offers), { checkedAt: CHECKED_AT, source: SOURCE, host: HOST });

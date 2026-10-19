@@ -83,6 +83,20 @@ test('cheaper options rank the same room type first, then meals, then flexibilit
     ['ORIGINAL TWIN (Non-smoking)', 'Breakfast', true, 14000], ['New Twin', 'Breakfast', true, 7000], ['New Twin', 'Breakfast', false, 3500]]);
 });
 
+test('the third Drop is the asked one-way contrast, meals first when none is asked', () => {
+  const data = observation(); // New Twin at USD 80 is AED 70 (20%) below: another room type within the cap
+  add(data, 'a', 'Original Twin', 9000); add(data, 'b', 'Original Twin (Non-smoking)', 9200); // the two perfect matches
+  add(data, 'meals', 'Original Twin', 9500, { board: 'Room Only' }); // 5% below
+  add(data, 'flag', 'Original Twin', 9600, { freeCancellation: false }); // 4% below
+  const third = contrast => publicQuotationDemo(buildQuotationDemo(quotationBaseline(quote(), 'TEST-QUOTE'), data, contrast && { contrast })).options
+    .map(option => [option.roomName, option.board, option.freeCancellation, option.indicativeDifferenceMinor]);
+  const best = [['Original Twin', 'Breakfast', true, 3500], ['Original Twin (Non-smoking)', 'Breakfast', true, 2800]];
+  assert.deepEqual(third(), [...best, ['Original Twin', 'Room Only', true, 1750]]);
+  assert.deepEqual(third('cancellation'), [...best, ['Original Twin', 'Breakfast', false, 1400]]);
+  assert.deepEqual(third('room'), [...best, ['New Twin', 'Breakfast', true, 7000]]);
+  assert.throws(() => third('view'), RangeError);
+});
+
 test('with no cheaper plausible option the closest dearer ones stay, ranked the same way', () => {
   const data = observation(); data.offers[0].money.priceMinor = 11000;
   add(data, 'same', 'Original Twin', 12000, { freeCancellation: false });

@@ -123,7 +123,7 @@ export const SEARCH_POSTS = 4;
 export const SEARCH_INTERVAL_MS = 3000;
 // The same search body is re-posted (idempotent, results accumulate) until this hotel is in and every
 // hotel the engine counted has arrived; 0 of 0 counts as empty only once confirmed by a second post.
-export async function captureEngineDrops({ baseline, source, apiUrl, token, fetchImpl, now = () => new Date(), sleep }) {
+export async function captureEngineDrops({ baseline, source, apiUrl, token, fetchImpl, now = () => new Date(), sleep, contrast }) {
   if (!apiUrlAllowed(source, apiUrl)) fail('ENGINE_HOST_NOT_ALLOWED');
   const hotelId = baseline.hotel.id; const host = new URL(apiUrl).hostname;
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json;charset=UTF-8', Accept: 'application/json', 'X-Territory': TERRITORY };
@@ -139,17 +139,17 @@ export async function captureEngineDrops({ baseline, source, apiUrl, token, fetc
     searchId = data.search_id;
     if (data.hotels.length && data.hotels.length >= data.total) { found = data.hotels[0]; break; }
     if (!data.hotels.length && data.total === 0 && posts >= 2) {
-      return { ...engineDropBundle(baseline, { id: hotelId, offers: [] }, { checkedAt: now().toISOString(), source, host }), searchPosts: posts, hotelName: null };
+      return { ...engineDropBundle(baseline, { id: hotelId, offers: [] }, { checkedAt: now().toISOString(), source, host, contrast }), searchPosts: posts, hotelName: null };
     }
   }
   if (!found) fail('ENGINE_SEARCH_INCOMPLETE');
   const rates = await postJson(fetchImpl, `${apiUrl}/v2/products/hotels/availabilities/rates`, headers, { search_id: searchId, hotel_id: hotelId }, 'ENGINE_HTTP_FAILED');
-  return { ...engineDropBundle(baseline, rates, { checkedAt: now().toISOString(), source, host }), searchPosts: posts, hotelName: text(found.name) };
+  return { ...engineDropBundle(baseline, rates, { checkedAt: now().toISOString(), source, host, contrast }), searchPosts: posts, hotelName: text(found.name) };
 }
 
 // rates: the engine's `{ id, offers[] }` for this hotel. Returns the bundle, its photo source URLs
-// (kept beside the bundle, never renderable) and the capture record.
-export function engineDropBundle(baseline, rates, { checkedAt, source, host } = {}) {
+// (kept beside the bundle, never renderable) and the capture record. contrast picks the third Drop's one difference.
+export function engineDropBundle(baseline, rates, { checkedAt, source, host, contrast } = {}) {
   if (!plain(rates) || !Array.isArray(rates.offers) || rates.offers.length > 5000) fail('ENGINE_RATES_INVALID');
   if (rates.id !== undefined && String(rates.id) !== baseline.hotel.id) fail('ENGINE_HOTEL_MAPPING_UNVERIFIED');
   if (!Number.isFinite(Date.parse(checkedAt)) || !engineHostAllowed(source, host) || baseline.quotedRetail.currency !== CURRENCY) fail('ENGINE_CONTEXT_INVALID');
@@ -168,7 +168,7 @@ export function engineDropBundle(baseline, rates, { checkedAt, source, host } = 
       indicativeDifferenceMinor: baseline.quotedRetail.totalMinor - total.totalMinor };
     if (isDisplayedDrop(baseline, option) && withinSavingCap(baseline, option)) candidates.push({ option, url: plain(image) ? httpsUrl(image.url) : null, offerId: text(offer.id) });
   }
-  const chosen = topDrops(baseline, candidates, candidate => candidate.option);
+  const chosen = topDrops(baseline, candidates, candidate => candidate.option, contrast);
   const options = chosen.map(candidate => candidate.option);
   const view = { schemaVersion: 1, transactionMode: 'selection-only', baseline, options, checkedAt,
     completeness: 'observed-options-only', customerRefund: null, reservationCreated: false };

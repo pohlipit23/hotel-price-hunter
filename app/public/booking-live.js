@@ -13,7 +13,7 @@ export async function startBookingDemo(ui) {
   const instantLabel = value => new Date(value).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC';
   const adviser = createStayAdviser({ parent: $('comparison'), before: $('price-details'),
     overviewParent: $('deal-list').querySelector('.section-heading'), getData: () => data, chatUrl: () => api('chat') });
-  const explanation = 'Estimated savings before final pricing and fees. Full cancellation terms and room matching still need verification.';
+  const explanation = 'Estimated savings before final pricing and fees.';
   const judgeScreens = { start: 'catalogue-screen', booked: 'booked-screen', setup: 'setup-screen', checking: 'checking-screen', launch: 'launch-screen', closeout: 'closeout-screen' };
   const stepIndex = catalogueMode ? { booked: 0, setup: 1, checking: 1, options: 2, review: 3, confirmed: 4 } : { options: 0, review: 1, confirmed: 2 };
   const routes = { start: 'start', booked: 'booked', setup: 'setup', options: 'drops', review: 'review', confirmed: 'confirmed', closeout: 'done' };
@@ -75,7 +75,7 @@ export async function startBookingDemo(ui) {
     }, launchMs());
   };
   const focusHeading = id => { if (launchTimer) pendingFocus = $(id); else $(id).focus({ preventScroll: true }); };
-  const termText = offer => offer.option.freeCancellation === true ? 'Free cancellation flag · full terms to check'
+  const termText = offer => offer.option.freeCancellation === true ? 'Free cancellation*'
     : offer.option.freeCancellation === false ? 'Non-refundable' : 'Cancellation terms to check';
   function photoContent(photo, onFallback = () => {}) {
     const frame = node('span', undefined, 'stay-photo');
@@ -121,7 +121,7 @@ export async function startBookingDemo(ui) {
       changeTile('Room', offer.room.name, 'room', labels.room),
       changeTile('Meals', offer.option.board, 'meals', labels.meals),
       changeTile('Cancellation', termText(offer), 'cancellation', labels.cancellation));
-    $('cancellation-summary').textContent = 'Room matching and full cancellation terms still need checking.';
+    $('cancellation-summary').textContent = offer.option.freeCancellation === true ? "*Subject to the hotel's full cancellation terms." : '';
     const details = [['Current room', view.booking.room.name], ['Selected room', offer.room.name],
       ['Meals', offer.option.board],
       ...(data.baseline.quotedSource ? [['Original source amount', data.baseline.quotedSource.currency + ' ' +
@@ -190,8 +190,6 @@ export async function startBookingDemo(ui) {
     }
     $('offer-empty').hidden = view.highlights.length > 0;
     $('lower-minimum').hidden = !catalogueMode || replay.status !== 'empty';
-    // With drops showing, this is the way back to the minimum (the empty state has its own "Lower my minimum").
-    $('drops-minimum').hidden = !catalogueMode || !data.watch || view.highlights.length === 0;
     $('offer-empty').textContent = replay?.status === 'unavailable' ? 'Drops are unavailable right now. Reload to try again.'
       : catalogueMode ? 'No drops above your minimum yet. Your original booking stays active.' :'No lower rates in the latest check. Your current booking stays unchanged.';
     if (catalogueMode && data.watch) {
@@ -227,7 +225,10 @@ export async function startBookingDemo(ui) {
   });
   const chrome = () => {
     $('changes-title').textContent = 'Find your next drop';
-    document.querySelector('.savings-explanation').textContent = 'Estimated savings for the whole stay · before final pricing and fees';
+    const heading = $('deal-list').querySelector('.section-heading');
+    // The judge's Drops page opens on the cards: only the heading stays, for screen readers and as the focus target.
+    if (catalogueMode) { heading.replaceChildren($('changes-title')); heading.classList.add('sr-only'); }
+    else heading.querySelector('.savings-explanation').textContent = 'Estimated savings for the whole stay · before final pricing and fees';
     document.querySelector('.demo-tag').textContent = catalogueMode ? 'Judge demo' : 'Booking demo';
     // The judge bar carries the demo label in catalogue mode, outside the app frame.
     document.querySelector('.demo-tag').hidden = catalogueMode; $('judge-bar').hidden = !catalogueMode;
@@ -345,7 +346,6 @@ export async function startBookingDemo(ui) {
   $('arm-watch').addEventListener('click', arm);
   $('judge-consent').addEventListener('change', () => { $('setup-message').textContent = ''; $('setup-message').classList.remove('error'); });
   $('change-minimum').addEventListener('click', () => go('setup', code)); $('lower-minimum').addEventListener('click', () => go('setup', code));
-  $('drops-minimum').addEventListener('click', () => go('setup', code));
   // The "What next?" pick ends the app: it is not stored server side, only remembered in this tab for the closeout.
   const choiceKey = () => 'roomdrop-closeout-' + code;
   const savedChoice = () => { try { return sessionStorage.getItem(choiceKey()); } catch { return null; } };

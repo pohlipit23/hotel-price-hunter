@@ -5,6 +5,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { authenticateGateway, createGateway } from '../app/gateway.mjs';
 import { normaliseGatewayRates } from '../app/domain/gateway-rates.mjs';
 import { buildQuotationDemo } from '../app/domain/quotation-demo.mjs';
+import { CONTRAST_KINDS } from '../app/public/room-match.js';
 import { AGENCY_SEARCH_CONTEXT, altovoBaseline, watchBlocker } from '../app/domain/altovo-quotation.mjs';
 import { captureEngineDrops, ENGINE_PROFILES, ENGINE_SEARCH_DEFAULTS, loginEngine, parseEngineCredentials } from '../app/domain/engine-availability.mjs';
 
@@ -20,11 +21,19 @@ async function credentialText(path) {
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const blocked = code => Object.assign(Error(), { code });
 const CODE = /^[A-Z0-9]{4,20}$/;
-const PREFIXES = ['--gateway-credentials-file=', '--projections=', '--approved-codes=', '--source=', '--engine-credentials-file=', '--engine-profile='];
+const PREFIXES = ['--gateway-credentials-file=', '--projections=', '--approved-codes=', '--source=', '--engine-credentials-file=', '--engine-profile=', '--contrast='];
 const sleepFor = ms => new Promise(done => setTimeout(done, ms));
 // Loose, display-only check that the engine returned the hotel the quotation names; null when the engine named none.
 const sameHotelName = (a, b) => { const words = value => String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   return a && b ? words(a).includes(words(b)) || words(b).includes(words(a)) : null; };
+// --contrast=CODE:kind,...: the one way an approved code's third Drop differs from the booking; codes left out use the default order.
+export function parseContrasts(text, approved) {
+  if (text === undefined) return {};
+  const pairs = text.split(',').map(pair => pair.split(':'));
+  if (pairs.some(pair => pair.length !== 2 || !approved.includes(pair[0]) || !CONTRAST_KINDS.includes(pair[1]))
+    || new Set(pairs.map(pair => pair[0])).size !== pairs.length) throw blocked('CONTRAST_INVALID');
+  return Object.fromEntries(pairs);
+}
 export const SEARCH_DEFAULTS = Object.freeze({ nationality: AGENCY_SEARCH_CONTEXT.nationality, countryResidence: AGENCY_SEARCH_CONTEXT.countryResidence,
   occupancy: AGENCY_SEARCH_CONTEXT.occupancy, source: AGENCY_SEARCH_CONTEXT.source });
 
@@ -99,10 +108,13 @@ export async function main(args = process.argv.slice(2), { env = process.env, fe
     const approvedText = value(PREFIXES[2]);
     if (approvedText === undefined) {
       report.requirements = ['Owner-approved air1 code list (--approved-codes=CODE,CODE)', 'Allowlisted Altovo projections in .local/altovo-sample',
-        'Owner-selected Gateway credential file (only with --execute)', 'Local read-only preparation']; return report;
+        'Owner-selected Gateway credential file (only with --execute)', 'Local read-only preparation',
+        'Optional: the one way each code\'s third Drop differs (--contrast=CODE:meals|room|cancellation,...), else meals, room, cancellation'];
+      return report;
     }
     const approved = approvedText.split(',');
     if (!approved.every(code => CODE.test(code)) || new Set(approved).size !== approved.length) throw blocked('APPROVED_CODES_INVALID');
+    const contrasts = parseContrasts(value(PREFIXES[6]), approved);
     const execute = args.includes('--execute');
     if (execute && (env.NODE_ENV === 'production' || env.K_SERVICE || env.CLOUD_RUN_JOB)) throw Error();
     const projectionDir = resolve(root, value(PREFIXES[1]) ?? '.local/altovo-sample');
@@ -113,7 +125,7 @@ export async function main(args = process.argv.slice(2), { env = process.env, fe
     if (!execute) {
       Object.assign(report, { mode: 'dry-run', status: 'validated', searchDefaults: engineSource ? ENGINE_SEARCH_DEFAULTS : SEARCH_DEFAULTS,
         entries: plan.map(({ baseline, blocker }) => ({ code: baseline.quotationCode, hotel: baseline.hotel.name, blocker, plannedSearch: !blocker,
-          ...(engineSource ? { engineHotelId: baseline.hotel.id } : {}) })) });
+          ...(engineSource ? { engineHotelId: baseline.hotel.id } : {}), ...(contrasts[baseline.quotationCode] ? { contrast: contrasts[baseline.quotationCode] } : {}) })) });
       return report;
     }
     const gatewayFile = value(PREFIXES[0]);
@@ -140,7 +152,8 @@ export async function main(args = process.argv.slice(2), { env = process.env, fe
       } else if (engineSource) {
         // One sign-in for the whole run; a rejected call is never retried or re-signed.
         engine.token ??= await loginEngine({ credentials: engine.credentials, iamUrl: engine.iamUrl, fetchImpl });
-        const captured = await captureEngineDrops({ baseline, source: engine.source, apiUrl: engine.apiUrl, token: engine.token, fetchImpl, now, sleep });
+        const captured = await captureEngineDrops({ baseline, source: engine.source, apiUrl: engine.apiUrl, token: engine.token, fetchImpl, now, sleep,
+          contrast: contrasts[baseline.quotationCode] });
         ({ bundle, capture, imageSources } = captured);
         engineFacts.set(baseline.quotationCode, { engineHotelId: baseline.hotel.id, engineHotelNameMatches: sameHotelName(captured.hotelName, baseline.hotel.name),
           searchPosts: captured.searchPosts });
@@ -160,7 +173,7 @@ export async function main(args = process.argv.slice(2), { env = process.env, fe
           session_id: randomUUID(), user_agent: 'RoomDrop-altovo-catalogue', nationality: b.searchContext.nationality, language_code: 'en-US', country_residence: b.searchContext.countryResidence };
         const response = await gateway.searchById(query);
         const observation = normaliseGatewayRates(response, { input: query, checkedAt: now().toISOString() });
-        bundle = buildQuotationDemo(baseline, observation);
+        bundle = buildQuotationDemo(baseline, observation, { contrast: contrasts[baseline.quotationCode] });
         imageSources = gatewayImageSources(response, bundle);
         // A successful search with no offers is a valid empty capture, recorded as such; a failed
         // search never reaches this point, so it cannot be mistaken for an empty one.
@@ -176,7 +189,8 @@ export async function main(args = process.argv.slice(2), { env = process.env, fe
     await writeFile(path, JSON.stringify({ schemaVersion: 1, preparedAt: checkedAt.toISOString(), entries }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
     Object.assign(report, { mode: 'altovo-quotation-catalogue', status: 'prepared', privateCatalogue: path,
       entries: entries.map(entry => ({ code: entry.code, hotel: entry.bundle.baseline.hotel.name, blocker: entry.blocker, capture: entry.capture.status,
-        optionCount: entry.bundle.options.length, imageSources: imageSummary(entry.imageSources), ...engineFacts.get(entry.code) })) });
+        optionCount: entry.bundle.options.length, imageSources: imageSummary(entry.imageSources), ...engineFacts.get(entry.code),
+        ...(contrasts[entry.code] ? { contrast: contrasts[entry.code] } : {}) })) });
   } catch (error) {
     report.status = 'blocked'; report.reason = typeof error.code === 'string' && /^[A-Z_]+$/.test(error.code) ? error.code : 'ALTOVO_CATALOGUE_PREPARATION_FAILED';
     // A failed capture is named by quotation code, so it is never mistaken for an empty one.
