@@ -130,3 +130,23 @@ test('quotation hosted entrypoint serves the curated RoomDrop page with durable 
     assert.equal(response.status, 200); assert.equal((await response.json()).entries.length, 2);
   } finally { await app.stop(); }
 });
+
+test('hosted Drop email stays off by default; on, it needs a full config and never the capture transport', async () => {
+  const on = { ...environment(), DROP_MAIL_ENABLED: 'true', DROP_MAIL_FROM: 'drops@roomdrop.example', MAIL_PEPPER: 'p'.repeat(40), DROP_MAIL_TRANSPORT: 'disabled' };
+  assert.doesNotThrow(() => validateCloudQuotationMode(on));
+  assert.doesNotThrow(() => validateCloudQuotationMode({ ...environment(), DROP_MAIL_ENABLED: 'false' }));
+  for (const patch of [{ DROP_MAIL_TRANSPORT: 'capture' }, { DROP_MAIL_ENABLED: 'on' }, { MAIL_PEPPER: '' }, { DROP_MAIL_FROM: undefined }]) {
+    assert.throws(() => validateCloudQuotationMode({ ...on, ...patch }), /exact private customer Cloud Run profile/);
+  }
+  let received; const signals = new EventEmitter(), server = new EventEmitter();
+  server.close = callback => callback(); server.closeAllConnections = () => {};
+  const start = (env, mailStore) => startHostedDemo({ environment: env, signals,
+    storesFactory: async () => ({ bookingStorage: {}, sessionStorage: {}, ...(mailStore ? { mailStore } : {}), close: async () => {} }),
+    catalogueLoader: async () => ({ entries: [{}] }), advisorFactory: async () => ({ available: false }),
+    serverFactory: options => { received = options; return server; }, listen: async () => {}, log: () => {} });
+  await (await start(environment())).stop(); assert.equal(Object.hasOwn(received, 'mail'), false);
+  const mailStore = { reserve() {}, peek() {}, claim() {} };
+  await (await start(on, mailStore)).stop(); assert.equal(received.mail.store, mailStore);
+  // Enabled without its store, startup is refused rather than silently running without the caps.
+  await assert.rejects(start(on));
+});
