@@ -1013,10 +1013,29 @@ Judges can run a Drop from their inbox. Branch `wip/drop-mail`; provider-agnosti
   passes at 320, 768, 1024 and 1440 px (render, fresh-context redeem, approve).
 - [x] Config: `DROP_MAIL_ENABLED` (off by default), `DROP_MAIL_FROM`, `MAIL_PEPPER`,
   `DROP_MAIL_TRANSPORT` (hosted: `disabled` only) in `validateCloudQuotationMode`.
-- [ ] Choose and implement the provider transport (Google-native or Cloudflare), with
-  scheduling at sendAt or a deferral queue, sender domain SPF/DKIM/DMARC.
-- [ ] Provision `MAIL_PEPPER` as a secret and Firestore TTL policies on `ttlAt` for the
-  four Drop mail collections.
+- [x] Provider chosen: Cloudflare Email Service from `roomdrop@mail.08-08-08.com`, delayed by
+  Google Cloud Tasks. `cloudflare` transport (REST send, bearer token, 5 s timeout), `cloud-tasks`
+  deferral (task named by mailId at now + 60 s, OIDC to `/internal/drop-mail/send`, which checks
+  audience, issuer and invoker before sending once) and `inline` deferral for local runs.
+  Env: `DROP_MAIL_TRANSPORT=cloudflare`, `DROP_MAIL_DEFERRAL=cloud-tasks`, `CLOUDFLARE_ACCOUNT_ID`,
+  `CLOUDFLARE_EMAIL_TOKEN`, `DROP_MAIL_TASKS_QUEUE`, `DROP_MAIL_TASKS_INVOKER`. Evidence:
+  `tests/drop-mail-providers.test.mjs` 5/5 with stubbed fetch, tokens and ID token checks.
+
+Owner setup (open; nothing below has been run). Project `sincere-apex-511418-p0`, region `asia-southeast1`.
+
+- [ ] Cloudflare: in the dashboard, Email Service > Sending, onboard only the subdomain
+  `mail.08-08-08.com` and add the DNS records it lists (SPF, DKIM, DMARC on `mail.`); leave the
+  root MX (Purelymail) untouched. Email Sending is beta on the Workers Paid plan.
+- [ ] Cloudflare: create an account API token with only the email sending permission for this
+  account (a 403 with code 10102 means it lacks it) and note the 32-character account ID.
+- [ ] Enable APIs: `gcloud services enable cloudtasks.googleapis.com secretmanager.googleapis.com --project sincere-apex-511418-p0`
+- [ ] Secrets (typed, no trailing newline): `$f = New-TemporaryFile; Read-Host -MaskInput 'Cloudflare token' | Set-Content $f -NoNewline; gcloud secrets create roomdrop-cloudflare-email-token --data-file $f --replication-policy automatic --project sincere-apex-511418-p0; Remove-Item $f`
+  and `$f = New-TemporaryFile; [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48)) | Set-Content $f -NoNewline; gcloud secrets create roomdrop-mail-pepper --data-file $f --replication-policy automatic --project sincere-apex-511418-p0; Remove-Item $f`
+- [ ] Queue: `gcloud tasks queues create roomdrop-drop-mail --location asia-southeast1 --max-attempts 5 --max-dispatches-per-second 5 --project sincere-apex-511418-p0`
+- [ ] Invoker service account: `gcloud iam service-accounts create roomdrop-tasks --display-name "RoomDrop Drop email tasks" --project sincere-apex-511418-p0`
+- [ ] IAM: `$sa = gcloud run services describe hotel-price-hunter --region asia-southeast1 --project sincere-apex-511418-p0 --format "value(spec.template.spec.serviceAccountName)"; $inv = 'roomdrop-tasks@sincere-apex-511418-p0.iam.gserviceaccount.com'; gcloud run services add-iam-policy-binding hotel-price-hunter --region asia-southeast1 --member "serviceAccount:$inv" --role roles/run.invoker --project sincere-apex-511418-p0; gcloud tasks queues add-iam-policy-binding roomdrop-drop-mail --location asia-southeast1 --member "serviceAccount:$sa" --role roles/cloudtasks.enqueuer --project sincere-apex-511418-p0; gcloud iam service-accounts add-iam-policy-binding $inv --member "serviceAccount:$sa" --role roles/iam.serviceAccountUser --project sincere-apex-511418-p0; foreach ($s in 'roomdrop-cloudflare-email-token', 'roomdrop-mail-pepper') { gcloud secrets add-iam-policy-binding $s --member "serviceAccount:$sa" --role roles/secretmanager.secretAccessor --project sincere-apex-511418-p0 }`
+  (if the describe prints nothing, the service runs as the default compute account; use that).
+- [ ] Firestore TTL on `ttlAt`: `foreach ($c in 'roomdropDropMailV1', 'roomdropDropMailSessionsV1', 'roomdropDropMailLedgerV1', 'roomdropDropMailCapacityV1', 'roomdropDropMailSentV1') { gcloud firestore fields ttls update ttlAt --collection-group $c --enable-ttl --async --project sincere-apex-511418-p0 }`
 - [ ] v7 deploy script with the Drop email environment.
 - [ ] Live mail acceptance: arm, receive within about a minute, open on another device, approve.
 - [ ] Hide or reword the address field while Drop email is off in production.
