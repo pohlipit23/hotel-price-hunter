@@ -500,7 +500,7 @@ Historical pre-integration component record (18 October, contract v1):
   `sha256:9333e743...`, v6c manifest pins, emulator smoke passed; owner-run
   `.local\deploy-roomdrop-v6d.ps1` refreshed preservation/import/rollback and
   serves hotel-price-hunter-00024-twg at 100%. TTL enabled 19 Oct (see below); the
-  same image now serves as restart probe revision 00025-5bg.
+  same image now serves as revision 00026-xgz.
 
 Those component proofs alone did not close acceptance. The authorised merge record below supersedes their integration blockers.
 Evidence and commands: `docs\public-demo-firestore-verification.md` (Part 2) and
@@ -541,12 +541,13 @@ Contract v3 follow-up (Part 2 only):
   Superseded 18 Oct: the user authorised merges b1eda30, f47960e and 5eaf0ae, which
   include the owner-authored optional revision fix (8423825).
 
-- [ ] Plan approval (given 18 October 2026) precedes coding; local checks and raw
+- [x] Plan approval (given 18 October 2026) precedes coding; local checks and raw
   acceptance evidence are complete. The full catalogue content matrix (S0) remains
   unchecked until supplied and captured; storage mechanics alone do not complete it.
   Note 19 Oct: production holds the six-booking v6c catalogue (179 cannot-start,
   180-183 and 185 watchable). The S0.4 gaps (closing soon, non-MYR, multi-night,
   multi-adult) are still uncovered unless the user waives them.
+  Waived 19 Oct: the user waived the S0.4 gaps; the six-booking v6c catalogue is final.
 - [x] Present exact production import, image/configuration, session TTL and rollback
   commands for approval. Preserve existing visitor/agency/watch data and private
   access boundaries; never commit `.local\` or merge the research branches.
@@ -571,8 +572,9 @@ Contract v3 follow-up (Part 2 only):
   same-cookie persistence (session stored under sha256(cookie) with `ttlAt`). With user
   approval, restart probe revision hotel-price-hunter-00025-5bg (env RESTART_PROBE only,
   same image) took 100% traffic and `--after-restart` passed (AIRB000180 watch revision 1).
-  00025-5bg now serves; rollback targets are 00024-twg and 00023-vf2. Evidence:
-  `.local\live-acceptance`.
+  Then 00026-xgz (same image, probe env removed) took 100% traffic and a rerun of
+  `tests\live-acceptance.mjs` passed with no errors; rollback targets are 00025-5bg
+  and 00024-twg. Evidence: `.local\live-acceptance`.
 
 ### Authorised d14f70f integration - current local acceptance
 
