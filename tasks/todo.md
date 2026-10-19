@@ -1021,26 +1021,40 @@ Judges can run a Drop from their inbox. Branch `wip/drop-mail`; provider-agnosti
   `CLOUDFLARE_EMAIL_TOKEN`, `DROP_MAIL_TASKS_QUEUE`, `DROP_MAIL_TASKS_INVOKER`. Evidence:
   `tests/drop-mail-providers.test.mjs` 5/5 with stubbed fetch, tokens and ID token checks.
 
-Owner setup (open; nothing below has been run). Project `sincere-apex-511418-p0`, region `asia-southeast1`.
+Owner setup. Project `sincere-apex-511418-p0`, region `asia-southeast1`. All of it verified read-only on
+19 Oct by the v7 preflight (snapshots in `.local/deploy-preflight/v7/`).
 
 - [x] Cloudflare: in the dashboard, Email Service > Sending, onboard only the subdomain
   `mail.09-09-09.com` and add the DNS records it lists (SPF, DKIM, DMARC on `mail.`).
   Email Sending is beta on the Workers Paid plan.
   Done 19 Oct by the owner: `cf-bounce.mail.09-09-09.com` MX and SPF and
   `_dmarc.mail.09-09-09.com` resolve (zone on Cloudflare DNS).
-- [ ] Cloudflare: create an account API token with only the email sending permission for this
+- [x] Cloudflare: create an account API token with only the email sending permission for this
   account (a 403 with code 10102 means it lacks it) and note the 32-character account ID.
   Partial 19 Oct: the owner created a token (`/user/tokens/verify` returns active); the token
   cannot read accounts or zones, so the account ID is still needed from the dashboard.
-- [ ] Enable APIs: `gcloud services enable cloudtasks.googleapis.com secretmanager.googleapis.com --project sincere-apex-511418-p0`
-- [ ] Secrets (typed, no trailing newline): `$f = New-TemporaryFile; Read-Host -MaskInput 'Cloudflare token' | Set-Content $f -NoNewline; gcloud secrets create roomdrop-cloudflare-email-token --data-file $f --replication-policy automatic --project sincere-apex-511418-p0; Remove-Item $f`
+  Done 19 Oct: account ID `767552e0d28f29e846d07a6d05a2f51d`; the owner verified the token can call the send endpoint.
+- [x] Enable APIs: `gcloud services enable cloudtasks.googleapis.com secretmanager.googleapis.com --project sincere-apex-511418-p0`
+- [x] Secrets (typed, no trailing newline): `$f = New-TemporaryFile; Read-Host -MaskInput 'Cloudflare token' | Set-Content $f -NoNewline; gcloud secrets create roomdrop-cloudflare-email-token --data-file $f --replication-policy automatic --project sincere-apex-511418-p0; Remove-Item $f`
   and (works in Windows PowerShell 5.1 too) `$b = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); $f = New-TemporaryFile; [Convert]::ToBase64String($b) | Set-Content $f -NoNewline; gcloud secrets versions add roomdrop-mail-pepper --data-file $f --project sincere-apex-511418-p0; Remove-Item $f`
-  Partial 19 Oct: the token secret has version 1; `roomdrop-mail-pepper` exists with no version yet.
-- [ ] Queue: `gcloud tasks queues create roomdrop-drop-mail --location asia-southeast1 --max-attempts 5 --max-dispatches-per-second 5 --project sincere-apex-511418-p0`
-- [ ] Invoker service account: `gcloud iam service-accounts create roomdrop-tasks --display-name "RoomDrop Drop email tasks" --project sincere-apex-511418-p0`
-- [ ] IAM: `$sa = gcloud run services describe hotel-price-hunter --region asia-southeast1 --project sincere-apex-511418-p0 --format "value(spec.template.spec.serviceAccountName)"; $inv = 'roomdrop-tasks@sincere-apex-511418-p0.iam.gserviceaccount.com'; gcloud run services add-iam-policy-binding hotel-price-hunter --region asia-southeast1 --member "serviceAccount:$inv" --role roles/run.invoker --project sincere-apex-511418-p0; gcloud tasks queues add-iam-policy-binding roomdrop-drop-mail --location asia-southeast1 --member "serviceAccount:$sa" --role roles/cloudtasks.enqueuer --project sincere-apex-511418-p0; gcloud iam service-accounts add-iam-policy-binding $inv --member "serviceAccount:$sa" --role roles/iam.serviceAccountUser --project sincere-apex-511418-p0; foreach ($s in 'roomdrop-cloudflare-email-token', 'roomdrop-mail-pepper') { gcloud secrets add-iam-policy-binding $s --member "serviceAccount:$sa" --role roles/secretmanager.secretAccessor --project sincere-apex-511418-p0 }`
+  Done 19 Oct: both secrets have version 1 ENABLED with secretAccessor for the runtime account.
+- [x] Queue: `gcloud tasks queues create roomdrop-drop-mail --location asia-southeast1 --max-attempts 5 --max-dispatches-per-second 5 --project sincere-apex-511418-p0`
+- [x] Invoker service account: `gcloud iam service-accounts create roomdrop-tasks --display-name "RoomDrop Drop email tasks" --project sincere-apex-511418-p0`
+- [x] IAM: `$sa = gcloud run services describe hotel-price-hunter --region asia-southeast1 --project sincere-apex-511418-p0 --format "value(spec.template.spec.serviceAccountName)"; $inv = 'roomdrop-tasks@sincere-apex-511418-p0.iam.gserviceaccount.com'; gcloud run services add-iam-policy-binding hotel-price-hunter --region asia-southeast1 --member "serviceAccount:$inv" --role roles/run.invoker --project sincere-apex-511418-p0; gcloud tasks queues add-iam-policy-binding roomdrop-drop-mail --location asia-southeast1 --member "serviceAccount:$sa" --role roles/cloudtasks.enqueuer --project sincere-apex-511418-p0; gcloud iam service-accounts add-iam-policy-binding $inv --member "serviceAccount:$sa" --role roles/iam.serviceAccountUser --project sincere-apex-511418-p0; foreach ($s in 'roomdrop-cloudflare-email-token', 'roomdrop-mail-pepper') { gcloud secrets add-iam-policy-binding $s --member "serviceAccount:$sa" --role roles/secretmanager.secretAccessor --project sincere-apex-511418-p0 }`
   (if the describe prints nothing, the service runs as the default compute account; use that).
-- [ ] Firestore TTL on `ttlAt`: `foreach ($c in 'roomdropDropMailV1', 'roomdropDropMailSessionsV1', 'roomdropDropMailLedgerV1', 'roomdropDropMailCapacityV1', 'roomdropDropMailSentV1') { gcloud firestore fields ttls update ttlAt --collection-group $c --enable-ttl --async --project sincere-apex-511418-p0 }`
-- [ ] v7 deploy script with the Drop email environment.
+- [x] Firestore TTL on `ttlAt`: `foreach ($c in 'roomdropDropMailV1', 'roomdropDropMailSessionsV1', 'roomdropDropMailLedgerV1', 'roomdropDropMailCapacityV1', 'roomdropDropMailSentV1') { gcloud firestore fields ttls update ttlAt --collection-group $c --enable-ttl --async --project sincere-apex-511418-p0 }`
+  Done: all five mail groups and `roomdropPublicSessionsV1` show ACTIVE (19 Oct).
+- [x] v7 deploy script with the Drop email environment: `.local/deploy-roomdrop-v7.ps1` (owner-run;
+  gates PUSH, DEPLOY, SWITCH, SMOKE; no import, the v6c pins stay latest). Read-only preflight checks the
+  source pin, secrets, queue, invoker, grants, TTL ACTIVE and the 00026-xgz baseline; DEPLOY adds the seven
+  `DROP_MAIL_*`/`CLOUDFLARE_ACCOUNT_ID` variables and `CLOUDFLARE_EMAIL_TOKEN`/`MAIL_PEPPER` pinned to
+  version 1, then checks the revision's own Ready condition; SWITCH moves traffic by name; SMOKE runs the
+  v6d HTTP checks plus `tests/live-acceptance.mjs --mail=<typed address>`. Source `de6bea8`, image
+  `sha256:7f9e7570...84d4`, amd64 manifest `sha256:213eca3f...3b53`. Evidence 19 Oct: `node --test`
+  451 pass 0 fail; emulator browser test, `v6c-image-smoke.mjs` and the new `v7-mail-smoke.mjs` (prod mail
+  env in the image, stubbed Cloud Tasks and Cloudflare: scheduled, OIDC callback sends once, inbox link
+  opens a fork) pass; dry run with STOP stops at PUSH after a green preflight.
+- [x] `tests/live-acceptance.mjs --mail=<address>`: judge A arms with that address and the check reports
+  the masked address and `delivery.status`; without it no address is typed, so no email can be sent.
 - [ ] Live mail acceptance: arm, receive within about a minute, open on another device, approve.
 - [ ] Hide or reword the address field while Drop email is off in production.
