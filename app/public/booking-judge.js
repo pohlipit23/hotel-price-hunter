@@ -35,11 +35,24 @@ export function deliveryEmailField(value, { remove = false } = {}) {
 // The masked saved address from the committed receipt; the full address never reaches the page.
 export function savedDelivery(data) { return data?.watch?.delivery?.maskedEmail ?? null; }
 // The hand-off after the committed "Drop Watch armed" receipt: the judge leaves the booking site for the app.
+// Only an email the server handed over (scheduled or sent) is promised; any other status says it was not sent.
 export function handoffCopy(data) {
   if (!data?.watch) return null;
+  const email = savedDelivery(data); const status = data.watch.delivery?.status;
+  const mailed = Boolean(email) && ['scheduled', 'sent'].includes(status);
   return { title: 'Drop Watch armed', lead: "You're leaving the booking site.",
-    text: 'In real life your drop arrives by email. For this demo we open the RoomDrop app now.', email: savedDelivery(data), action: 'Open RoomDrop' };
+    text: mailed ? 'Check your inbox in about a minute. For this demo we open the RoomDrop app now.'
+      : 'In real life your drop arrives by email. For this demo we open the RoomDrop app now.',
+    email, emailNote: !email ? null : mailed ? 'Emailing ' + email : 'Saved for ' + email + (status === 'pending-service' ? ' · not sent yet' : ' · not sent'),
+    action: 'Open RoomDrop' };
 }
+// A Drop email link, #inbox-CODE~TOKEN, or null. The token is a 43-character base64url secret: the page strips
+// it from the address bar at once and only ever sends it in one POST body.
+export function inboxLink(hash) {
+  const match = /^#inbox-([A-Z0-9]{4,20})~([A-Za-z0-9_-]{43})$/.exec(hash ?? '');
+  return match ? { code: match[1], token: match[2] } : null;
+}
+export const INBOX_GONE = 'That email link has expired or was used up. Pick a booking to start a new Drop Watch.';
 const blockers = {
   NON_REFUNDABLE: ['non-refundable', 'This booking is non-refundable', 'A cheaper room only helps if this booking can be cancelled for free. This one cannot, so there is nothing to watch.'],
   NO_FREE_CANCELLATION: ['no free cancellation', 'No free cancellation on this booking', 'Every cancellation here costs money, so a cheaper room would not save anything.'],
@@ -317,7 +330,7 @@ export function createJudgeScreens(ui) {
       $('checking-title').textContent = copy.title;
       $('checking-status').replaceChildren(node('span', copy.title + '. ', 'sr-only'), copy.lead);
       $('handoff-text').textContent = copy.text;
-      $('handoff-email').hidden = !copy.email; $('handoff-email').textContent = copy.email ? 'Saved for ' + copy.email + ' · not sent yet' : '';
+      $('handoff-email').hidden = !copy.email; $('handoff-email').textContent = copy.emailNote ?? '';
       $('open-roomdrop-label').textContent = copy.action; $('handoff').hidden = false;
       // Only the modal scrolls, so the button may bring itself into view on short screens.
       $('open-roomdrop').focus();

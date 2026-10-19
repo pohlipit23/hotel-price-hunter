@@ -9,6 +9,8 @@ import { minorDigits } from '../public/drop-watch.js';
 export const REPLAY_LABEL = 'Replayed from a captured price check. Not a live price.';
 const C = { page: '#eef4f9', surface: '#ffffff', ink: '#202c3b', muted: '#52657b', coral: '#c2402f', blue: '#2f5d8f', line: '#d5dee8',
   green: '#0b5e40', greenBg: '#dff3e8', blueBg: '#dbe8f7', roomInk: '#23466e' };
+// The logo PNG is drawn on this cream paper, so its badge uses the same colour and the edges disappear.
+const LOGO_PAPER = '#fefbf6';
 const HEADING = "'Bricolage Grotesque', 'Trebuchet MS', 'Segoe UI', Arial, sans-serif";
 const BODY = "'DM Sans', 'Segoe UI', Helvetica, Arial, sans-serif";
 const CODE = /^[A-Z0-9]{4,20}$/;
@@ -93,7 +95,7 @@ export function dropMailMessage(facts) {
 <p style="margin:2px 0 0;color:${C.muted};font:400 13px/1.35 ${BODY};">${escape(stayLabel(stay))}</p>
 </td>
 <td width="98" valign="middle" style="width:98px;">${found ? stamp({ label: 'Drop', amount: saving, unit: currency, filled: drops.length > 1 })
-    : stamp({ label: 'Still', amount: 'Watching', unit: '', filled: false })}</td>
+    : stamp({ label: 'Still', amount: 'On', unit: 'Watching', filled: false })}</td>
 </tr></table></td></tr>`;
   const tear = `<tr><td style="padding:0 22px;"><div style="border-top:2px dashed ${C.line};height:0;line-height:0;font-size:0;">&nbsp;</div></td></tr>`;
   const detail = found ? `<tr><td style="padding:16px 22px 4px;">
@@ -137,7 +139,9 @@ ${more > 0 ? `<p style="margin:10px 0 0;color:${C.blue};font:700 14px/1.4 ${BODY
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.page}" style="border-collapse:collapse;background:${C.page};">
 <tr><td align="center" style="padding:24px 10px 32px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:560px;">
-<tr><td align="center" style="padding:0 0 18px;"><a href="${escape(origin)}/" style="text-decoration:none;"><img src="${escape(origin)}/assets/roomdrop-logo.png" width="150" alt="RoomDrop" style="display:block;width:150px;height:auto;border:0;"></a></td></tr>
+<tr><td align="center" style="padding:0 0 18px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="border-collapse:separate;"><tr><td bgcolor="${LOGO_PAPER}" style="border-radius:16px;background:${LOGO_PAPER};padding:2px 14px;box-shadow:0 4px 12px rgba(32,44,59,.06);">
+<a href="${escape(origin)}/" style="text-decoration:none;"><img src="${escape(origin)}/assets/roomdrop-logo.png" width="140" alt="RoomDrop" style="display:block;width:140px;height:auto;border:0;"></a></td></tr></table></td></tr>
 <tr><td style="border-radius:20px;background:${C.surface};box-shadow:0 8px 18px rgba(32,44,59,.07);">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-radius:20px;overflow:hidden;background:${C.surface};">
 <tr><td style="padding:0;">${airmail()}</td></tr>

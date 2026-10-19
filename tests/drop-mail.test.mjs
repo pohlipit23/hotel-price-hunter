@@ -55,7 +55,7 @@ test('with nothing above the minimum the email says so honestly: no saving, no s
   const message = dropMailMessage(await facts(10_000_00));
   assert.equal(message.kind, 'nothing-yet');
   assert.equal(message.subject, 'No drop yet on your Siam Kempinski Hotel Bangkok stay');
-  assert.match(message.html, /No drop yet/); assert.match(message.html, />Watching<\/div>/);
+  assert.match(message.html, /No drop yet/); assert.match(message.html, />On<\/div>\s*<div[^>]*>Watching<\/div>/);
   assert.match(message.html, /Nothing at least <strong[^>]*>-10,000 MYR<\/strong> in this check/);
   assert.doesNotMatch(message.html, /line-through|Your room dropped|more drop/);
   assert.ok(message.html.includes(REPLAY_LABEL)); assert.ok(message.text.includes(REPLAY_LABEL));

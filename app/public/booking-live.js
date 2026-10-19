@@ -1,12 +1,14 @@
 import { bookingView, comparisonLabels, replayResult, currentConfirmation } from './booking-live-data.js';
 import { createStayAdviser } from './stay-advice.js';
-import { cardPhoto, closeoutCopy, CLOSEOUT_VIDEO } from './booking-judge.js';
+import { cardPhoto, closeoutCopy, CLOSEOUT_VIDEO, inboxLink, INBOX_GONE } from './booking-judge.js';
 
 /** Use the existing booking screens and shared cards; confirmation is selection-only.
  * Catalogue mode adds the judge flow in front: Original Booking, Drop Watch setup and a replayed first check. */
 export async function startBookingDemo(ui) {
   const { $, node, money, savingLabel, addStamp, setActionContent, factTile, stayText, guestText, stayPhoto, offerPhotoIndex } = ui;
   const catalogueMode = document.body.dataset.bookingMode === 'catalogue';
+  // A Drop email link leaves the address bar before anything loads: the token must not stay in history.
+  let inbox = catalogueMode ? stripInbox() : null;
   let data, view, selected, busy = false, lastTrigger, code = null, judge, entries = [], navigation = 0;
   let pendingRoute = false, routingLocation = null;
   const api = action => catalogueMode ? `/api/booking-demo/q/${code}${action ? '/' + action : ''}` : '/api/booking-demo' + (action ? '/' + action : '');
@@ -282,6 +284,18 @@ export async function startBookingDemo(ui) {
   const { createJudgeScreens } = await import('./booking-judge.js');
   judge = createJudgeScreens(ui);
   const status = (text, error = false) => { $('page-status').textContent = text; $('page-status').classList.toggle('error', error); };
+  // Opens this browser's session for an emailed Drop Watch: the arming browser keeps its own, any other gets a copy.
+  // Approving stays a separate step on the Drops page. A dead link lands on the start page (the caller adds a note).
+  async function redeemInbox(link) {
+    let opened = false;
+    if (link.token) try {
+      const response = await fetch('/api/booking-demo/q/' + link.code + '/inbox', { method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: link.token }) });
+      opened = response.ok;
+    } catch {}
+    if (!opened) history.replaceState({ bookingScreen: 'start', code: null }, '', '#start');
+    return opened;
+  }
   async function load(next) {
     const response = await fetch('/api/booking-demo/q/' + next, { credentials: 'same-origin' });
     if (!response.ok) return false;
@@ -425,6 +439,8 @@ export async function startBookingDemo(ui) {
   function followLocation() {
     if (busy) { pendingRoute = true; return; }
     pendingRoute = false;
+    const link = stripInbox();
+    if (link) { void redeemInbox(link).then(opened => { if (!opened) status(INBOX_GONE); followLocation(); }); return; }
     const parsed = /^#(start|booked|setup|drops|review|confirmed|done)(?:-([A-Z0-9]{4,20}))?$/.exec(location.hash);
     const route = Object.keys(routes).find(key => routes[key] === parsed?.[1]) ?? 'start';
     const state = history.state, target = parsed?.[2];
@@ -438,15 +454,25 @@ export async function startBookingDemo(ui) {
   addEventListener('popstate', followLocation);
   addEventListener('hashchange', followLocation);
   try {
+    // Redeemed before the catalogue read, so that read restores the opened session instead of starting another.
+    const gone = inbox ? !(await redeemInbox(inbox)) : false; inbox = null;
     const response = await fetch('/api/booking-demo/catalogue', { credentials: 'same-origin' }); if (!response.ok) throw Error();
     entries = (await response.json()).entries;
     // Judges only pick bookings a Drop Watch can start on; non-refundable ones stay in the data, off the picker.
     judge.renderCatalogue(entries.filter(entry => entry.blocker !== 'NON_REFUNDABLE'), (next, trigger) => { lastTrigger = trigger; go('booked', next); });
-    chrome(); $('content').hidden = false; status('');
+    chrome(); $('content').hidden = false; status(gone ? INBOX_GONE : '');
     const parsed = /^#(booked|setup|drops|review|confirmed|done)-([A-Z0-9]{4,20})$/.exec(location.hash);
     const screen = parsed ? Object.keys(routes).find(key => routes[key] === parsed[1]) : 'start';
     const optionId = history.state?.code === parsed?.[2] ? history.state?.optionId : undefined;
     history.replaceState({ bookingScreen: screen, code: parsed?.[2] ?? null, optionId }, '', screen === 'start' ? '#start' : location.hash);
     await go(screen, parsed?.[2], { push: false, optionId });
   } catch { status('The demo bookings could not be loaded. Please reload to try again.', true); }
+}
+
+// Replaces a #inbox-CODE~TOKEN address with #drops-CODE (or #start when it is malformed) and returns the link.
+function stripInbox() {
+  if (!location.hash.startsWith('#inbox-')) return null;
+  const link = inboxLink(location.hash) ?? { code: null, token: null };
+  history.replaceState({ bookingScreen: link.code ? 'options' : 'start', code: link.code }, '', link.code ? '#drops-' + link.code : '#start');
+  return link;
 }
