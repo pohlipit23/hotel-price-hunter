@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { createBookingDemoServer } from '../app/booking-demo-server.mjs';
 import { watchBlocker } from '../app/domain/altovo-quotation.mjs';
 import { agencyMinimumSavingMinor } from '../app/public/drop-watch.js';
+import { localChromium } from './browser-chromium.mjs';
 
 const args = process.argv.slice(2), existing = args.includes('--existing');
 const inputPath = args.find(arg => arg.startsWith('--catalogue='))?.slice(12);
@@ -57,9 +58,7 @@ try {
   let playwright;
   try { playwright = await import('playwright'); }
   catch { playwright = await import(pathToFileURL(join(process.env.APPDATA, 'npm/node_modules/@playwright/cli/node_modules/playwright/index.mjs')).href); }
-  const cache = join(process.env.LOCALAPPDATA, 'ms-playwright');
-  const builds = (await readdir(cache)).filter(name => /^chromium-\d+$/.test(name)).sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]));
-  browser = await playwright.chromium.launch({ headless: true, executablePath: join(cache, builds[0], 'chrome-win64/chrome.exe') });
+  browser = await playwright.chromium.launch({ headless: true, executablePath: localChromium() });
   const eligible = loaded.entries.filter(entry => watchBlocker(entry.bundle.baseline, now()) === null && entry.bundle.options.length);
   assert.ok(eligible.length >= 2, 'Two currently eligible captured bookings are required');
   const code = eligible[0].code, otherCode = existing ? eligible[1].code : 'PART2002';

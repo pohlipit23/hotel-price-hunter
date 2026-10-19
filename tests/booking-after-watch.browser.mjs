@@ -5,14 +5,13 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createBookingDemoServer } from '../app/booking-demo-server.mjs';
 import { altovoCatalogueFixture } from './fixtures/altovo-catalogue.mjs';
+import { localChromium } from './browser-chromium.mjs';
 
 const output = resolve('.local/part2-browser'); await mkdir(output, { recursive: true });
 let playwright;
 try { playwright = await import('playwright'); }
 catch { playwright = await import(pathToFileURL(join(process.env.APPDATA, 'npm/node_modules/@playwright/cli/node_modules/playwright/index.mjs')).href); }
-const cache = join(process.env.LOCALAPPDATA, 'ms-playwright');
-const builds = (await readdir(cache)).filter(name => /^chromium-\d+$/.test(name)).sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]));
-const browser = await playwright.chromium.launch({ headless: true, executablePath: join(cache, builds[0], 'chrome-win64/chrome.exe') });
+const browser = await playwright.chromium.launch({ headless: true, executablePath: localChromium() });
 const catalogue = altovoCatalogueFixture(), code = 'AIRB000180', otherCode = 'PART2002';
 const other = structuredClone(catalogue.entries[0]); other.code = otherCode; other.bundle.baseline.quotationCode = otherCode;
 // Deliberately share snapshot/option aliases to prove the UI also binds conversation state to code.

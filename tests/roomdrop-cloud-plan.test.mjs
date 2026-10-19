@@ -6,6 +6,8 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sourceContext, registryEvidence, IMAGE, IGNORE, DOCKERFILE } from '../scripts/roomdrop-source-plan.mjs';
+// These checks run the bundle with Windows PowerShell 5 (powershell.exe), which only exists on Windows.
+const windowsPowerShell = { skip: process.platform !== 'win32' && 'needs Windows PowerShell (powershell.exe)' };
 
 const project = 'sincere-apex-511418-p0', account = 'pete@altovo.com', region = 'asia-southeast1';
 const digest = value => 'sha256:' + createHash('sha256').update(value).digest('hex');
@@ -24,7 +26,7 @@ async function fixture(t) {
   return { root, files, sourceCommit, git, setDirty: value => { dirty = value; } };
 }
 
-test('offline default has structured fixed-target commands, isolated auth and no activation race', () => {
+test('offline default has structured fixed-target commands, isolated auth and no activation race', windowsPowerShell, () => {
   const result = bundle(); assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
   assert.equal(plan.executedCloudCommands, 0); assert.equal(plan.account, account); assert.equal(plan.project, project); assert.equal(plan.region, region);
@@ -47,7 +49,7 @@ test('offline default has structured fixed-target commands, isolated auth and no
   assert.doesNotMatch(JSON.stringify(activate.arguments), /oidc|override|--paused/);
 });
 
-test('private customer and bounded watch job use separate identities and exact literal configuration', () => {
+test('private customer and bounded watch job use separate identities and exact literal configuration', windowsPowerShell, () => {
   const result = bundle(); assert.equal(result.status, 0, result.stderr); const plan = JSON.parse(result.stdout);
   const customer = plan.phases.DeployCustomer[0].arguments, job = plan.phases.DeployJob[0].arguments;
   for (const flag of ['--iap','--no-allow-unauthenticated','--invoker-iam-check','--cpu=1','--memory=512Mi','--concurrency=4','--min=0','--max=1','--max-instances=1','--timeout=30s','--cpu-throttling','--no-cpu-boost',`--service-account=hotel-price-hunter-runtime@${project}.iam.gserviceaccount.com`]) assert.ok(customer.includes(flag), flag);
@@ -61,7 +63,7 @@ test('private customer and bounded watch job use separate identities and exact l
   const iap = plan.phases.GrantAccess[0].arguments; assert.ok(iap.includes('--service=hotel-price-hunter')); assert.ok(iap.includes('--member=user:' + account));
 });
 
-test('job invoker uses supported unconditional binding arguments while other IAM commands retain their condition flag', () => {
+test('job invoker uses supported unconditional binding arguments while other IAM commands retain their condition flag', windowsPowerShell, () => {
   const result = bundle(); assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
   const bindings = Object.values(plan.phases).flat().filter(step => step.program === 'gcloud' && step.arguments.includes('add-iam-policy-binding'));
@@ -74,7 +76,7 @@ test('job invoker uses supported unconditional binding arguments while other IAM
   for (const binding of otherBindings) assert.ok(binding.arguments.includes('--condition=None'), binding.name);
 });
 
-test('bundle rejects execution switches, invalid pins and unsubstantiated image digests', () => {
+test('bundle rejects execution switches, invalid pins and unsubstantiated image digests', windowsPowerShell, () => {
   for (const args of [['-Execute'], ['-Phase','Unknown'], ['-SourceCommit','short'], ['-ImageDigest','sha256:' + 'a'.repeat(64)], ['-RegistryEvidenceFile','missing.json']]) {
     const result = bundle(args); assert.notEqual(result.status, 0, args.join(' '));
   }

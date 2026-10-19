@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createBookingDemoServer } from '../app/booking-demo-server.mjs';
 import { altovoCatalogueFixture } from './fixtures/altovo-catalogue.mjs';
+import { localChromium } from './browser-chromium.mjs';
 
 const output = resolve('.local/part2-v3-browser'); await mkdir(output, { recursive: true });
 const catalogue = altovoCatalogueFixture(), code = 'AIRB000180', bundle = catalogue.entries[0].bundle;
@@ -13,9 +14,7 @@ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); const orig
 let playwright;
 try { playwright = await import('playwright'); }
 catch { playwright = await import(pathToFileURL(join(process.env.APPDATA, 'npm/node_modules/@playwright/cli/node_modules/playwright/index.mjs')).href); }
-const cache = join(process.env.LOCALAPPDATA, 'ms-playwright');
-const builds = (await readdir(cache)).filter(name => /^chromium-\d+$/.test(name)).sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]));
-const browser = await playwright.chromium.launch({ headless: true, executablePath: join(cache, builds[0], 'chrome-win64/chrome.exe') });
+const browser = await playwright.chromium.launch({ headless: true, executablePath: localChromium() });
 const report = { status: 'started', proof: 'injected-v3-arm-endpoint', checks: [], errors: [], external: [] };
 try {
   for (const width of [320, 768, 1024, 1440]) {

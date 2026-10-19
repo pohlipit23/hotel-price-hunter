@@ -10,12 +10,11 @@ import { homedir } from 'node:os';
 import { createBookingDemoServer } from '../app/booking-demo-server.mjs';
 import { createMemorySessionStorage } from '../app/quotation-session-storage.mjs';
 import { curated, plannedBookings } from './fixtures/roomdrop-harness.mjs';
+import { localChromium } from './browser-chromium.mjs';
 
 const output = resolve('.local/judge-flow/browser'); await mkdir(output, { recursive: true });
 let playwright; try { playwright = await import('playwright'); } catch { playwright = await import(pathToFileURL(join(process.env.APPDATA || '', 'npm/node_modules/@playwright/cli/node_modules/playwright/index.mjs')).href); }
-const cache = join(process.env.LOCALAPPDATA || join(homedir(), 'AppData/Local'), 'ms-playwright');
-const builds = (await readdir(cache)).filter(name => /^chromium-\d+$/.test(name)).sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]));
-const browser = await playwright.chromium.launch({ headless: true, executablePath: join(cache, builds[0], 'chrome-win64/chrome.exe') });
+const browser = await playwright.chromium.launch({ headless: true, executablePath: localChromium() });
 // The fixture's Siam card has its reviewed S0.5 hotel photo; the Hyatt card has none and keeps the honest fallback.
 // Neither has a booked-room photo (the emulator walk, tests/booking-emulator.browser.mjs, covers one).
 const SIAM_ALT = 'Siam Kempinski Hotel Bangkok and its pool gardens';

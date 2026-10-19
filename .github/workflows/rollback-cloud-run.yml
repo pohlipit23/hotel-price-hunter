@@ -1,0 +1,45 @@
+# Manual rollback: move 100% of traffic to a named earlier revision, after approval on "production".
+name: Roll back Cloud Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: 'Revision to serve, e.g. hotel-price-hunter-00020-b7f'
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_ID: sincere-apex-511418-p0
+  REGION: asia-southeast1
+  SERVICE: hotel-price-hunter
+  ORIGIN: https://hotel-price-hunter-2qbcpylngq-as.a.run.app
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: ${{ env.ORIGIN }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      REVISION: ${{ inputs.revision }}
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Move traffic
+        run: |
+          [[ "$REVISION" =~ ^hotel-price-hunter-[0-9]{5}-[a-z0-9]{3}$ ]] || { echo "Not a revision name: $REVISION"; exit 1; }
+          gcloud run services update-traffic "$SERVICE" --to-revisions="$REVISION=100" --region="$REGION" --project="$PROJECT_ID" --quiet
+      - name: Smoke test the public URL
+        run: |
+          curl -sf "$ORIGIN/health" | jq -e '.status == "ok"'
+          curl -sf "$ORIGIN/" | grep -q 'data-booking-mode="catalogue"'

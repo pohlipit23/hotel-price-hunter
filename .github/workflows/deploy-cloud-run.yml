@@ -1,0 +1,199 @@
+# Automated RoomDrop release to Cloud Run.
+# test -> build (image pushed once, deployed by digest) -> candidate (new revision, no traffic)
+# -> promote (waits for approval on the "production" environment, moves traffic, smoke-tests, rolls back on failure).
+# Google Cloud access is keyless: Workload Identity Federation, set up by scripts/setup-github-deploy.ps1.
+# Until that setup exists (repo variable GCP_WIF_PROVIDER is empty), only the test job runs.
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'Dockerfile.booking'
+      - 'scripts/prepare-booking-release.mjs'
+      - 'tests/**'
+      - '.github/workflows/deploy-cloud-run.yml'
+  workflow_dispatch:
+
+# One release at a time; a newer push waits instead of cancelling a release halfway.
+concurrency:
+  group: cloud-run-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_ID: sincere-apex-511418-p0
+  REGION: asia-southeast1
+  SERVICE: hotel-price-hunter
+  ORIGIN: https://hotel-price-hunter-2qbcpylngq-as.a.run.app
+  PLAYWRIGHT_VERSION: 1.55.0
+  EMULATOR_IMAGE: gcr.io/google.com/cloudsdktool/google-cloud-cli:563.0.0-emulators
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Unit tests
+        run: node --test tests/*.test.mjs
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save --ignore-scripts "playwright@${PLAYWRIGHT_VERSION}"
+          npx playwright install --with-deps chromium
+      - name: Browser checks (fixture data, external requests blocked)
+        run: |
+          node tests/booking-judge.browser.mjs
+          node tests/booking-after-watch.browser.mjs
+          node tests/booking-v3.browser.mjs
+      - name: Firestore emulator browser check (synthetic fixture)
+        env:
+          GOOGLE_CLOUD_PROJECT: demo-roomdrop-part2
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8281
+        run: |
+          docker run -d --name roomdrop-part2-firestore -p 127.0.0.1:8281:8281 "$EMULATOR_IMAGE" \
+            gcloud emulators firestore start --host-port=0.0.0.0:8281 --project=demo-roomdrop-part2 --quiet
+          for _ in $(seq 1 60); do curl -sf http://127.0.0.1:8281/ >/dev/null && break; sleep 2; done
+          node tests/booking-firestore.browser.mjs
+      - name: Keep screenshots when a check fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-screenshots
+          path: .local/
+          if-no-files-found: ignore
+
+  build:
+    needs: test
+    if: vars.GCP_WIF_PROVIDER != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image: ${{ steps.push.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Freeze the release context from this commit
+        id: prepare
+        env:
+          CATALOGUE_MANIFEST: ${{ vars.ROOMDROP_CATALOGUE_MANIFEST }}
+        run: |
+          test -n "$CATALOGUE_MANIFEST" || { echo "Repo variable ROOMDROP_CATALOGUE_MANIFEST is not set."; exit 1; }
+          mkdir -p .local/integration
+          printf '%s' "$CATALOGUE_MANIFEST" > .local/integration/catalogue-manifest.json
+          node scripts/prepare-booking-release.mjs --prepare --source="$GITHUB_SHA" --manifest=.local/integration/catalogue-manifest.json > prepared.json
+          manifest=$(jq -r .manifestPath prepared.json)
+          echo "context=$(jq -r .contextDirectory prepared.json)" >> "$GITHUB_OUTPUT"
+          echo "repository=$(jq -r .registry "$manifest")" >> "$GITHUB_OUTPUT"
+          echo "tag=$(jq -r .registryTag "$manifest")" >> "$GITHUB_OUTPUT"
+          jq '{sourceCommit, contextSha256, catalogueManifestSha256}' "$manifest"
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Build and push the image
+        id: push
+        env:
+          CONTEXT: ${{ steps.prepare.outputs.context }}
+          REPOSITORY: ${{ steps.prepare.outputs.repository }}
+          TAG: ${{ steps.prepare.outputs.tag }}
+        run: |
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          docker build --platform linux/amd64 --tag "$REPOSITORY:$TAG" "$CONTEXT"
+          docker push "$REPOSITORY:$TAG"
+          digest=$(gcloud artifacts docker images describe "$REPOSITORY:$TAG" --project="$PROJECT_ID" --format='value(image_summary.digest)')
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo "No registry digest for $REPOSITORY:$TAG"; exit 1; }
+          echo "image=$REPOSITORY@$digest" >> "$GITHUB_OUTPUT"
+          echo "Pushed $REPOSITORY@$digest"
+
+  candidate:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      previous: ${{ steps.deploy.outputs.previous }}
+      revision: ${{ steps.deploy.outputs.revision }}
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy a no-traffic revision and check it is Ready
+        id: deploy
+        env:
+          IMAGE: ${{ needs.build.outputs.image }}
+        run: |
+          describe() { gcloud run services describe "$SERVICE" --region="$REGION" --project="$PROJECT_ID" --format=json; }
+          before=$(describe)
+          previous=$(jq -r 'if (.status.traffic | length) == 1 and .status.traffic[0].percent == 100 then .status.traffic[0].revisionName else empty end' <<<"$before")
+          test -n "$previous" || { echo "Expected one revision at 100% before deploying."; exit 1; }
+          # Only the image changes; env, identity, scaling and access stay as they are.
+          gcloud run services update "$SERVICE" --image="$IMAGE" --no-cpu-boost --no-traffic --region="$REGION" --project="$PROJECT_ID" --quiet
+          after=$(describe)
+          revision=$(jq -r .status.latestCreatedRevisionName <<<"$after")
+          test "$revision" != "$previous" || { echo "No new revision was created."; exit 1; }
+          jq -e --arg p "$previous" '(.status.traffic | length) == 1 and .status.traffic[0].revisionName == $p and .status.traffic[0].percent == 100' <<<"$after" >/dev/null \
+            || { echo "Traffic moved during the no-traffic deploy."; exit 1; }
+          # A no-traffic revision can be retired at once; its own Ready condition is what counts.
+          gcloud run revisions describe "$revision" --region="$REGION" --project="$PROJECT_ID" --format=json \
+            | jq -e '[.status.conditions[] | select(.type == "Ready" and .status == "True")] | length == 1' >/dev/null \
+            || { echo "Revision $revision is not Ready."; exit 1; }
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "Candidate $revision is Ready with no traffic; $previous still serves 100%."
+
+  promote:
+    needs: candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The approval gate: required reviewers on this environment must approve before traffic moves.
+    environment:
+      name: production
+      url: ${{ env.ORIGIN }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PREVIOUS: ${{ needs.candidate.outputs.previous }}
+      REVISION: ${{ needs.candidate.outputs.revision }}
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Move 100% of traffic to the candidate
+        id: switch
+        run: gcloud run services update-traffic "$SERVICE" --to-revisions="$REVISION=100" --region="$REGION" --project="$PROJECT_ID" --quiet
+      - name: Smoke test the public URL
+        run: |
+          curl -sf "$ORIGIN/health" | jq -e '.status == "ok"'
+          curl -sf "$ORIGIN/" | grep -q 'data-booking-mode="catalogue"'
+          curl -sf "$ORIGIN/api/booking-demo/catalogue" | jq -e '(.entries | length) == 6'
+          curl -sf -o /dev/null "$ORIGIN/booking-live.js"
+          echo "Smoke passed on $REVISION."
+      - name: Roll back when the smoke test fails
+        if: failure() && steps.switch.outcome == 'success'
+        run: |
+          gcloud run services update-traffic "$SERVICE" --to-revisions="$PREVIOUS=100" --region="$REGION" --project="$PROJECT_ID" --quiet
+          echo "Smoke failed: traffic is back on $PREVIOUS."

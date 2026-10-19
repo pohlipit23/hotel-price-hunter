@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { verifyAgencyMetadata, verifyRegistryLineage, sourceContext, cloudArguments, customerFingerprint, TARGET } from '../scripts/verify-agency-cloud.mjs';
+// These checks run the bundle with Windows PowerShell 5 (powershell.exe), which only exists on Windows.
+const windowsPowerShell = { skip: process.platform !== 'win32' && 'needs Windows PowerShell (powershell.exe)' };
 
 const sha = value => createHash('sha256').update(value).digest('hex');
 const digest = value => 'sha256:' + sha(value);
@@ -121,7 +123,7 @@ test('source context checks clean exact HEAD, actual allowlisted bytes, untracke
   await assert.rejects(sourceContext({ root, sourceCommit, git }));
 });
 
-test('PowerShell bundle is offline by default, keeps exact account/project flags and scopes every mutation to the approved agency target', () => {
+test('PowerShell bundle is offline by default, keeps exact account/project flags and scopes every mutation to the approved agency target', windowsPowerShell, () => {
   const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', 'scripts/prepare-agency-cloud.ps1'], { encoding: 'utf8', timeout: 15000, windowsHide: true });
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
