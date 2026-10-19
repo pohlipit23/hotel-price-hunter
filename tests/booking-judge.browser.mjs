@@ -1,7 +1,8 @@
 // Judge flow browser check on the curated fixture catalogue (tests/fixtures/curated-bookings.json) served through the
-// booking storage read interface with memory sessions: start grid -> Original Booking -> setup -> armed (by keyboard),
-// a failed arm, reload of the committed receipt, Drops -> Review -> Confirmed, cannot-start paths and an eligibility
-// change over time, at 320, 768 and 1440 px. No live supplier, Altovo or Gemini calls. Listens on port 0.
+// booking storage read interface with memory sessions: start grid -> the agency's confirmation page -> RoomDrop's setup
+// modal (open/close by Esc, X, backdrop and Back) -> armed (by keyboard), a failed arm, the armed add-on after closing,
+// reload of the committed receipt, Drops -> Review -> Confirmed, cannot-start paths and an eligibility change over
+// time, at 320, 768 and 1440 px. No live supplier, Altovo or Gemini calls. Listens on port 0.
 import assert from 'node:assert/strict';
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
@@ -95,10 +96,10 @@ try {
     assert.match(await siamCard.locator('.watch-tag').innerText(), /Drop Watch ready/);
     assert.equal(await siamCard.locator('.scenario-label').innerText(), 'Free cancellation');
     assert.match(await siamCard.innerText(), /Bangkok, Thailand[\s\S]*17 Feb - 18 Feb · 1 night[\s\S]*MYR 2,335\.52/);
-    // A reviewed photo loads and is labelled as the hotel's; no photo means the drawn fallback and no label.
+    // A reviewed photo loads with no label; photos speak for themselves.
     assert.equal(await siamCard.locator('img.card-photo').getAttribute('alt'), SIAM_ALT);
     await page.waitForFunction(code => document.querySelector(`[data-code="${code}"] img.card-photo`)?.naturalWidth > 0, SIAM);
-    assert.equal(await siamCard.locator('.photo-tag').innerText(), 'Hotel photo');
+    assert.equal(await page.locator('#catalogue-screen .photo-tag').count(), 0, 'catalogue photos carry no label');
     assert.equal(await hyattCard.count(), 0);
     assert.equal(await page.locator('#journey-strip li').count(), 3); await step(1); await site('none');
     // The journey strip lives in the judge-only bar, outside the product frame.
@@ -107,23 +108,61 @@ try {
     assert.match(await page.locator('#journey-strip').innerText(), /Pick a booking[\s\S]*Made on Altovo's booking engine, not part of this submission\. RoomDrop starts at the confirmation\.[\s\S]*Set up a drop[\s\S]*RoomDrop[\s\S]*Invite on the confirmation page \(or in the confirmation email\)\.[\s\S]*Get your drop[\s\S]*RoomDrop app[\s\S]*Cheaper room found\? It arrives by email\./);
     await shot('start');
 
-    // F6 Original Booking, opened by keyboard; refresh keeps the page.
+    // F6 the agency's confirmation page with the RoomDrop add-on, opened by keyboard; refresh keeps the page.
     await siamCard.locator('.catalogue-open').focus(); await page.keyboard.press('Enter');
     await visible('booked-screen'); await focused('booked-title');
     assert.equal(new URL(page.url()).hash, '#booked-' + SIAM);
     const booked = await page.locator('#booked-screen').innerText();
-    assert.match(booked, /Your agency booked this/i);
+    assert.match(booked, /Your booking is confirmed\s+Confirmation no\. AIRB000180/);
     assert.match(booked, /Altovo staging quotation standing in for a confirmed booking - captured 18 Oct 2026/); await step(2); await site('agency');
     assert.equal(await page.locator('#agency-brand').innerText(), 'Travel Agency');
-    assert.match(booked, /Free cancellation until 14 Feb 2027, 16:58 UTC/); assert.match(booked, /MYR 2,335\.52/); assert.match(booked, /1 guest/);
+    assert.equal(await page.locator('#judge-bar-text').innerText(), "This is your travel agency's confirmation page. The framed box is the RoomDrop widget.");
+    assert.match(await page.locator('#agency-nav').innerText(), /My trips\s+Help/);
+    assert.equal(await page.locator('#agency-nav a, #agency-nav button').count(), 0, 'the agency menu is for looks only');
+    assert.match(booked, /Check-in\s+Wed 17 Feb 2027[\s\S]*Check-out\s+Thu 18 Feb 2027/); assert.match(booked, /Room\s+Executive Suite/); assert.match(booked, /Meals\s+Breakfast/);
+    assert.match(booked, /Free cancellation until 14 Feb 2027, 16:58 UTC\*/); assert.match(booked, /\*Subject to the hotel's full cancellation terms\./);
+    assert.match(booked, /Total paid\s+MYR 2,335\.52/); assert.match(booked, /1 guest/); assert.match(booked, /Lead guest[\s\S]*Manage booking/);
+    // The add-on: one short pitch, one button, powered by RoomDrop.
+    assert.equal(await page.locator('#drop-offer').getAttribute('data-state'), 'ready');
+    assert.match(await page.locator('#drop-offer').innerText(), /^Prices often drop after you book\.\s+We'll watch this one for you\.\s+Set up a drop\s+Powered by\s*$/);
+    assert.equal(await page.locator('#drop-offer .powered-logo img').getAttribute('alt'), 'RoomDrop');
     assert.equal(await page.locator('#booked-screen button.primary:visible').count(), 1, 'one primary action');
     assert.equal(await page.locator('#setup-drop').innerText(), 'Set up a drop');
     assert.equal(await page.locator('#booked-photo img.card-photo').getAttribute('alt'), SIAM_ALT);
-    assert.equal(await page.locator('#booked-photo-tag').innerText(), 'Hotel photo');
+    assert.deepEqual([await page.locator('#booked-photo-tag').count(), await page.locator('#booked-screen .photo-tag').count()], [0, 0], 'the booked photo carries no label');
     assert.equal(await page.locator('#booked-room').isVisible(), false, 'no room photo without a reviewed one');
     if (width === 768) { await page.reload(); await visible('booked-screen'); }
     await page.waitForFunction(() => document.querySelector('#booked-photo img')?.naturalWidth > 0);
     await shot('booked');
+
+    // The add-on opens RoomDrop's modal over the page (#setup-). Esc, the X, the backdrop and Back each close it and
+    // return focus to the add-on's button; focus stays in the modal while it is open.
+    const modalOpen = () => page.locator('#drop-modal').evaluate(dialog => dialog.open);
+    const closedOnPage = async how => {
+      await page.waitForFunction(() => !document.querySelector('#drop-modal').open);
+      await page.waitForFunction(code => location.hash === '#booked-' + code, SIAM);
+      await page.waitForFunction(() => document.activeElement?.id === 'setup-drop');
+      assert.deepEqual([await page.locator('#booked-screen').isVisible(), await page.locator('#setup-screen').isVisible()], [true, false], width + ' closed by ' + how);
+    };
+    const opensModal = async () => {
+      await page.keyboard.press('Enter'); await visible('setup-screen'); await focused('setup-title');
+      assert.equal(new URL(page.url()).hash, '#setup-' + SIAM); assert.equal(await modalOpen(), true);
+      assert.equal(await page.locator('#booked-screen').isVisible(), true, 'the agency page stays behind the modal'); await step(2); await site('agency');
+    };
+    await page.locator('#setup-drop').focus(); await opensModal();
+    for (let i = 0; i < 12; i += 1) {
+      await page.keyboard.press('Tab');
+      assert(await page.evaluate(() => Boolean(document.activeElement?.closest('#drop-modal'))), width + ' focus left the modal at ' + await active());
+    }
+    await page.keyboard.press('Escape'); await closedOnPage('Esc');
+    await opensModal(); await page.locator('#drop-close').click(); await closedOnPage('X');
+    await opensModal(); await page.mouse.click(4, 4); await closedOnPage('backdrop');
+    await opensModal(); await page.goBack(); await closedOnPage('Back');
+    // A #setup- link opens the page with the modal already open, also on a fresh load.
+    await page.evaluate(code => { location.hash = '#setup-' + code; }, SIAM); await visible('setup-screen'); await focused('setup-title');
+    await page.reload(); await visible('setup-screen'); await focused('setup-title');
+    assert.deepEqual([await modalOpen(), await page.locator('#booked-screen').isVisible()], [true, true]);
+    await page.keyboard.press('Escape'); await closedOnPage('Esc after a direct link');
 
     // F7a setup by keyboard: consent is required, then a failed arm stays retryable and never shows armed.
     await page.locator('#booked-title').focus(); await tabTo('#setup-drop'); await page.keyboard.press('Enter');
@@ -136,7 +175,7 @@ try {
     await page.getByText('Tick the box so RoomDrop may check this booking').waitFor(); await focused('judge-consent');
     await page.keyboard.press('Space'); assert.equal(await page.locator('#judge-consent').isChecked(), true);
     // The optional delivery email, by keyboard: a malformed address is flagged in place, then corrected.
-    assert.match(await page.locator('label[for="delivery-email"]').innerText(), /Where should we send your drop\?/);
+    assert.match(await page.locator('label[for="delivery-email"]').innerText(), /Email my drop to\s+Optional/);
     assert.match(await page.locator('#delivery-consent').innerText(), /^Use this email only to send my drop\. Email delivery is not live yet; it is kept only with this 1-hour demo session\.$/);
     await page.locator('#delivery-email').focus(); await page.keyboard.type('judge@example'); await page.keyboard.press('Tab');
     assert.equal(await page.locator('#delivery-problem').innerText(), 'Check the email address, or leave it empty.');
@@ -211,7 +250,16 @@ try {
     assert.equal(await page.locator('input[name="minimum-saving"][value="5000"]').isChecked(), true);
     assert.equal(await page.locator('#arm-watch').innerText(), 'Update my Drop Watch');
     await page.locator('input[name="minimum-saving"][value="25000"]').check(); await page.locator('#arm-watch').click();
-    await visible('checking-screen'); await shot('handoff-email', false); await handoff('j***@example.test');
+    await visible('handoff'); assert.equal(await page.locator('#handoff-email').innerText(), 'Saved for j***@example.test · not sent yet');
+    await shot('handoff-email', false);
+    // Closing the modal after arming leaves the judge on the agency page, where the add-on now says armed.
+    await page.locator('#drop-close').click();
+    await page.waitForFunction(code => location.hash === '#booked-' + code, SIAM); await page.locator('#drop-offer[data-state="armed"]').waitFor();
+    assert.match(await page.locator('#drop-offer').innerText(), /^Drop Watch armed\s+Drops of MYR 250 or more\s+Open RoomDrop\s*→\s+Change my Drop Watch\s+Powered by\s*$/);
+    assert.equal(await modalOpen(), false); await focused('setup-drop'); await step(2); await site('agency');
+    assert.equal(await page.locator('#booked-screen button.primary:visible').count(), 1, 'one primary action when armed');
+    await shot('armed-card');
+    await page.locator('#drop-open').click(); await visible('launch-screen');
     await drops(); assert.equal(await page.locator('#offer-empty').isVisible(), true);
     assert.doesNotMatch(await page.locator('body').innerText(), /judge@/);
     assert.equal(await page.locator('#offer-empty').innerText(), 'No drops above your minimum yet. Your original booking stays active.');
@@ -275,20 +323,25 @@ try {
     // Pick another booking returns to the start page.
     await page.locator('#closeout-restart').click(); await visible('catalogue-screen'); await focused('catalogue-title');
     assert.equal(new URL(page.url()).hash, '#start');
-    // Cannot start: the reason, with the setup action shown but disabled; direct setup links fall back.
+    // Cannot start: the add-on says so with the reason and has no button; direct setup links fall back to the page.
     // Not on the picker, but a direct link still shows why it cannot start.
     await page.evaluate(code => { location.hash = '#booked-' + code; }, HYATT); await visible('booked-screen'); await visible('booked-blocked');
-    assert.equal(await page.locator('#setup-drop').isDisabled(), true);
+    assert.equal(await page.locator('#drop-offer').getAttribute('data-state'), 'blocked');
+    assert.equal(await page.locator('#drop-offer-title').innerText(), "Can't watch this booking");
+    assert.equal(await page.locator('#blocked-title').innerText(), 'This booking is non-refundable');
+    assert.equal(await page.locator('#drop-offer button:visible').count(), 0, 'no button on a booking that cannot start');
+    assert.deepEqual([await page.locator('#setup-drop').isVisible(), await page.locator('#setup-drop').isDisabled()], [false, true]);
     assert.equal(await page.locator('#setup-drop').getAttribute('aria-describedby'), 'blocked-title');
-    assert.match(await page.locator('#booked-blocked').innerText(), /non-refundable/i);
-    assert.match(await page.locator('#booked-screen').innerText(), /Non-refundable/);
-    assert.equal(await page.locator('#booked-photo-tag').isVisible(), false, 'no photo tag on the fallback');
+    assert.match(await page.locator('#booked-screen').innerText(), /Cancellation policy\s+Non-refundable/);
+    assert.doesNotMatch(await page.locator('#booked-screen').innerText(), /Subject to the hotel's full cancellation terms/);
+    assert.equal(await page.locator('#booked-screen .photo-tag').count(), 0, 'no photo tag on the fallback');
     assert.equal(await page.locator('#booked-room').isVisible(), false);
     await shot('cannot-start');
     await page.goto(origin + '/#setup-' + HYATT); await visible('booked-blocked');
-    await page.locator('#pick-another').click(); await visible('catalogue-screen');
+    assert.equal(await modalOpen(), false, 'no setup modal on a booking that cannot start');
+    await page.locator('#booked-back').click(); await visible('catalogue-screen');
     await page.goBack(); await visible('booked-blocked');
-    report.checks.push({ width, start: 'passed', booked: 'passed', keyboard: 'passed', consentRequired: 'passed', failedArm: 'passed', armed: 'passed',
+    report.checks.push({ width, start: 'passed', booked: 'passed', modalRoutes: 'passed', focusReturn: 'passed', keyboard: 'passed', consentRequired: 'passed', failedArm: 'passed', armed: 'passed', armedCard: 'passed',
       reloadReceipt: 'passed', minimumFilter: 'passed', empty: 'passed', review: 'passed', confirmed: 'passed', backForward: 'passed', cannotStart: 'passed' });
     await context.close();
   }
@@ -308,7 +361,8 @@ try {
   await page.screenshot({ path: join(output, 'ended-start-768.png'), fullPage: true }); report.screenshots.push(join(output, 'ended-start-768.png'));
   await page.goto(late.origin + '/#setup-' + SIAM); await page.locator('#booked-blocked').waitFor({ state: 'visible' });
   assert.match(await page.locator('#blocked-title').innerText(), /Free cancellation has ended/);
-  assert.equal(await page.locator('#setup-drop').isDisabled(), true);
+  assert.equal(await page.locator('#drop-offer-title').innerText(), "Can't watch this booking");
+  assert.deepEqual([await page.locator('#setup-drop').isDisabled(), await page.locator('#drop-offer button:visible').count(), await page.locator('#drop-modal').evaluate(dialog => dialog.open)], [true, 0, false]);
   await page.screenshot({ path: join(output, 'ended-booked-768.png'), fullPage: true }); report.screenshots.push(join(output, 'ended-booked-768.png'));
   await context.close();
   report.checks.push({ width: 768, endedEligibility: 'passed' });

@@ -115,7 +115,8 @@ try {
     const withPhotos = loaded.entries.find(entry => entry.code === code).bundle.options.every(option => option.photo);
     if (withPhotos) {
       await page.waitForFunction(() => [...document.querySelectorAll('#offers img')].every(image => image.complete && image.naturalWidth > 0));
-      assert.equal(await page.locator('#offers .photo-tag').filter({ hasText: /^Hotel photo$/ }).count(), await page.locator('#offers .offer-ticket').count());
+      assert.equal(await page.locator('#offers img').count(), await page.locator('#offers .offer-ticket').count(), 'every drop shows its photo');
+      assert.equal(await page.locator('#offers .photo-tag').count(), 0, 'catalogue photos carry no label');
       assert.equal(await page.locator('#offers img').evaluateAll(images => images.every(image => /^\/assets\/roomdrop-[a-z0-9-]+\.jpg$/.test(image.getAttribute('src')))), true);
     }
     await page.locator('#offers .offer-action').first().focus(); await page.keyboard.press('Enter'); await visible('comparison');

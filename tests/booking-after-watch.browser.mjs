@@ -71,24 +71,29 @@ try {
       assert.equal(placement.insideParent, true, `${stage}: Gemini launch button outside heading`);
       assert.equal(placement.occludesContent, false, `${stage}: Gemini overlaps card or consent/action content`);
     };
+    // Setup and the hand-off run in RoomDrop's modal over the agency's confirmation page; the Drops page has no modal.
+    const modalOpen = () => page.locator('#drop-modal').evaluate(dialog => dialog.open);
     const arm = async (target, minimum = 1000) => {
       await page.goto(origin + '/#setup-' + target); await visible('setup-screen');
+      assert.deepEqual([await modalOpen(), await page.locator('#booked-screen').isVisible()], [true, true], 'setup opens in the modal over the agency page');
       await page.locator('#judge-consent').check();
       await page.locator(`input[name="minimum-saving"][value="${minimum}"]`).check();
       await page.locator('#arm-watch').click(); await visible('handoff');
+      assert.equal(await modalOpen(), true, 'the hand-off plays in the same modal');
       await page.locator('#open-roomdrop').click(); await drops();
+      assert.equal(await modalOpen(), false, 'no modal on Drops');
       assert.equal(await page.locator('#armed-strip').isVisible(), false, 'the armed strip stays hidden on Drops');
       assert.equal(await page.locator('footer').isVisible(), false, 'no page footer on Drops');
     };
     await arm(code);
     assert.match(await page.locator('#armed-detail').innerText(), /Replayed .*Captured .*not live/);
     assert.equal(await page.locator('#offers .offer-ticket').count(), 3); await checkLauncher('drops'); await shot('drops');
-    assert.equal(await page.locator('#offers .photo-tag').filter({ hasText: /^Hotel photo$/ }).count(), 3);
+    assert.equal(await page.locator('#offers .photo-tag').count(), 0, 'catalogue photos carry no label');
     assert.equal(await page.locator('#offers img').evaluateAll(images => images.every(image => image.getAttribute('src') === '/assets/roomdrop-airb000180-hotel.jpg' && image.complete && image.naturalWidth > 0)), true);
     await page.locator('[data-offer-id="option-fixture-final-deluxe"]').focus(); await page.keyboard.press('Enter');
     await visible('comparison'); await checkLauncher('review'); await page.locator('#approve-offer').click();
     assert.equal(await page.locator('#comparison-photo img').getAttribute('src'), '/' + photo.asset);
-    assert.equal(await page.locator('#comparison .review-photo > .photo-tag').innerText(), 'Hotel photo');
+    assert.equal(await page.locator('#comparison .photo-tag').count(), 0, 'the review photo carries no label');
     assert.match(await page.locator('#review-message').innerText(), /confirm the cancellation flexibility/);
     await page.locator('#accept-reduced-flexibility').check();
     await page.locator('#gemini-launcher').click(); await visible('gemini-dialog');
@@ -110,6 +115,7 @@ try {
     await shot('closeout'); await page.goBack(); await visible('simulated-switch');
     await page.reload(); await visible('simulated-switch');
     assert.equal(await page.locator('#switch-to-photo img').getAttribute('src'), '/' + photo.asset);
+    assert.equal(await page.locator('#simulated-switch .photo-tag').count(), 0, 'the confirmation photo carries no label');
     const initial = await (await context.request.get(origin + '/api/booking-demo/q/' + code)).json();
     assert.equal(initial.confirmation.reservationCreated, false); assert.equal(initial.confirmation.quoteModified, false);
     assert.equal(initial.confirmation.customerRefund, null);
@@ -157,7 +163,7 @@ try {
       assert.equal(await page.locator('#armed-detail').innerText(), otherDetail);
       await page.unroute(watchUrl);
     }
-    // A failed local image must remove the Hotel photo claim, just like an absent photo.
+    // A failed local image falls back to the drawn placeholder, just like an absent photo, still with no label.
     await page.route('**/' + photo.asset, route => route.fulfill({ status: 404, body: '' }));
     await arm(code);
     await page.waitForFunction(() => document.querySelectorAll('#offers img').length === 0);

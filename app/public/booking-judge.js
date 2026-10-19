@@ -1,4 +1,5 @@
-/** Judge flow screens: catalogue, booked Original Booking, Drop Watch setup and the replayed first check. Display only. */
+/** Judge flow screens: catalogue, the agency's confirmation page with the RoomDrop add-on, and the drop modal
+ * (Drop Watch setup, then the replayed first check). Display only. */
 import { minorDigits, minimumSavingChoices, agencyMinimumSavingMinor, deliveryEmailValid } from './drop-watch.js';
 
 // Altovo may be named as the staging booking engine that made the bookings; no Altovo or AirBorneo logo.
@@ -10,8 +11,9 @@ export const JOURNEY = Object.freeze([
   { title: 'Get your drop', tag: 'RoomDrop app', text: 'Cheaper room found? It arrives by email.' },
 ]);
 // Which journey step a visible screen belongs to: the start grid, the booking site, then the RoomDrop app.
+// Setup and the replayed check open in a modal over the booking site's page, so they stay step 2 with it.
 // The closeout comes after all three steps, so every step shows as passed there.
-const STEP_OF = { 'catalogue-screen': 1, 'booked-screen': 2, 'setup-screen': 2, 'checking-screen': 2, 'launch-screen': 3, 'booking-summary': 3, comparison: 3, 'simulated-switch': 3, 'closeout-screen': 4 };
+const STEP_OF = { 'catalogue-screen': 1, 'booked-screen': 2, 'launch-screen': 3, 'booking-summary': 3, comparison: 3, 'simulated-switch': 3, 'closeout-screen': 4 };
 export function journeyStep(screenId) { return STEP_OF[screenId] ?? null; }
 // The closeout after the confirmation's "What next?" pick: what would happen next outside the demo.
 export const CLOSEOUT_VIDEO = 'https://www.youtube-nocookie.com/embed/zKe3UFlgUNc';
@@ -107,12 +109,26 @@ export function armRequestBody(data, minimumSavingMinor, deliveryEmail) {
   return { snapshotVersion: data.snapshotVersion, consent: true, minimumSavingMinor, expectedRevision: data.watch?.revision ?? 0,
     ...(deliveryEmail !== undefined ? { deliveryEmail } : {}) };
 }
-// The armed line, from the committed receipt only; no receipt, no armed state.
-export function armedDetail(data) {
+// The committed minimum, as the armed add-on card says it; no receipt, no armed state.
+export function armedSummary(data) {
   if (!data.watch) return null;
   const currency = data.baseline.quotedRetail.currency; const minimum = data.watch.minimumSavingMinor;
   const floor = data.agencyMinimumSavingMinor ?? agencyMinimumSavingMinor(currency);
-  return (minimum <= floor ? 'Any drop of ' : 'Drops of ') + formatMoney(minimum, currency) + ' or more · replayed check from ' + formatInstant(data.watch.firstCheck.checkedAt);
+  return (minimum <= floor ? 'Any drop of ' : 'Drops of ') + formatMoney(minimum, currency) + ' or more';
+}
+// The armed line, from the committed receipt only; no receipt, no armed state.
+export function armedDetail(data) {
+  return data.watch ? armedSummary(data) + ' · replayed check from ' + formatInstant(data.watch.firstCheck.checkedAt) : null;
+}
+// The add-on card on the agency's page: an offer, the armed state, or why this booking cannot be watched.
+export function offerState(data) { return data.blocker ? 'blocked' : data.watch ? 'armed' : 'ready'; }
+// Check-in and check-out as the agency prints them. The baseline has dates only, no times.
+// Built from parts, so every engine prints "Wed 17 Feb 2027" whatever its locale punctuation.
+export const dayText = day => new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+  .formatToParts(new Date(day + 'T00:00:00Z')).filter(part => part.type !== 'literal').map(part => part.value).join(' ');
+export function nightsText(stay) {
+  const nights = Math.round((Date.parse(stay.checkout) - Date.parse(stay.checkin)) / 86400000);
+  return nights + (nights === 1 ? ' night' : ' nights');
 }
 const guests = occupancy => {
   const people = occupancy.adults + occupancy.childAges.length + occupancy.infantAges.length;
@@ -188,6 +204,21 @@ export function createJudgeScreens(ui) {
     image.addEventListener('error', () => { onFallback(); image.replaceWith(fallback(card.cityName)); });
     return image;
   };
+  // The RoomDrop add-on card. A booking that cannot start keeps its reason and has no button at all;
+  // once armed it opens the app, with a small link back to the setup.
+  const renderOffer = data => {
+    const state = offerState(data); $('drop-offer').dataset.state = state;
+    $('drop-offer-title').textContent = { ready: 'Prices often drop after you book.', armed: 'Drop Watch armed', blocked: "Can't watch this booking" }[state];
+    $('drop-offer-text').textContent = state === 'armed' ? armedSummary(data) : "We'll watch this one for you.";
+    $('drop-offer-text').hidden = state === 'blocked'; $('booked-blocked').hidden = state !== 'blocked'; $('drop-open').hidden = state !== 'armed';
+    const setup = $('setup-drop'); setup.hidden = setup.disabled = state === 'blocked';
+    if (state === 'blocked') {
+      const { title, text } = cannotStart(data.blocker); $('blocked-title').textContent = title; $('blocked-text').textContent = text;
+      setup.setAttribute('aria-describedby', 'blocked-title');
+    } else setup.removeAttribute('aria-describedby');
+    setup.className = state === 'armed' ? 'plain drop-change' : 'primary drop-cta';
+    setup.textContent = state === 'armed' ? 'Change my Drop Watch' : 'Set up a drop';
+  };
   return {
     renderCatalogue(entries, open) {
       $('catalogue-note').textContent = 'Each card is a real Altovo staging quotation standing in for a confirmed booking.';
@@ -198,10 +229,8 @@ export function createJudgeScreens(ui) {
         const title = node('h2', entry.hotel.name); title.id = 'catalogue-hotel-' + entry.code;
         card.setAttribute('aria-labelledby', title.id);
         const photo = node('div', undefined, 'catalogue-photo');
-        // A supplied photo is labelled as the hotel's; the drawn fallback (or a failed load) has no label.
-        const photoTag = node('span', 'Hotel photo', 'photo-tag'); let supplied = true;
-        photo.append(photoNode(entry.card, () => { supplied = false; photoTag.remove(); }), tagNode(entry));
-        if (supplied) photo.append(photoTag);
+        // Photos carry no "Hotel photo" label: the picture under a hotel name speaks for itself.
+        photo.append(photoNode(entry.card), tagNode(entry));
         const body = node('div', undefined, 'catalogue-body');
         if (facts.scenario) body.append(node('p', facts.scenario, 'scenario-label scenario-' + (index % 3)));
         const price = node('p', undefined, 'catalogue-price');
@@ -215,12 +244,15 @@ export function createJudgeScreens(ui) {
         return card;
       }));
     },
+    // The agency's confirmation page: only facts the booking has; guest details stay generic placeholders.
     renderBooked(data) {
       const b = data.baseline; const card = cards.get(data.code) ?? null;
-      $('booked-title').textContent = b.hotel.name;
-      $('booked-place').textContent = [placeText(b.hotel, card?.cityName), b.hotel.star ? b.hotel.star + ' star' : null, 'Ref ' + b.quotationCode].filter(Boolean).join(' · ');
-      $('booked-photo-tag').hidden = false;
-      $('booked-photo').replaceChildren(photoNode(card, () => { $('booked-photo-tag').hidden = true; }));
+      $('booked-code').textContent = b.quotationCode;
+      $('booked-hotel').textContent = b.hotel.name;
+      const stars = Math.round(Number(b.hotel.star) || 0); $('booked-stars').hidden = !stars;
+      $('booked-stars').textContent = '★'.repeat(stars); $('booked-stars').setAttribute('aria-label', stars + ' star hotel');
+      $('booked-place').textContent = placeText(b.hotel, card?.cityName);
+      $('booked-photo').replaceChildren(photoNode(card));
       // The booked room's own reviewed photo, labelled as the room; absent (or failing to load) shows nothing.
       const room = roomPhoto(card); $('booked-room').hidden = !room; $('booked-room-photo').replaceChildren();
       if (room) {
@@ -228,22 +260,19 @@ export function createJudgeScreens(ui) {
         image.addEventListener('error', () => { $('booked-room').hidden = true; });
         $('booked-room-photo').append(image); $('booked-room-name').textContent = b.room.name || 'Your room';
       }
-      const facts = [['Room', b.room.name || 'Room not named'], ['Meals', b.room.board || 'Not specified'], ['Dates', stayText(b)],
-        ['Guests', guests(b.occupancy)], ['Cancellation', cancellationText(b.cancellation)]];
+      $('booked-checkin').textContent = dayText(b.stay.checkin); $('booked-checkout').textContent = dayText(b.stay.checkout);
+      const facts = [['Nights', nightsText(b.stay)], ['Room', b.room.name || 'Room not named'], ['Meals', b.room.board || 'Not specified'], ['Guests', guests(b.occupancy)]];
       $('booked-facts').replaceChildren(...facts.map(([label, value]) => {
-        const row = node('div', undefined, 'booked-fact' + (label === 'Cancellation' ? (b.cancellation?.freeUntil && !b.cancellation.nonRefundable ? ' fact-free' : ' fact-locked') : ''));
-        row.append(node('dt', label), node('dd', value)); return row;
+        const row = node('div'); row.append(node('dt', label), node('dd', value)); return row;
       }));
       $('booked-price').textContent = formatMoney(b.quotedRetail.totalMinor, b.quotedRetail.currency);
+      const free = Boolean(b.cancellation?.freeUntil && !b.cancellation.nonRefundable);
+      $('booked-policy').textContent = cancellationText(b.cancellation) + (free ? '*' : '');
+      $('booked-policy').className = 'agency-policy ' + (free ? 'policy-free' : 'policy-locked'); $('booked-policy-note').hidden = !free;
       $('booked-note').textContent = capturedNote(data);
-      // A booking that cannot start stays viewable: its reason, and the setup action shown but disabled.
-      $('booked-blocked').hidden = !data.blocker; $('setup-drop').disabled = Boolean(data.blocker);
-      if (data.blocker) {
-        const { title, text } = cannotStart(data.blocker); $('blocked-title').textContent = title; $('blocked-text').textContent = text;
-        $('setup-drop').setAttribute('aria-describedby', 'blocked-title');
-      } else $('setup-drop').removeAttribute('aria-describedby');
-      $('setup-drop').textContent = data.watch ? 'Change my Drop Watch' : 'Set up a drop';
+      renderOffer(data);
     },
+    renderOffer,
     renderSetup(data, chosen) {
       const b = data.baseline; const currency = b.quotedRetail.currency;
       $('setup-booking').textContent = b.hotel.name + ' · ' + formatMoney(b.quotedRetail.totalMinor, currency);
@@ -268,25 +297,30 @@ export function createJudgeScreens(ui) {
       if (problem) { $('delivery-email').focus(); throw Object.assign(new Error(problem), { userMessage: problem }); }
       return armRequestBody(data, minimumSavingMinor, deliveryEmailField($('delivery-email').value, { remove: removeSaved }).email);
     },
-    // Replays the captured check (a short beat, never a live search), then the hand-off: the watch is already
-    // committed; the judge leaves the booking site and opens the RoomDrop app. Resolves when they continue.
+    // In the modal: the Armed stamp lands, then the captured check replays (a short beat, never a live search),
+    // then the hand-off: the watch is already committed; the judge leaves the booking site and opens the
+    // RoomDrop app. Resolves when they continue.
     async playCheck(data, isCurrent) {
       const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const screen = $('checking-screen');
-      $('checking-replay').textContent = 'Replayed check · captured ' + formatInstant(data.watch.firstCheck.checkedAt) + ' · not live';
-      $('checking-title').textContent = 'Checking for drops';
-      $('checking-status').textContent = 'Replaying the check from ' + formatInstant(data.watch.firstCheck.checkedAt) + '.';
-      screen.classList.remove('checked', 'handoff'); $('handoff').hidden = true;
-      await new Promise(resolve => setTimeout(resolve, reduced ? 500 : 1500));
+      const screen = $('checking-screen'), checkedAt = formatInstant(data.watch.firstCheck.checkedAt);
+      const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+      $('checking-replay').textContent = 'Replayed check · captured ' + checkedAt + ' · not live';
+      $('checking-title').textContent = 'Drop Watch armed'; $('checking-status').textContent = '';
+      screen.classList.remove('checking', 'handoff'); $('handoff').hidden = true;
+      await pause(reduced ? 0 : 900);
+      if (!isCurrent()) return false;
+      screen.classList.add('checking'); $('checking-status').textContent = 'Checking for drops · replaying the check from ' + checkedAt + '.';
+      await pause(reduced ? 500 : 1500);
       if (!isCurrent()) return false;
       const copy = handoffCopy(data);
-      screen.classList.add('checked', 'handoff');
+      screen.classList.replace('checking', 'handoff');
       $('checking-title').textContent = copy.title;
       $('checking-status').replaceChildren(node('span', copy.title + '. ', 'sr-only'), copy.lead);
       $('handoff-text').textContent = copy.text;
       $('handoff-email').hidden = !copy.email; $('handoff-email').textContent = copy.email ? 'Saved for ' + copy.email + ' · not sent yet' : '';
       $('open-roomdrop-label').textContent = copy.action; $('handoff').hidden = false;
-      $('open-roomdrop').focus({ preventScroll: true });
+      // Only the modal scrolls, so the button may bring itself into view on short screens.
+      $('open-roomdrop').focus();
       const continued = await new Promise(resolve => {
         const timer = setInterval(() => { if (!isCurrent() || screen.hidden) done(false); }, 150);
         const click = () => done(true);

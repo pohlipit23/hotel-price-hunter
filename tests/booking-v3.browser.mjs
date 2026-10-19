@@ -58,11 +58,14 @@ try {
     assert.equal(bodies[2].expectedRevision, 2); assert.equal(JSON.stringify(watch), committed);
     assert.equal(await page.locator('#deal-list').isVisible(), false);
     await page.reload(); await visible('setup-screen');
+    // A fresh #setup- load opens RoomDrop's modal over the agency page; failed arms keep it open for a retry.
+    assert.equal(await page.locator('#drop-modal').evaluate(dialog => dialog.open), true);
     for (const errorCode of ['CATALOGUE_UNAVAILABLE', 'DEMO_UNAVAILABLE']) {
       unavailable = errorCode;
       await Promise.all([page.waitForResponse(response => response.url().endsWith('/watch')), page.locator('#arm-watch').click()]);
       await page.locator('#setup-message').filter({ hasText: /unavailable/ }).waitFor();
       assert.equal(bodies.at(-1).expectedRevision, 3); assert.equal(JSON.stringify(watch), committed);
+      assert.deepEqual([await page.locator('#setup-screen').isVisible(), await page.locator('#checking-screen').isVisible()], [true, false]);
     }
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     await page.screenshot({ path: join(output, `stale-and-unavailable-${width}.png`), fullPage: true });

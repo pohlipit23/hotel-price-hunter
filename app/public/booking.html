@@ -24,6 +24,8 @@
     <header class="site-header">
       <a class="brand" href="/" aria-label="RoomDrop home"><img src="/assets/roomdrop-logo.png" alt="RoomDrop"></a>
       <span id="agency-brand" class="agency-brand" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9.5"/><path d="M7.5 13.5 17 9l-2 6-3-1.5-1.5 2-.5-3Z"/></svg>Travel Agency</span>
+      <!-- The agency's own menu, for looks only: the demo has no such pages. -->
+      <span id="agency-nav" class="agency-nav" aria-hidden="true" hidden><span>My trips</span><span>Help</span></span>
       <span class="demo-tag">Fictional demo</span>
     </header>
     <main id="main">
@@ -53,85 +55,139 @@
           <div id="catalogue-list" class="catalogue-grid"></div>
         </section>
 
-        <section id="booked-screen" class="judge-screen" aria-labelledby="booked-title" hidden>
+        <!-- Step 2: the travel agency's own confirmation page. Only the framed add-on and its modal are RoomDrop. -->
+        <section id="booked-screen" class="judge-screen agency-page" aria-labelledby="booked-title" hidden>
           <a id="booked-back" class="back" href="#start"><span aria-hidden="true">‹</span> All bookings</a>
-          <article class="ticket booked-ticket">
-            <div class="ticket-photo booked-photo">
-              <div id="booked-photo"></div>
-              <span id="booked-photo-tag" class="photo-tag">Hotel photo</span>
-              <span class="booked-stamp" aria-hidden="true"><span>Agency</span><strong>Booked</strong></span>
-            </div>
-            <div class="ticket-tear" aria-hidden="true"></div>
-            <div class="booked-caption">
-              <p class="eyebrow">Your agency booked this</p>
-              <h1 id="booked-title" tabindex="-1"></h1>
-              <p id="booked-place" class="muted"></p>
-              <figure id="booked-room" class="booked-room" hidden>
-                <div id="booked-room-photo" class="booked-room-photo"></div>
-                <figcaption><span class="photo-kind">Room photo</span><strong id="booked-room-name"></strong></figcaption>
-              </figure>
-              <dl id="booked-facts" class="booked-facts"></dl>
-              <div class="booked-total"><span>Whole stay</span><strong id="booked-price"></strong></div>
-            </div>
-          </article>
-          <p id="booked-note" class="honest-note"></p>
-          <section id="booked-blocked" class="cannot-start" aria-labelledby="blocked-title" hidden>
-            <span class="cannot-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-6 15L18 6"/></svg></span>
+          <div class="agency-confirmed">
+            <span class="agency-check" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="m6 12.5 4 4 8-9"/></svg></span>
             <div>
-              <h2 id="blocked-title"></h2>
-              <p id="blocked-text" class="small"></p>
+              <h1 id="booked-title" tabindex="-1">Your booking is confirmed</h1>
+              <p>Confirmation no. <strong id="booked-code"></strong></p>
             </div>
-            <button id="pick-another" class="secondary" type="button">Pick another booking</button>
-          </section>
-          <div id="booked-ready" class="judge-actions">
-            <button id="setup-drop" class="primary" type="button">Set up a drop</button>
           </div>
-        </section>
-
-        <section id="setup-screen" class="judge-screen" aria-labelledby="setup-title" hidden>
-          <a id="setup-back" class="back" href="#booked"><span aria-hidden="true">‹</span> Your booking</a>
-          <div class="setup-card">
-            <div class="setup-heading">
-              <span class="watch-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11Z"/><path d="M9 14h6"/></svg></span>
-              <div>
-                <p class="eyebrow">Drop Watch</p>
-                <h1 id="setup-title" tabindex="-1">Set up your drop</h1>
-                <p id="setup-booking" class="small muted"></p>
+          <div class="agency-layout">
+            <div class="agency-main">
+              <article class="agency-card agency-hotel" aria-labelledby="booked-hotel">
+                <div class="agency-hotel-photo">
+                  <div id="booked-photo"></div>
+                    </div>
+                <div class="agency-hotel-copy">
+                  <h2 id="booked-hotel"></h2>
+                  <p class="agency-hotel-meta"><span id="booked-stars" class="agency-stars" role="img"></span><span id="booked-place"></span></p>
+                </div>
+              </article>
+              <section class="agency-card" aria-labelledby="stay-title">
+                <h2 id="stay-title" class="agency-card-title">Your stay</h2>
+                <div class="agency-dates">
+                  <p><span>Check-in</span><strong id="booked-checkin"></strong></p>
+                  <p><span>Check-out</span><strong id="booked-checkout"></strong></p>
+                </div>
+                <figure id="booked-room" class="booked-room" hidden>
+                  <div id="booked-room-photo" class="booked-room-photo"></div>
+                  <figcaption><span class="photo-kind">Room photo</span><strong id="booked-room-name"></strong></figcaption>
+                </figure>
+                <dl id="booked-facts" class="agency-facts"></dl>
+              </section>
+            </div>
+            <div class="agency-side">
+              <div class="drop-slot">
+                <p class="agency-addon">Add to your trip</p>
+                <!-- The RoomDrop widget: a third-party add-on on the agency's page. -->
+                <section id="drop-offer" class="drop-offer" data-state="ready" aria-labelledby="drop-offer-title">
+                  <div class="drop-offer-inner">
+                    <div class="drop-offer-head">
+                      <span class="drop-offer-stamp" aria-hidden="true">
+                        <svg class="stamp-ready" viewBox="0 0 24 24" focusable="false"><path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11Z"/><path d="M9 14h6"/></svg>
+                        <svg class="stamp-armed" viewBox="0 0 24 24" focusable="false"><path d="m6 12.5 4 4 8-9"/></svg>
+                        <svg class="stamp-blocked" viewBox="0 0 24 24" focusable="false"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-6 15L18 6"/></svg>
+                      </span>
+                      <div class="drop-offer-copy">
+                        <h2 id="drop-offer-title">Prices often drop after you book.</h2>
+                        <p id="drop-offer-text">We'll watch this one for you.</p>
+                      </div>
+                    </div>
+                    <div id="booked-blocked" class="drop-offer-blocked" hidden>
+                      <h3 id="blocked-title"></h3>
+                      <p id="blocked-text"></p>
+                    </div>
+                    <div class="drop-offer-actions">
+                      <button id="drop-open" class="primary drop-open" type="button" hidden>Open RoomDrop <span aria-hidden="true">→</span></button>
+                      <button id="setup-drop" class="primary drop-cta" type="button">Set up a drop</button>
+                    </div>
+                    <p class="powered-by">Powered by <span class="powered-logo"><img src="/assets/roomdrop-logo.png" alt="RoomDrop"></span></p>
+                  </div>
+                </section>
               </div>
+              <section class="agency-card agency-price" aria-labelledby="price-title">
+                <h2 id="price-title" class="agency-card-title">Price summary</h2>
+                <p class="agency-total"><span>Total paid</span><strong id="booked-price"></strong></p>
+                <p class="agency-fine">Taxes included</p>
+              </section>
             </div>
-            <fieldset id="minimum-choices" class="minimum-choices">
-              <legend>Tell me about drops of at least</legend>
-              <div id="minimum-options" class="chip-row"></div>
-            </fieldset>
-            <div class="delivery-field">
-              <label for="delivery-email"><span class="delivery-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M3 6h18v12H3z"/><path d="m3 7 9 6 9-6"/></svg></span>Where should we send your drop? <span class="optional-tag">Optional</span></label>
-              <input id="delivery-email" type="email" inputmode="email" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@example.com" aria-describedby="delivery-problem delivery-consent">
-              <p id="delivery-saved" class="delivery-saved" hidden><span>Saved <strong id="delivery-saved-email"></strong></span><button id="delivery-remove" class="secondary" type="button">Remove</button></p>
-              <p id="delivery-problem" class="field-problem" hidden></p>
-              <p id="delivery-consent" class="delivery-consent">Use this email only to send my drop. Email delivery is not live yet; it is kept only with this 1-hour demo session.</p>
+            <div class="agency-more">
+              <section class="agency-card" aria-labelledby="policy-title">
+                <h2 id="policy-title" class="agency-card-title">Cancellation policy</h2>
+                <p id="booked-policy" class="agency-policy"></p>
+                <p id="booked-policy-note" class="agency-fine">*Subject to the hotel's full cancellation terms.</p>
+              </section>
+              <section class="agency-card agency-placeholders" aria-labelledby="guest-title">
+                <h2 id="guest-title" class="agency-card-title">Guest details</h2>
+                <p class="agency-row"><span>Lead guest</span><span class="agency-skeleton" aria-hidden="true"></span><span class="sr-only">Not shown in this demo</span></p>
+                <p class="agency-row"><span>Manage booking</span><span class="agency-chevron" aria-hidden="true">›</span></p>
+              </section>
+              <p id="booked-note" class="honest-note"></p>
             </div>
-            <label class="watch-consent-box" for="judge-consent">
-              <input id="judge-consent" type="checkbox">
-              <span>RoomDrop may check this booking for cheaper equivalent rooms and show them to me. Nothing changes without my approval.</span>
-            </label>
-            <p id="setup-message" role="status" class="inline-message"></p>
-            <button id="arm-watch" class="primary" type="button">Arm my Drop Watch</button>
           </div>
-        </section>
 
-        <section id="checking-screen" class="judge-screen" aria-labelledby="checking-title" hidden>
-          <div class="checking-card">
-            <div class="checking-drops" aria-hidden="true"><span></span><span></span><span></span></div>
-            <span class="handoff-stamp" aria-hidden="true"><span>Drop Watch</span><strong>Armed</strong></span>
-            <h1 id="checking-title" tabindex="-1">Checking for drops</h1>
-            <p id="checking-status" class="checking-status" role="status" aria-live="polite" aria-atomic="true"></p>
-            <div id="handoff" class="handoff-box" hidden>
-              <p id="handoff-text" class="handoff-text"></p>
-              <p id="handoff-email" class="handoff-email" hidden></p>
-              <button id="open-roomdrop" class="primary" type="button"><span id="open-roomdrop-label">Open RoomDrop</span> <span class="handoff-arrow" aria-hidden="true">→</span></button>
+          <!-- RoomDrop's modal over the dimmed agency page: setup, then the armed stamp, the replayed check and the hand-off. -->
+          <dialog id="drop-modal" class="drop-modal" aria-labelledby="setup-title">
+            <div class="drop-sheet">
+              <div class="drop-sheet-top">
+                <span class="drop-handle" aria-hidden="true"></span>
+                <button id="drop-close" class="drop-close" type="button" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+              </div>
+              <section id="setup-screen" class="drop-view setup-view" aria-labelledby="setup-title">
+                <div class="setup-heading">
+                  <span class="watch-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11Z"/><path d="M9 14h6"/></svg></span>
+                  <div>
+                    <p class="eyebrow">Drop Watch</p>
+                    <h2 id="setup-title" tabindex="-1">Set up your drop</h2>
+                    <p id="setup-booking" class="small muted"></p>
+                  </div>
+                </div>
+                <fieldset id="minimum-choices" class="minimum-choices">
+                  <legend>Tell me about drops of at least</legend>
+                  <div id="minimum-options" class="chip-row"></div>
+                </fieldset>
+                <div class="delivery-field">
+                  <label for="delivery-email"><span class="delivery-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M3 6h18v12H3z"/><path d="m3 7 9 6 9-6"/></svg></span>Email my drop to <span class="optional-tag">Optional</span></label>
+                  <input id="delivery-email" type="email" inputmode="email" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@example.com" aria-describedby="delivery-problem delivery-consent">
+                  <p id="delivery-saved" class="delivery-saved" hidden><span>Saved <strong id="delivery-saved-email"></strong></span><button id="delivery-remove" class="secondary" type="button">Remove</button></p>
+                  <p id="delivery-problem" class="field-problem" hidden></p>
+                  <p id="delivery-consent" class="delivery-consent">Use this email only to send my drop. Email delivery is not live yet; it is kept only with this 1-hour demo session.</p>
+                </div>
+                <label class="watch-consent-box" for="judge-consent">
+                  <input id="judge-consent" type="checkbox">
+                  <span>RoomDrop may check this booking for cheaper equivalent rooms and show them to me. Nothing changes without my approval.</span>
+                </label>
+                <p id="setup-message" role="status" class="inline-message"></p>
+                <button id="arm-watch" class="primary" type="button">Arm my Drop Watch</button>
+              </section>
+              <section id="checking-screen" class="drop-view checking-view" aria-labelledby="checking-title" hidden>
+                <span class="handoff-stamp" aria-hidden="true"><span>Drop Watch</span><strong>Armed</strong></span>
+                <h2 id="checking-title" tabindex="-1">Drop Watch armed</h2>
+                <div class="checking-drops" aria-hidden="true"><span></span><span></span><span></span></div>
+                <p id="checking-status" class="checking-status" role="status" aria-live="polite" aria-atomic="true"></p>
+                <div id="handoff" class="handoff-box" hidden>
+                  <p id="handoff-text" class="handoff-text"></p>
+                  <p id="handoff-email" class="handoff-email" hidden></p>
+                  <button id="open-roomdrop" class="primary" type="button"><span id="open-roomdrop-label">Open RoomDrop</span> <span class="handoff-arrow" aria-hidden="true">→</span></button>
+                </div>
+                <p id="checking-replay" class="replay-tag"></p>
+              </section>
+              <p class="powered-by">Powered by <span class="powered-logo"><img src="/assets/roomdrop-logo.png" alt="RoomDrop"></span></p>
             </div>
-            <p id="checking-replay" class="replay-tag"></p>
-          </div>
+          </dialog>
         </section>
 
         <!-- Judge-only closeout after the confirmation's "What next?" choice: the RoomDrop app has ended. -->

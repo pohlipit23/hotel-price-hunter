@@ -2,8 +2,8 @@
 // These are the display rules in app/public/booking-judge.js; the browser walk is tests/booking-judge.browser.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { JOURNEY, armRequestBody, armedDetail, cannotStart, capturedNote, cardFacts, cardPhoto, deliveryEmailField, handoffCopy, journeyStep, minimumOptions,
-  roomPhoto, savedDelivery } from '../app/public/booking-judge.js';
+import { JOURNEY, armRequestBody, armedDetail, armedSummary, cannotStart, capturedNote, cardFacts, cardPhoto, dayText, deliveryEmailField, handoffCopy, journeyStep,
+  minimumOptions, nightsText, offerState, roomPhoto, savedDelivery } from '../app/public/booking-judge.js';
 
 const siam = {
   code: 'AIRB000180', blocker: null, tag: 'ready', hotel: { name: 'Siam Kempinski Hotel Bangkok', cityCode: 'BKK', countryCode: 'TH' },
@@ -104,8 +104,24 @@ test('the journey strip: pick on Altovo, set up in RoomDrop, get the drop in the
   assert.equal(JOURNEY[0].text, "Made on Altovo's booking engine, not part of this submission. RoomDrop starts at the confirmation.");
   assert.equal(JOURNEY[1].text, 'Invite on the confirmation page (or in the confirmation email).');
   assert.equal(JOURNEY[2].text, 'Cheaper room found? It arrives by email.');
-  assert.deepEqual(['catalogue-screen', 'booked-screen', 'setup-screen', 'checking-screen', 'booking-summary', 'comparison', 'simulated-switch', null].map(journeyStep),
-    [1, 2, 2, 2, 3, 3, 3, null]);
+  // Setup and the replayed check open in a modal over the agency's confirmation page, so the page's step 2 covers them.
+  assert.deepEqual(['catalogue-screen', 'booked-screen', 'launch-screen', 'booking-summary', 'comparison', 'simulated-switch', 'closeout-screen', null].map(journeyStep),
+    [1, 2, 3, 3, 3, 3, 4, null]);
+  assert.equal(journeyStep('setup-screen'), null); assert.equal(journeyStep('checking-screen'), null);
+});
+
+test('the agency confirmation page: the add-on card state, and dates without invented times', () => {
+  const data = { baseline: { quotedRetail: { currency: 'MYR' } }, agencyMinimumSavingMinor: 1000, blocker: null, watch: null };
+  assert.equal(offerState(data), 'ready');
+  assert.equal(offerState({ ...data, watch: { minimumSavingMinor: 1000 } }), 'armed');
+  // A booking that cannot start stays blocked even with an older receipt.
+  assert.equal(offerState({ ...data, blocker: 'NON_REFUNDABLE', watch: { minimumSavingMinor: 1000 } }), 'blocked');
+  assert.equal(armedSummary({ ...data, watch: { minimumSavingMinor: 1000 } }), 'Any drop of MYR 10 or more');
+  assert.equal(armedSummary({ ...data, watch: { minimumSavingMinor: 5000 } }), 'Drops of MYR 50 or more');
+  assert.equal(armedSummary(data), null);
+  assert.equal(dayText('2027-02-17'), 'Wed 17 Feb 2027');
+  assert.equal(nightsText({ checkin: '2027-02-17', checkout: '2027-02-18' }), '1 night');
+  assert.equal(nightsText({ checkin: '2027-02-17', checkout: '2027-02-20' }), '3 nights');
 });
 
 test('the hand-off after arming says the judge leaves the booking site, from the committed receipt only', () => {

@@ -14,12 +14,22 @@ export async function startBookingDemo(ui) {
   const adviser = createStayAdviser({ parent: $('comparison'), before: $('price-details'),
     overviewParent: $('deal-list').querySelector('.section-heading'), getData: () => data, chatUrl: () => api('chat') });
   const explanation = 'Estimated savings before final pricing and fees.';
-  const judgeScreens = { start: 'catalogue-screen', booked: 'booked-screen', setup: 'setup-screen', checking: 'checking-screen', launch: 'launch-screen', closeout: 'closeout-screen' };
+  const judgeScreens = { start: 'catalogue-screen', booked: 'booked-screen', launch: 'launch-screen', closeout: 'closeout-screen' };
+  // Setup and the replayed check play in RoomDrop's modal over the agency's confirmation page.
+  const modalViews = ['setup', 'checking'], pageOf = screen => modalViews.includes(screen) ? 'booked' : screen;
+  const modal = $('drop-modal');
+  let dropTrigger = null, returnFocus = null;
+  const syncModal = screen => {
+    if (!modalViews.includes(screen)) { if (modal.open) modal.close('route'); return; }
+    $('setup-screen').hidden = screen !== 'setup'; $('checking-screen').hidden = screen !== 'checking';
+    modal.setAttribute('aria-labelledby', screen + '-title');
+    if (!modal.open) { modal.returnValue = ''; modal.showModal(); }
+  };
   const stepIndex = catalogueMode ? { booked: 0, setup: 1, checking: 1, options: 2, review: 3, confirmed: 4 } : { options: 0, review: 1, confirmed: 2 };
   const routes = { start: 'start', booked: 'booked', setup: 'setup', options: 'drops', review: 'review', confirmed: 'confirmed', closeout: 'done' };
   const steps = screen => {
     const existing = ['options', 'review', 'confirmed'].includes(screen);
-    for (const [name, id] of Object.entries(judgeScreens)) $(id).hidden = screen !== name;
+    for (const [name, id] of Object.entries(judgeScreens)) $(id).hidden = pageOf(screen) !== name;
     $('booking-summary').hidden = !existing || screen === 'review'; $('comparison').hidden = screen !== 'review';
     $('simulated-switch').hidden = screen !== 'confirmed'; $('current-ticket').hidden = screen === 'confirmed';
     $('deal-list').hidden = ['confirmed', 'launch', 'closeout'].includes(screen); $('price-watch').hidden = catalogueMode || screen === 'confirmed';
@@ -30,15 +40,17 @@ export async function startBookingDemo(ui) {
     if (catalogueMode) {
       // The start page and the closeout sit outside both sites: the judge is before or after the app.
       const site = ['start', 'closeout'].includes(screen) ? null : existing || screen === 'launch' ? 'roomdrop' : 'agency';
-      $('app-frame').dataset.site = site ?? 'none'; shownSite = site; shownScreen = screen;
+      $('app-frame').dataset.site = site ?? 'none'; shownSite = site; shownScreen = screen; shownCode = code;
+      syncModal(screen);
       // While the splash plays, the frame and the judge bar both flag that the actual app is starting.
       $('app-frame').classList.toggle('launching', screen === 'launch'); $('judge-bar').classList.toggle('judge-bar-entering', screen === 'launch');
       // The launch splash carries its own logo, so the header waits until the Drops page.
       document.querySelector('.site-header').hidden = !site || screen === 'launch';
       $('judge-bar-text').textContent = screen === 'launch' ? 'Now starting the RoomDrop app · the hackathon submission'
         : screen === 'closeout' ? 'The RoomDrop app ends here · thanks for judging'
-        : site === 'roomdrop' ? 'Hackathon submission starts here' : 'How this demo works';
-      document.querySelector('.brand').hidden = site !== 'roomdrop'; $('agency-brand').hidden = site !== 'agency';
+        : site === 'roomdrop' ? 'Hackathon submission starts here'
+        : site === 'agency' ? "This is your travel agency's confirmation page. The framed box is the RoomDrop widget." : 'How this demo works';
+      document.querySelector('.brand').hidden = site !== 'roomdrop'; $('agency-brand').hidden = $('agency-nav').hidden = site !== 'agency';
     }
     $('customer-steps').hidden = catalogueMode || screen === 'start';
     $('content').classList.toggle('has-review', screen === 'review'); $('content').classList.toggle('has-switch', screen === 'confirmed');
@@ -56,7 +68,7 @@ export async function startBookingDemo(ui) {
     : screen === 'review' ? '#comparison' : screen === 'confirmed' ? '#confirmed' : '#booking-summary';
   // Entering RoomDrop from anywhere else (the agency pages, the start page or a fresh load) plays a short launch
   // splash first; moving between RoomDrop pages does not. Focus requested meanwhile lands once the page shows.
-  let shownSite = null, shownScreen = null, launchTimer = null, pendingFocus = null;
+  let shownSite = null, shownScreen = null, shownCode = null, launchTimer = null, pendingFocus = null;
   const launchMs = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 2000 : 5000;
   const navigate = (screen, push = true) => {
     const state = { bookingScreen: screen, optionId: screen === 'review' ? selected?.offerId : null, code: screen === 'start' ? null : code };
@@ -65,7 +77,9 @@ export async function startBookingDemo(ui) {
   };
   const show = screen => {
     clearTimeout(launchTimer); launchTimer = null; pendingFocus = null;
-    const reveal = () => { steps(screen); window.scrollTo({ top: 0, behavior: 'instant' }); };
+    // Opening or closing the modal keeps the agency page where it was.
+    const samePage = shownCode === code && pageOf(shownScreen) === 'booked' && pageOf(screen) === 'booked';
+    const reveal = () => { steps(screen); if (!samePage) window.scrollTo({ top: 0, behavior: 'instant' }); };
     // Back from the closeout returns to the confirmation directly; the app is not starting again.
     if (!catalogueMode || !['options', 'review', 'confirmed'].includes(screen) || shownSite === 'roomdrop' || shownScreen === 'closeout') return reveal();
     steps('launch'); window.scrollTo({ top: 0, behavior: 'instant' }); $('launch-title').focus({ preventScroll: true });
@@ -88,10 +102,10 @@ export async function startBookingDemo(ui) {
     }
     return frame;
   }
-  function setPhoto(target, photo, label = 'Hotel photo') {
-    const tag = target.parentElement.querySelector(':scope > .photo-tag');
-    if (tag) { tag.textContent = label; tag.hidden = false; }
-    target.replaceChildren(photoContent(photo, () => { if (tag) tag.hidden = true; }));
+  // Catalogue photos are real and need no "Hotel photo" label, so the shared markup's tag goes.
+  function setPhoto(target, photo) {
+    target.parentElement.querySelector(':scope > .photo-tag')?.remove();
+    target.replaceChildren(photoContent(photo));
   }
   function review(offer, trigger, push = true) {
     if (busy) return;
@@ -184,9 +198,8 @@ export async function startBookingDemo(ui) {
     $('room').textContent = view.booking.room.name + ' · ' + data.baseline.room.board;
     $('offers').replaceChildren(...view.highlights.map(highlight => ui.offerCard(highlight.offer, highlight)));
     if (catalogueMode) for (const [index, highlight] of view.highlights.entries()) {
-      const card = $('offers').children[index], tag = card.querySelector('.photo-tag');
-      tag.textContent = 'Hotel photo';
-      card.querySelector('.offer-photo > .stay-photo').replaceWith(photoContent(highlight.offer.option.photo, () => tag.remove()));
+      const card = $('offers').children[index]; card.querySelector('.photo-tag')?.remove();
+      card.querySelector('.offer-photo > .stay-photo').replaceWith(photoContent(highlight.offer.option.photo));
     }
     $('offer-empty').hidden = view.highlights.length > 0;
     $('lower-minimum').hidden = !catalogueMode || replay.status !== 'empty';
@@ -285,7 +298,7 @@ export async function startBookingDemo(ui) {
         if (!payload) { status('That booking is not in this demo. Pick one below.', true); screen = 'start'; }
         else {
           code = target; data = payload; selected = null; lastTrigger = trigger || null; applyData();
-          $('booked-back').href = '#start'; $('setup-back').href = '#booked-' + code;
+          $('booked-back').href = '#start';
         }
       }
       catch { status('That booking could not be loaded. Please try again.', true); screen = 'start'; }
@@ -299,8 +312,9 @@ export async function startBookingDemo(ui) {
       if (data.confirmation) { closeout(push); return; }
       screen = 'options';
     }
-    if (screen === 'booked') { judge.renderBooked(data); navigate('booked', push); focusHeading('booked-title'); return; }
-    if (screen === 'setup') { judge.renderSetup(data); navigate('setup', push); focusHeading('setup-title'); return; }
+    // Leaving the modal (Back, or a close that went back) returns focus to what opened it.
+    if (screen === 'booked') { const closing = modal.open || returnFocus; judge.renderBooked(data); navigate('booked', push); if (closing) focusTrigger(); else focusHeading('booked-title'); return; }
+    if (screen === 'setup') { judge.renderBooked(data); judge.renderSetup(data); navigate('setup', push); focusHeading('setup-title'); return; }
     // Once a drop is chosen the app is finished: Drops and review routes land on the confirmation.
     if (catalogueMode && data.confirmation && ['options', 'review'].includes(screen)) screen = 'confirmed';
     if (screen === 'confirmed' && data.confirmation && confirmed(data.confirmation, push)) return;
@@ -316,6 +330,7 @@ export async function startBookingDemo(ui) {
       $('judge-consent').focus(); return;
     }
     busy = true; $('arm-watch').disabled = true; $('arm-watch').setAttribute('aria-busy', 'true');
+    const token = ++navigation;
     try {
       const response = await fetch(api('watch'), { method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': data.csrfToken },
@@ -327,12 +342,12 @@ export async function startBookingDemo(ui) {
         if (['CATALOGUE_UNAVAILABLE', 'DEMO_UNAVAILABLE'].includes(result.error?.code)) throw Object.assign(Error(), { userMessage: 'RoomDrop is unavailable right now. Please try again.' });
         throw Error();
       }
-      data.watch = result.watch; data.confirmation = null; selected = null; applyData();
-      if (pendingRoute) { busy = false; return; }
+      data.watch = result.watch; data.confirmation = null; selected = null; applyData(); judge.renderOffer(data);
+      // A route change, or the modal closed meanwhile: the armed card already shows on the agency page.
+      if (pendingRoute || token !== navigation) { busy = false; return; }
       if (replayResult(data).status === 'unavailable') { busy = false; overview(); return; }
-      const token = ++navigation;
       history.pushState({ bookingScreen: 'options', code }, '', hashFor('options'));
-      steps('checking'); window.scrollTo({ top: 0, behavior: 'instant' }); focusHeading('checking-title');
+      steps('checking'); focusHeading('checking-title');
       busy = false;
       if (await judge.playCheck(data, () => token === navigation)) { show('options'); focusHeading('changes-title'); }
     } catch (error) {
@@ -340,9 +355,43 @@ export async function startBookingDemo(ui) {
     } finally { busy = false; $('arm-watch').disabled = false; $('arm-watch').removeAttribute('aria-busy'); if (pendingRoute) followLocation(); }
   }
   const link = (id, handler) => $(id).addEventListener('click', event => { event.preventDefault(); handler(); });
-  link('booked-back', () => go('start')); link('setup-back', () => go('booked', code));
-  $('pick-another').addEventListener('click', () => go('start'));
-  $('setup-drop').addEventListener('click', () => go('setup', code));
+  link('booked-back', () => go('start'));
+  // The add-on opens the modal at once over the loaded page; a direct #setup- link loads first (go).
+  $('setup-drop').addEventListener('click', event => {
+    if (busy || !data || data.blocker) return;
+    dropTrigger = event.currentTarget; ++navigation; judge.renderSetup(data);
+    history.pushState({ bookingScreen: 'setup', code, optionId: null, overPage: true }, '', hashFor('setup'));
+    show('setup'); focusHeading('setup-title');
+  });
+  $('drop-open').addEventListener('click', () => go('options', code));
+  const focusTrigger = () => {
+    const target = [returnFocus, dropTrigger, $('setup-drop')].find(item => item?.isConnected && !item.closest('[hidden]')) ?? $('booked-title');
+    returnFocus = null; target.focus();
+  };
+  // The judge closes the modal (X, Esc or the backdrop): back to the confirmation page. Route changes close it
+  // themselves ('route'). Not while the arm request is out; a close that slips through is caught in arm().
+  function dismissed() {
+    ++navigation;
+    if (location.hash === hashFor('setup') && history.state?.overPage) { returnFocus = dropTrigger; history.back(); return; }
+    history.replaceState({ bookingScreen: 'booked', code, optionId: null }, '', hashFor('booked'));
+    judge.renderBooked(data); steps('booked'); focusTrigger();
+  }
+  modal.addEventListener('close', () => { if (modal.returnValue !== 'route' && !modal.open) dismissed(); });
+  modal.addEventListener('cancel', event => { if (busy) event.preventDefault(); });
+  $('drop-close').addEventListener('click', () => { if (!busy) modal.close('dismiss'); });
+  // A modal dialog still lets Tab leave for the browser's own toolbar; keep it cycling inside the modal instead.
+  modal.addEventListener('keydown', event => {
+    if (event.key !== 'Tab') return;
+    const items = [...modal.querySelectorAll('button, input, a[href], [tabindex]:not([tabindex="-1"])')].filter(item => !item.disabled && item.getClientRects().length);
+    const at = document.activeElement, follows = item => at.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING;
+    if (!items.length) return;
+    if (!event.shiftKey && !items.some(follows)) { event.preventDefault(); items[0].focus(); }
+    if (event.shiftKey && !items.some(item => item !== at && !follows(item))) { event.preventDefault(); items.at(-1).focus(); }
+  });
+  modal.addEventListener('click', event => {
+    const box = modal.getBoundingClientRect();
+    if (!busy && event.target === modal && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom)) modal.close('dismiss');
+  });
   $('arm-watch').addEventListener('click', arm);
   $('judge-consent').addEventListener('change', () => { $('setup-message').textContent = ''; $('setup-message').classList.remove('error'); });
   $('change-minimum').addEventListener('click', () => go('setup', code)); $('lower-minimum').addEventListener('click', () => go('setup', code));

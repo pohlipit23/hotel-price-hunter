@@ -97,7 +97,7 @@ try {
     assert.deepEqual(await page.locator('.catalogue-card').evaluateAll(cards => cards.map(card => card.dataset.code)), order);
     for (const code of order) {
       assert.equal(await page.locator(`[data-code="${code}"] img.card-photo`).getAttribute('alt'), reviewed[code].hotel.alt, code);
-      assert.equal(await page.locator(`[data-code="${code}"] .photo-tag`).innerText(), 'Hotel photo', code);
+      assert.equal(await page.locator(`[data-code="${code}"] .photo-tag`).count(), 0, code + ' photo carries no label');
     }
     await loaded(page, 'img.card-photo');
     assert.equal(await page.locator('.photo-fallback').count(), 0);
@@ -105,7 +105,7 @@ try {
     for (const code of [PAN, SIAM, HYATT]) {
       await page.locator(`[data-code="${code}"] .catalogue-open`).click(); await visible(page, 'booked-screen');
       assert.equal(await page.locator('#booked-photo img.card-photo').getAttribute('alt'), reviewed[code].hotel.alt);
-      assert.equal(await page.locator('#booked-photo-tag').innerText(), 'Hotel photo');
+      assert.equal(await page.locator('#booked-screen .photo-tag').count(), 0, 'the booked photo carries no label');
       assert.equal(await page.locator('#booked-room').isVisible(), Boolean(reviewed[code].room), code + ' room photo shown only when reviewed');
       if (reviewed[code].room) {
         assert.equal(await page.locator('#booked-room img').getAttribute('alt'), reviewed[code].room.alt);
