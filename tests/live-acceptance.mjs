@@ -1,9 +1,13 @@
 // Live cloud acceptance for a deployed RoomDrop service, using only its public HTTP endpoints and UI as a judge would.
-// Usage: node tests/live-acceptance.mjs [baseUrl] [--project=<gcp project>]
+// Usage: node tests/live-acceptance.mjs [baseUrl] [--project=<gcp project>] [--mail=<address>]
 // Optional: set $env:GCP_ACCESS_TOKEN (gcloud auth print-access-token) to also read the session document back from
 // Firestore with a read-only REST GET. It never deploys, restarts, writes Firestore directly, calls Gemini (/advice and
 // /chat are blocked) or calls a supplier. It does create ordinary visitor sessions, arms Drop Watches and records demo
 // selections through the app, exactly as a judge clicking through would.
+// Drop email: without --mail no address is typed, so no Drop email can be sent whatever the service's mail setting.
+// With --mail=<address>, judge A (only) arms with that address and the check expects the masked hand-off and the
+// watch's delivery.status: 'scheduled' when the service has Drop email on, 'pending-service' when it is off. A real
+// email then goes to that address about a minute later; confirming it arrived and that its link opens is manual.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -15,6 +19,9 @@ const args = process.argv.slice(2);
 const origin = new URL(args.find(arg => !arg.startsWith('--')) ?? 'https://hotel-price-hunter-2qbcpylngq-as.a.run.app').origin;
 const project = args.find(arg => arg.startsWith('--project='))?.slice(10) ?? 'sincere-apex-511418-p0';
 const sessionsCollection = args.find(arg => arg.startsWith('--sessions='))?.slice(11) ?? 'roomdropPublicSessionsV1';
+const mailTo = args.find(arg => arg.startsWith('--mail='))?.slice(7) ?? null;
+if (mailTo !== null && !/^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/.test(mailTo)) { console.error('--mail needs one plain email address.'); process.exit(2); }
+const maskedMail = mailTo && mailTo[0] + '***' + mailTo.slice(mailTo.lastIndexOf('@'));
 const preferred = ['AIRB000180', 'AIRB000181', 'AIRB000182', 'AIRB000183'];
 const output = resolve('.local/live-acceptance'); await mkdir(output, { recursive: true });
 const report = { origin, startedAt: new Date().toISOString(), checks: {}, screenshots: [], errors: [], external: [], blocked: [] };
@@ -55,12 +62,15 @@ try {
     const visible = id => page.locator('#' + id).waitFor({ state: 'visible', timeout: 30000 });
     const shot = async stage => { const path = join(output, `${label}-${stage}-${width}.png`); await page.screenshot({ path, fullPage: true }); report.screenshots.push(path); };
     const get = async code => (await context.request.get(api('/q/' + code))).json();
-    const arm = async (code, minimum) => {
+    // Types an address only when one is given (--mail, judge A); otherwise the optional field stays empty.
+    const arm = async (code, minimum, email = null) => {
       await page.goto(origin + '/#setup-' + code); await visible('setup-screen'); await page.locator('#judge-consent').check();
       await page.locator(`input[name="minimum-saving"][value="${minimum}"]`).check();
-      await page.locator('#delivery-email').fill('judge-live@example.test');
+      await page.locator('#delivery-email').waitFor({ state: 'visible' });
+      if (email) await page.locator('#delivery-email').fill(email);
       await page.locator('#arm-watch').click(); await visible('handoff');
-      assert.match(await page.locator('#handoff-email').innerText(), /j\*\*\*@example.test/);
+      if (email) assert.ok((await page.locator('#handoff-email').innerText()).includes(maskedMail), 'masked address missing from hand-off');
+      else assert.equal(await page.locator('#handoff-email').isVisible(), false, 'hand-off shows an address that was never typed');
       await page.locator('#open-roomdrop').click(); await visible('deal-list');
       await page.locator('#booking-label').filter({ hasText: /^Original Booking/ }).waitFor();
     };
@@ -79,11 +89,21 @@ try {
   const [first, second] = eligible;
 
   await check('a-replay-labels', async () => {
-    await a.arm(first.code, first.minimum);
+    await a.arm(first.code, first.minimum, mailTo);
     const detail = await a.page.locator('#armed-detail').innerText();
     assert.match(detail, /Replayed .*Captured .*not live/);
     await a.shot('drops');
     return { code: first.code, armedDetail: detail };
+  });
+
+  if (mailTo) await check('mail-arm', async () => {
+    // The arm response already recorded the mail outcome; a fresh read shows it as stored (masked address only).
+    const delivery = (await a.get(first.code)).watch?.delivery;
+    assert.ok(delivery, 'watch has no delivery');
+    assert.equal(delivery.maskedEmail, maskedMail); assert.equal(delivery.email, undefined, 'raw address exposed');
+    assert.ok(['scheduled', 'pending-service'].includes(delivery.status), 'unexpected delivery.status ' + delivery.status);
+    return { code: first.code, maskedEmail: delivery.maskedEmail, deliveryStatus: delivery.status, mailId: delivery.mailId ?? null,
+      next: delivery.status === 'scheduled' ? 'Confirm the email arrives in about a minute and its link opens this booking\'s Drops.' : 'Drop email is off on this service.' };
   });
 
   await check('b-arm-confirm', async () => {
