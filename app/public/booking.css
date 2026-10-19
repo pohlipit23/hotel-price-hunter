@@ -416,18 +416,6 @@ details[open] > summary::after { transform: rotate(225deg); }
 .fact-warning { background: #fffaf0; border-color: var(--warning-line); }
 .fact-warning .fact-icon { background: var(--warning-bg); color: var(--amber); }
 .fact-warning .fact-cue { border-color: #d8b86d; color: var(--amber); }
-.fact-hotel { border-radius: 6px 15px 15px 6px; transform: rotate(-.35deg); }
-.fact-hotel .fact-icon { border-radius: 4px 9px 9px 4px; }
-.fact-hotel .fact-icon::after { position: absolute; top: 5px; right: 5px; width: 4px; height: 4px; border: 1px solid currentColor; border-radius: 50%; background: var(--surface); content: ''; }
-.fact-room { border-radius: 7px; border-style: dashed; transform: rotate(.25deg); }
-.fact-room::before, .fact-room::after { position: absolute; top: 50%; z-index: 1; width: 9px; height: 9px; border-radius: 50%; background: var(--surface); content: ''; transform: translateY(-50%); }
-.fact-room::before { left: -5px; }
-.fact-room::after { right: -5px; }
-.fact-meals { border: 1px dashed #e8d8bd; border-bottom-width: 3px; border-radius: 3px; background: #fffcf5; box-shadow: 0 3px 0 #f1e6d5; }
-.fact-meals .fact-icon { border-radius: 50%; background: #f8eddb; color: #755a30; }
-.fact-cancellation { border-style: dashed; border-radius: 14px 14px 8px 8px; }
-.fact-cancellation .fact-icon { border: 1px dashed currentColor; border-radius: 4px; transform: rotate(-5deg); }
-.fact-cancellation .fact-cue { transform: rotate(2deg); }
 .cancellation-summary { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 10px; font-size: 13px; color: var(--muted); }
 .cancellation-summary p { margin: 0 0 5px; overflow-wrap: anywhere; }
 .price-details { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }

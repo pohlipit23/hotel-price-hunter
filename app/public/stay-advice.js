@@ -1,4 +1,5 @@
 import { watchBinding } from './booking-live-data.js';
+let sparkleCount = 0;
 /** One conversation shared by the compact adviser and the floating Gemini dialog. */
 export function createStayAdviser({ parent, before, overviewParent, getData, chatUrl = () => '/api/booking-demo/chat' }) {
   const el = (tag, text, className) => {
@@ -6,6 +7,23 @@ export function createStayAdviser({ parent, before, overviewParent, getData, cha
     if (text) item.textContent = text;
     if (className) item.className = className;
     return item;
+  };
+  // The standard Gemini sparkle in its blue-to-violet gradient.
+  const sparkle = className => {
+    const ns = 'http://www.w3.org/2000/svg', id = 'gemini-gradient-' + (++sparkleCount);
+    const holder = el('span', null, className); holder.setAttribute('aria-hidden', 'true');
+    const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('focusable', 'false');
+    const gradient = document.createElementNS(ns, 'linearGradient'); gradient.id = id;
+    for (const [attribute, value] of [['x1', '0'], ['y1', '1'], ['x2', '1'], ['y2', '0']]) gradient.setAttribute(attribute, value);
+    for (const [offset, color] of [['0', '#4893FC'], ['.27', '#4893FC'], ['.78', '#969DFF'], ['1', '#BD99FE']]) {
+      const stop = document.createElementNS(ns, 'stop'); stop.setAttribute('offset', offset); stop.setAttribute('stop-color', color); gradient.append(stop);
+    }
+    const defs = document.createElementNS(ns, 'defs'); defs.append(gradient);
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', 'M12 24A14.3 14.3 0 0 0 0 12 14.3 14.3 0 0 0 12 0a14.3 14.3 0 0 0 12 12 14.3 14.3 0 0 0-12 12');
+    path.setAttribute('fill', 'url(#' + id + ')');
+    svg.append(defs, path); holder.append(svg);
+    return holder;
   };
   const section = el('section', null, 'stay-adviser');
   section.setAttribute('aria-labelledby', 'stay-advice-title');
@@ -23,14 +41,14 @@ export function createStayAdviser({ parent, before, overviewParent, getData, cha
   const launcher = el('button', null, 'gemini-launcher');
   launcher.type = 'button'; launcher.id = 'gemini-launcher'; launcher.hidden = true;
   launcher.setAttribute('aria-haspopup', 'dialog'); launcher.setAttribute('aria-controls', 'gemini-dialog');
-  const star = el('span', '✦', 'gemini-star'); star.setAttribute('aria-hidden', 'true');
+  const star = sparkle('gemini-star');
   launcher.append(star, el('span', 'Ask Gemini', 'gemini-label'));
 
   const dialog = el('dialog', null, 'gemini-dialog'); dialog.id = 'gemini-dialog';
   dialog.setAttribute('aria-labelledby', 'gemini-title');
   const header = el('header', null, 'gemini-header');
   const identity = el('div', null, 'gemini-identity');
-  const avatar = el('span', '✦', 'gemini-avatar'); avatar.setAttribute('aria-hidden', 'true');
+  const avatar = sparkle('gemini-avatar');
   const identityText = el('div', null, 'gemini-identity-text');
   const dialogTitle = el('h2', 'Gemini'); dialogTitle.id = 'gemini-title';
   const contextLabel = el('p', 'RoomDrop support', 'gemini-context');
@@ -128,7 +146,7 @@ export function createStayAdviser({ parent, before, overviewParent, getData, cha
     }
     if (!entries.length && !controller) {
       const empty = el('div', null, 'stay-chat-empty');
-      const mark = el('span', '✦', 'stay-chat-empty-mark'); mark.setAttribute('aria-hidden', 'true');
+      const mark = sparkle('stay-chat-empty-mark');
       empty.append(mark, el('p', available ? 'Compare the options and what matters to you.' : 'Gemini is unavailable right now.'));
       log.append(empty);
     }

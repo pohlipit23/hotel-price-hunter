@@ -64,20 +64,22 @@ function setActionContent(button, label) {
   icon.append(path);
   button.replaceChildren(icon, node('span', label, 'action-label'));
 }
-function money(minor, currency = state?.currency?.code || 'USD') {
+function money(minor, currency = state?.currency?.code || 'USD', whole = false) {
   if (!Number.isSafeInteger(minor)) return 'Not verified';
   const digits = state?.currency?.minorUnit ?? 2;
+  if (whole) return currency + ' ' + new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(minor / (10 ** digits)));
   return currency + ' ' + new Intl.NumberFormat('en-US', { minimumFractionDigits: minor % (10 ** digits) ? digits : 0, maximumFractionDigits: digits }).format(minor / (10 ** digits));
 }
+// Drop amounts are shown as rounded whole units.
 function savingLabel(minor, currency = state?.currency?.code || 'USD') {
   if (!Number.isSafeInteger(minor) || minor <= 0) return 'Saving unavailable';
-  const formatted = money(minor, currency);
+  const formatted = money(minor, currency, true);
   const amount = formatted.startsWith(currency + ' ') ? formatted.slice(currency.length + 1) : formatted;
   return '-' + amount + ' ' + currency;
 }
 function addStamp(target, minor, currency, label, className = '') {
   target.replaceChildren();
-  const formatted = money(minor, currency);
+  const formatted = money(minor, currency, true);
   const amount = formatted.startsWith(currency + ' ') ? formatted.slice(currency.length + 1) : formatted;
   target.className = 'saving-stamp' + (className ? ' ' + className : '') + (amount.length > 5 ? ' stamp-long' : '');
   target.setAttribute('role', 'img');
