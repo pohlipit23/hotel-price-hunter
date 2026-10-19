@@ -1013,7 +1013,7 @@ Judges can run a Drop from their inbox. Branch `wip/drop-mail`; provider-agnosti
   passes at 320, 768, 1024 and 1440 px (render, fresh-context redeem, approve).
 - [x] Config: `DROP_MAIL_ENABLED` (off by default), `DROP_MAIL_FROM`, `MAIL_PEPPER`,
   `DROP_MAIL_TRANSPORT` (hosted: `disabled` only) in `validateCloudQuotationMode`.
-- [x] Provider chosen: Cloudflare Email Service from `roomdrop@mail.08-08-08.com`, delayed by
+- [x] Provider chosen: Cloudflare Email Service from `roomdrop@mail.09-09-09.com`, delayed by
   Google Cloud Tasks. `cloudflare` transport (REST send, bearer token, 5 s timeout), `cloud-tasks`
   deferral (task named by mailId at now + 60 s, OIDC to `/internal/drop-mail/send`, which checks
   audience, issuer and invoker before sending once) and `inline` deferral for local runs.
@@ -1023,11 +1023,15 @@ Judges can run a Drop from their inbox. Branch `wip/drop-mail`; provider-agnosti
 
 Owner setup (open; nothing below has been run). Project `sincere-apex-511418-p0`, region `asia-southeast1`.
 
-- [ ] Cloudflare: in the dashboard, Email Service > Sending, onboard only the subdomain
-  `mail.08-08-08.com` and add the DNS records it lists (SPF, DKIM, DMARC on `mail.`); leave the
-  root MX (Purelymail) untouched. Email Sending is beta on the Workers Paid plan.
+- [x] Cloudflare: in the dashboard, Email Service > Sending, onboard only the subdomain
+  `mail.09-09-09.com` and add the DNS records it lists (SPF, DKIM, DMARC on `mail.`).
+  Email Sending is beta on the Workers Paid plan.
+  Done 19 Oct by the owner: `cf-bounce.mail.09-09-09.com` MX and SPF and
+  `_dmarc.mail.09-09-09.com` resolve (zone on Cloudflare DNS).
 - [ ] Cloudflare: create an account API token with only the email sending permission for this
   account (a 403 with code 10102 means it lacks it) and note the 32-character account ID.
+  Partial 19 Oct: the owner created a token (`/user/tokens/verify` returns active); the token
+  cannot read accounts or zones, so the account ID is still needed from the dashboard.
 - [ ] Enable APIs: `gcloud services enable cloudtasks.googleapis.com secretmanager.googleapis.com --project sincere-apex-511418-p0`
 - [ ] Secrets (typed, no trailing newline): `$f = New-TemporaryFile; Read-Host -MaskInput 'Cloudflare token' | Set-Content $f -NoNewline; gcloud secrets create roomdrop-cloudflare-email-token --data-file $f --replication-policy automatic --project sincere-apex-511418-p0; Remove-Item $f`
   and `$f = New-TemporaryFile; [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48)) | Set-Content $f -NoNewline; gcloud secrets create roomdrop-mail-pepper --data-file $f --replication-policy automatic --project sincere-apex-511418-p0; Remove-Item $f`

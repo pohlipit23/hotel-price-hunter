@@ -25,23 +25,23 @@ const delivered = () => respond(200, { success: true, errors: [], messages: [], 
 
 test('the Cloudflare transport posts the documented REST body with a bearer token and maps failures to bounded codes', async () => {
   const stub = stubFetch(delivered);
-  const transport = createCloudflareTransport({ accountId: ACCOUNT, token: TOKEN, from: 'roomdrop@mail.08-08-08.com', fetch: stub.fetch });
+  const transport = createCloudflareTransport({ accountId: ACCOUNT, token: TOKEN, from: 'roomdrop@mail.09-09-09.com', fetch: stub.fetch });
   assert.deepEqual(await transport.send({ ...MESSAGE, sendAt: null, idempotencyKey: KEY }), { id: KEY });
   const [call] = stub.calls;
   assert.equal(call.url, `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/email/sending/send`); assert.equal(call.method, 'POST');
   assert.deepEqual(call.headers, { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' });
-  assert.deepEqual(call.json, { ...MESSAGE, from: 'roomdrop@mail.08-08-08.com', headers: { 'X-RoomDrop-Mail-Id': KEY } });
+  assert.deepEqual(call.json, { ...MESSAGE, from: 'roomdrop@mail.09-09-09.com', headers: { 'X-RoomDrop-Mail-Id': KEY } });
   assert.ok(call.signal instanceof AbortSignal);
   await assert.rejects(transport.send({ ...MESSAGE, sendAt: '2026-10-20T00:01:00.000Z', idempotencyKey: KEY }), { code: 'MAIL_SCHEDULING_UNSUPPORTED' });
   for (const [reply, code] of [[() => respond(500, { success: false, errors: [{ code: 1, message: 'PRIVATE judge@example.test' }], result: null }), 'MAIL_PROVIDER_REFUSED'],
     [() => respond(429, { success: false, errors: [{ code: 10004, message: 'email.sending.error.throttled' }], result: null }), 'MAIL_PROVIDER_THROTTLED'],
     [() => respond(200, { success: true, result: { delivered: [], permanent_bounces: ['judge@example.test'], queued: [] } }), 'MAIL_BOUNCED'],
     [() => { throw Error('PRIVATE network ' + TOKEN); }, 'MAIL_PROVIDER_UNAVAILABLE'], [() => new Response('not json', { status: 502 }), 'MAIL_PROVIDER_UNAVAILABLE']]) {
-    const failing = createCloudflareTransport({ accountId: ACCOUNT, token: TOKEN, from: 'roomdrop@mail.08-08-08.com', fetch: stubFetch(reply).fetch });
+    const failing = createCloudflareTransport({ accountId: ACCOUNT, token: TOKEN, from: 'roomdrop@mail.09-09-09.com', fetch: stubFetch(reply).fetch });
     await assert.rejects(failing.send({ ...MESSAGE, sendAt: null, idempotencyKey: KEY }), error => error.code === code && !/PRIVATE|judge@|cf-token/.test(error.message));
   }
   for (const options of [{ accountId: 'short' }, { token: '' }, { from: 'not-an-address' }]) {
-    assert.throws(() => createCloudflareTransport({ accountId: ACCOUNT, token: TOKEN, from: 'roomdrop@mail.08-08-08.com', ...options }), { code: 'DROP_MAIL_CONFIG_INVALID' });
+    assert.throws(() => createCloudflareTransport({ accountId: ACCOUNT, token: TOKEN, from: 'roomdrop@mail.09-09-09.com', ...options }), { code: 'DROP_MAIL_CONFIG_INVALID' });
   }
 });
 
@@ -79,7 +79,7 @@ test('the task verifier accepts only a Google ID token for this audience from th
   assert.equal(await throwing('Bearer a.b.c'), false);
 });
 
-const cloudEnvironment = { DROP_MAIL_ENABLED: 'true', DROP_MAIL_FROM: 'roomdrop@mail.08-08-08.com', MAIL_PEPPER: 'p'.repeat(40), DROP_MAIL_TRANSPORT: 'cloudflare',
+const cloudEnvironment = { DROP_MAIL_ENABLED: 'true', DROP_MAIL_FROM: 'roomdrop@mail.09-09-09.com', MAIL_PEPPER: 'p'.repeat(40), DROP_MAIL_TRANSPORT: 'cloudflare',
   CLOUDFLARE_ACCOUNT_ID: ACCOUNT, CLOUDFLARE_EMAIL_TOKEN: TOKEN, DROP_MAIL_DEFERRAL: 'cloud-tasks', DROP_MAIL_TASKS_QUEUE: QUEUE, DROP_MAIL_TASKS_INVOKER: INVOKER, APP_ORIGIN: ORIGIN };
 test('Cloudflare and Cloud Tasks settings are complete or refused; hosted runs allow inline or cloud-tasks only', () => {
   const settings = dropMailSettings(cloudEnvironment, { hosted: true });
