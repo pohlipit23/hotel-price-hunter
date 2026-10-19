@@ -187,6 +187,19 @@ function createQuotationServer({ bundle: single, store = null, reviewedCatalogue
       if (['/health', '/healthz'].includes(url.pathname) && req.method === 'GET') return json(res, 200, store
         ? { status: 'ok', surface: 'quotation-demo', mode: 'selection-only', model, catalogueSize }
         : { status: 'ok', surface: 'quotation-demo', mode: 'selection-only', model, snapshotVersion: single.snapshotVersion, optionCount: single.options.length });
+      // The Cloud Tasks callback for a queued Drop email (cloud-tasks deferral only). Not a judge route: the caller must
+      // present Google's OIDC token for the configured invoker. No session is read or written here.
+      if (url.pathname === '/api/quotation-demo/internal/drop-mail') {
+        if (!mail?.verifyTask || req.method !== 'POST') return error(404, 'ROUTE_UNAVAILABLE');
+        if (!(await mail.verifyTask(req.headers.authorization))) return error(401, 'TASK_UNAUTHORIZED');
+        if (!(req.headers['content-type'] ?? '').startsWith('application/json')) return error(400, 'INVALID_MAIL_TASK');
+        const chunks = []; let size = 0;
+        for await (const chunk of req) { size += chunk.length; if (size > 262_144) return error(413, 'INVALID_MAIL_TASK'); chunks.push(chunk); }
+        let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return error(400, 'INVALID_MAIL_TASK'); }
+        // A refused task is final (400); a provider failure is 503 so Cloud Tasks retries it.
+        try { return json(res, 200, { status: await mail.deliverTask(body) }); }
+        catch (failure) { return failure?.code === 'INVALID_MAIL_TASK' ? error(400, 'INVALID_MAIL_TASK') : error(503, 'MAIL_UNAVAILABLE'); }
+      }
       const cookie = /(?:^|;\s*)roomdrop_quote=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie ?? '')?.[1];
       // Catalogue mode: every booking is addressed by its catalogue code in the path, never by query.
       const route = store ? /^\/api\/quotation-demo\/q\/([A-Z0-9]{4,20})(?:\/(watch|confirm|advice|chat|inbox))?$/.exec(url.pathname) : null;

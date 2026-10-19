@@ -100,7 +100,7 @@ test('addresses normalise for caps (case, spaces, +tags, Gmail dots) and are key
 test('Drop email is off by default; on needs a sender, a pepper and a named transport; hosted never captures', () => {
   const on = { DROP_MAIL_ENABLED: 'true', DROP_MAIL_FROM: 'drops@roomdrop.example', MAIL_PEPPER: PEPPER, DROP_MAIL_TRANSPORT: 'capture' };
   assert.equal(dropMailSettings({}), null); assert.equal(dropMailSettings({ DROP_MAIL_ENABLED: 'false', MAIL_PEPPER: PEPPER }), null);
-  assert.deepEqual(dropMailSettings(on), { transport: 'capture', from: on.DROP_MAIL_FROM, pepper: PEPPER });
+  assert.deepEqual(dropMailSettings(on), { transport: 'capture', deferral: 'inline', from: on.DROP_MAIL_FROM, pepper: PEPPER });
   assert.equal(dropMailSettings({ ...on, DROP_MAIL_TRANSPORT: 'disabled' }, { hosted: true }).transport, 'disabled');
   for (const patch of [{ DROP_MAIL_ENABLED: 'yes' }, { DROP_MAIL_ENABLED: '' }, { DROP_MAIL_FROM: 'not-an-address' }, { MAIL_PEPPER: 'short' },
     { DROP_MAIL_TRANSPORT: undefined }, { DROP_MAIL_TRANSPORT: 'smtp' }]) {
@@ -169,8 +169,8 @@ test('a failed, slow or disabled transport never throws: the outcome is failed, 
   const started = Date.now(); assert.equal((await deliver(slow.mail)).status, 'failed'); assert.ok(Date.now() - started < 2000);
   const disabled = mailer({ transport: createDisabledTransport() });
   assert.deepEqual(await deliver(disabled.mail), { status: 'failed' }); assert.equal(disabled.store.documents.links.size, 0);
-  // Sending now instead of provider scheduling reports sent, with no sendAt.
-  const now = mailer({ deferral: 'now' });
+  // The inline deferral sends at once and reports sent, with no sendAt.
+  const now = mailer({ deferral: 'inline' });
   assert.equal((await deliver(now.mail)).status, 'sent'); assert.equal(now.transport.sent[0].sendAt, null);
   // A session about to end gets no email: the link would be dead on arrival.
   assert.deepEqual(await deliver(mailer().mail, { expiresAt: ARMED.getTime() + 120_000 }), { status: 'capped' });
