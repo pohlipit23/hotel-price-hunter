@@ -48,7 +48,7 @@ test('the Drop email is a light-only, table-built HTML email with the minus stam
   for (const image of images) { assert.match(image, new RegExp(`src="${ORIGIN}/assets/`)); assert.match(image, /alt="[^"]*"/); }
   assert.ok(message.html.includes('alt="Siam Kempinski Hotel Bangkok and its pool gardens"'));
   assert.match(message.text, /^Your room dropped: -121 MYR$/m); assert.match(message.text, new RegExp(`See my drops: ${ORIGIN}/#inbox-`));
-  assert.match(message.html, /max-width:560px/); assert.doesNotMatch(message.html + message.text + message.subject, /[–—]/);
+  assert.match(message.html, /max-width:560px/); assert.doesNotMatch(message.html + message.text + message.subject, /[\u2013\u2014]/);
 });
 
 test('with nothing above the minimum the email says so honestly: no saving, no stamp amount, the same replay label', async () => {

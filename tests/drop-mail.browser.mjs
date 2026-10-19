@@ -59,7 +59,7 @@ try {
     for (const [kind, { message }] of [['drop', drop], ['nothing-yet', empty]]) {
       await mailPage.setContent(message.html.replaceAll(HOSTED, origin), { waitUntil: 'load' });
       const text = await mailPage.locator('body').innerText();
-      assert.ok(text.includes(REPLAY_LABEL), kind + ' replay label'); assert.doesNotMatch(text, /[–—]/);
+      assert.ok(text.includes(REPLAY_LABEL), kind + ' replay label'); assert.doesNotMatch(text, /[\u2013\u2014]/);
       assert.match(text, kind === 'drop' ? /Your room dropped[\s\S]*-121[\s\S]*See my drops/ : /No drop yet[\s\S]*Open my Drop Watch/);
       if (kind === 'nothing-yet') assert.doesNotMatch(text, /Your room dropped|more drop/);
       assert(await mailPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), kind + ' overflow at ' + width);
