@@ -270,10 +270,15 @@ This is the Part 1/Part 2 seam.
 Reassigned to Codex by the user on 18 October 2026 (with F10a); not done in the
 Part 1 worktree.
 
-- [ ] Acceptance: inject real Firestore booking/session storage at hosted startup
+- [x] Acceptance: inject real Firestore booking/session storage at hosted startup
   for catalogue, bootstrap and arm, keeping production emulator/credential/origin
   guards intact. Startup never seeds or imports data. No memory/file fallback for
   these routes in hosted mode.
+- Evidence (19 Oct): done by Codex in merge b1eda30 ("Transferred F9a" in the d14f70f
+  integration record below). `app\booking-cloud.mjs:24-31` builds `createBookingStorage`
+  and `createFirestoreSessionStorage` from `createRoomdropFirestore` with no fallback;
+  `:65` throws `DURABLE_STORAGE_REQUIRED`. Serving in the v6d image (revision
+  hotel-price-hunter-00024-twg).
 - Verify: `node --test .\tests\quotation-cloud.test.mjs` cases for catalogue and
   arm with injected test dependencies and bounded missing-storage failure.
 - Depends on: F7a. Small, two files: `app\booking-cloud.mjs`,
@@ -284,9 +289,13 @@ Part 1 worktree.
 Reassigned to Codex by the user on 18 October 2026 (with F9a); not done in the
 Part 1 worktree.
 
-- [ ] Acceptance: release preparation and `Dockerfile.booking` include the new
+- [x] Acceptance: release preparation and `Dockerfile.booking` include the new
   Part 1 modules (adapter, booking/session storage, arm domain) and their
   dependency closure, excluding credentials and private captures.
+- Evidence (19 Oct): done by Codex in merge b1eda30 ("Transferred F10a" below);
+  `scripts\prepare-booking-release.mjs` freezes the manifest-only exact-source
+  context that `Dockerfile.booking` copies. Packaged images v6/v6c/v6d passed the
+  emulator smoke and network-disabled guards before release.
 - Verify: `node --test .\tests\public-demo-release.test.mjs` cases for the new
   files; exact-context build of the packaged entrypoint against the emulator.
 - Depends on: F9a. Small, two files: `scripts\prepare-booking-release.mjs`,
@@ -410,10 +419,15 @@ deploy, production import or live upstream call.
 
 ### Checkpoint F6-F8 (Part 2): Complete local judge journey
 
-- [ ] Start grid, Original Booking confirmation, cannot-start, consent/minimum,
+- [x] Start grid, Original Booking confirmation, cannot-start, consent/minimum,
   armed/replayed check, Deals, Review and Confirmed pass mobile/desktop inspection.
-- [ ] Catalogue facts and replay labels stay honest; two-session/multi-code
+- [x] Catalogue facts and replay labels stay honest; two-session/multi-code
   isolation, keyboard navigation and model-unavailable paths have raw evidence.
+- Evidence (19 Oct, local only): merges f47960e and 5eaf0ae plus db270ce; real-capture,
+  judge, v3 and Firestore browser gates at 320/390/768/1024/1440 px, two judges/two
+  codes, stale tab, dialog/keyboard checks (see the 8423825 and 33bb55f records below
+  and `.local\roomdrop-part2-status.md`). Live production equivalent is the cloud
+  acceptance item further down.
 
 ### F9b: Complete the hosted Firestore entrypoints (Part 2 of F9)
 
@@ -472,14 +486,21 @@ Historical pre-integration component record (18 October, contract v1):
 - [x] F10b preparation slice: manifest-only export, recursive dependency closure,
   exact source hashes and explicitly marked test-source bundles. An incomplete
   commit cannot silently package missing Part 1 dependencies.
-- [ ] F3b-F11b integrated acceptance: bring in Part 1 only after the user's
+- [x] F3b-F11b integrated acceptance: bring in Part 1 only after the user's
   integration go-ahead, reconcile factory wiring, include the bootstrap projection,
   and run `booking-firestore.browser.mjs` against the actual modules. Its current
   result is `PART1_DEPENDENCIES_UNAVAILABLE`, not a pass.
-- [ ] F10b/F11b release candidate: freeze the combined exact commit with actual
+  Done 18 Oct: authorised merge b1eda30; `booking-firestore.browser.mjs` passes
+  against the actual modules (see "Authorised d14f70f integration" below).
+- [x] F10b/F11b release candidate: freeze the combined exact commit with actual
   reviewed code/version pins, build and smoke that image against the emulator,
   then refresh cloud preservation/import/TTL/rollback evidence for approval.
   Test-source images and the earlier memory image are not release candidates.
+  Done 19 Oct: frozen v6d source 6969c09 (app code baf62af), image
+  `sha256:9333e743...`, v6c manifest pins, emulator smoke passed; owner-run
+  `.local\deploy-roomdrop-v6d.ps1` refreshed preservation/import/rollback and
+  serves hotel-price-hunter-00024-twg at 100%. TTL enabled 19 Oct (see below); the
+  same image now serves as restart probe revision 00025-5bg.
 
 Those component proofs alone did not close acceptance. The authorised merge record below supersedes their integration blockers.
 Evidence and commands: `docs\public-demo-firestore-verification.md` (Part 2) and
@@ -495,9 +516,13 @@ Contract v2 follow-up (Part 2 only):
   and verifies actual memory/Firestore compatibility, catalogue rejection,
   unchanged guards/watch, receipt/context persistence and the `ttlAt` Timestamp.
   No Part 1 source is copied or edited and no branch is merged/rebased.
-- [ ] Whole-journey acceptance and combined release remain open. Claude reports
+- [x] Whole-journey acceptance and combined release remain open. Claude reports
   AIRB000179-184 captured (180-183 armable with three Drops each, 179/184
   non-refundable); Part 2 has not inspected or imported those real captures.
+  Re-scoped 19 Oct: the combined release is done (v6d live, see the F10b/F11b
+  item above) and the real captures are imported (v6/v6c, AIRB000185 replaced 184).
+  Only live whole-journey acceptance remains, tracked by the cloud acceptance item below.
+  Done 19 Oct: live acceptance passed (see the cloud acceptance item below).
 
 Contract v3 follow-up (Part 2 only):
 
@@ -510,19 +535,44 @@ Contract v3 follow-up (Part 2 only):
 - [x] `booking-v3.browser.mjs` passes at 320/768/1024/1440 px against an injected
   v3 arm endpoint. The memory-receipt browser harness explicitly strips the new
   request field for the untouched legacy base server and proves no revision logic.
-- [ ] Full integrated proof remains blocked by the no-merge/no-rebase boundary.
+- [x] Full integrated proof remains blocked by the no-merge/no-rebase boundary.
   Also relay the source-inspected omitted-revision mismatch at `d14f70f` to Claude;
   the updated client always includes the field and is unaffected by that fallback.
+  Superseded 18 Oct: the user authorised merges b1eda30, f47960e and 5eaf0ae, which
+  include the owner-authored optional revision fix (8423825).
 
 - [ ] Plan approval (given 18 October 2026) precedes coding; local checks and raw
   acceptance evidence are complete. The full catalogue content matrix (S0) remains
   unchecked until supplied and captured; storage mechanics alone do not complete it.
-- [ ] Present exact production import, image/configuration, session TTL and rollback
+  Note 19 Oct: production holds the six-booking v6c catalogue (179 cannot-start,
+  180-183 and 185 watchable). The S0.4 gaps (closing soon, non-MYR, multi-night,
+  multi-adult) are still uncovered unless the user waives them.
+- [x] Present exact production import, image/configuration, session TTL and rollback
   commands for approval. Preserve existing visitor/agency/watch data and private
   access boundaries; never commit `.local\` or merge the research branches.
-- [ ] After separately approved execution, verify public curated reads, replay
+  Re-scoped 19 Oct: import, image/configuration and rollback were approved and run by
+  the owner (`.local\deploy-roomdrop-v6.ps1`, `-v6c.ps1`, `-v6d.ps1`; receipts
+  `.local\deploy-preflight\production-import*.json`; rollback target 00023-vf2).
+  Only session TTL remains: `gcloud firestore fields ttls list` is still empty; propose
+  TTL on `roomdropPublicSessionsV1.ttlAt` in (default) for separate approval.
+  Done 19 Oct: the user approved it; `gcloud firestore fields ttls update ttlAt
+  --collection-group=roomdropPublicSessionsV1 --enable-ttl` ran and `ttls list`
+  shows `roomdropPublicSessionsV1.ttlAt` state ACTIVE.
+- [x] After separately approved execution, verify public curated reads, replay
   labels, live eligibility, restart persistence and two-judge isolation, with
   before/after private-service checks. Liveness alone cannot close acceptance.
+  Partial 19 Oct: the v6d SMOKE stage on 00024-twg passed health, catalogue (six
+  entries, 179 blocked), six fresh per-code reads, eight photo hashes and before/after
+  agency/database/TTL/scheduler/jobs/IAM preservation. Still open: browser replay
+  labels, arm/confirm, restart persistence and two-judge isolation on the live service.
+  Done 19 Oct: `tests\live-acceptance.mjs` passed on 00024-twg: replay labels at 390 px
+  (no page errors or external requests), arm and confirm on AIRB000180 (no reservation
+  or quote change), two-judge isolation (180/181, separate cookies and CSRF tokens) and
+  same-cookie persistence (session stored under sha256(cookie) with `ttlAt`). With user
+  approval, restart probe revision hotel-price-hunter-00025-5bg (env RESTART_PROBE only,
+  same image) took 100% traffic and `--after-restart` passed (AIRB000180 watch revision 1).
+  00025-5bg now serves; rollback targets are 00024-twg and 00023-vf2. Evidence:
+  `.local\live-acceptance`.
 
 ### Authorised d14f70f integration - current local acceptance
 
@@ -541,9 +591,11 @@ Contract v3 follow-up (Part 2 only):
 - [x] Full Node run: 399 tests, 370 passed, 0 failed, 29 skipped. Targeted core
   emulator run: 48 passed, 0 failed, 0 skipped. The hardcoded 8181 importer test
   was excluded; the reviewed real importer ran against 8281 instead.
-- [ ] F11b final handoff/release acceptance awaits Claude's F6/F7a and F11a. The
+- [x] F11b final handoff/release acceptance awaits Claude's F6/F7a and F11a. The
   current image is an integration candidate. Later merges, any live capture/model
   call, production import, push, deployment or access change need their authority.
+  Superseded: F6/F7a/F11a integrated (f47960e, 5eaf0ae, db270ce); later releases
+  v6/v6c/v6d shipped with owner approval.
 
 Current evidence and exact pins are in the Part 2 integration section of
 `docs/public-demo-firestore-verification.md` and the release document.
@@ -564,9 +616,11 @@ Current evidence and exact pins are in the Part 2 integration section of
   aligned with existing Part 2 failure copy and replay/capture timestamp detail.
 - [x] Refreshed exact-source image and both hosted entrypoints pass the emulator
   smoke and network-disabled production-emulator guard; source `f47960e`.
-- [ ] Photo capture remains in progress with Claude, and final F11a/F11b release
+- [x] Photo capture remains in progress with Claude, and final F11a/F11b release
   handoff remains open. No further merge, push, deploy, production import or live
   call is included in this approval.
+  Done: eight reviewed photos (f386e57, rendered in c7de6a4) are packaged and their
+  hashes match on the live service (v6d SMOKE); release handoff superseded as above.
 
 ### Authorised 33bb55f / contract v5 merge - current local acceptance
 
@@ -585,9 +639,13 @@ Current evidence and exact pins are in the Part 2 integration section of
 - [x] F11b local acceptance/bundle: frozen source c7de6a4, both hosted entrypoints,
   real emulator restart/isolation and network-disabled CLI guards pass. Evidence
   and exact image/pins are in the current Part 2 verification and release docs.
-- [ ] Later release decision: forthcoming engine recapture/new Drop-set pins,
+- [x] Later release decision: forthcoming engine recapture/new Drop-set pins,
   current cloud preservation/configuration, production importer support, TTL and
   rollback review. No push, deploy, production import or live call ran.
+  Decided 19 Oct: engine recapture cut by the user; new Gateway Drop-set pins shipped
+  as v6/v6c (5a23d40, f86e6cd); guarded production importer a3e02e7; preservation
+  and rollback reviewed in each owner-run release script. TTL alone carries over to
+  the open session TTL item above.
 
 ## Hackathon AI restoration, 17 October
 
