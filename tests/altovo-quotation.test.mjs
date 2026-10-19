@@ -61,5 +61,8 @@ test('card tags, agency minimum and qualifying Drops are derived from facts', ()
   const { baseline, options } = altovoCatalogueFixture().entries[0].bundle;
   assert.deepEqual(qualifyingDrops(baseline, options, 1000).length, 3);
   assert.deepEqual(qualifyingDrops(baseline, options, 5000).map(option => option.optionId), ['option-fixture-final-deluxe', 'option-fixture-flex-premier']);
+  // Best matched first whatever the stored order: the booked Executive Suite, then breakfast, then the rest.
+  assert.deepEqual(qualifyingDrops(baseline, options.toReversed(), 1000).map(option => option.optionId),
+    ['option-fixture-flex-suite', 'option-fixture-final-deluxe', 'option-fixture-flex-premier']);
   assert.deepEqual(qualifyingDrops(baseline, options, 25000), []);
 });

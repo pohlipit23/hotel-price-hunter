@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { publicQuotationDemo } from './domain/quotation-demo.mjs';
 import { QUOTATION_MODEL } from './quotation-advisor.mjs';
 import { isDisplayedDrop } from './public/drop-eligibility.js';
+import { compareDrops } from './public/room-match.js';
 import { agencyMinimumSavingMinor, watchTag } from './public/drop-watch.js';
 import { watchBlocker } from './domain/altovo-quotation.mjs';
 import { armDropWatch, armRequest, committedWatch } from './domain/booking-drop-watch.mjs';
@@ -273,7 +274,8 @@ function createQuotationServer({ bundle: single, store = null, reviewedCatalogue
           try {
             if (chat) {
               const optionId = option?.optionId ?? null;
-              const advice = await advisor.chat({ baseline: bundle.baseline, options: option ? [option] : bundle.options.filter(shown),
+              // The overview discusses Drops best matched first, as the page lists them.
+              const advice = await advisor.chat({ baseline: bundle.baseline, options: option ? [option] : bundle.options.filter(shown).toSorted(compareDrops(bundle.baseline)),
                 pageContext: body.pageContext, optionId, snapshotVersion: bundle.snapshotVersion, checkedAt: bundle.checkedAt,
                 intent: body.intent, message: body.message, history: scope.chatHistory });
               if (sessions.get(cookie) !== session || session.expiresAt <= now().getTime()) return error(401, 'DEMO_SESSION_REQUIRED');

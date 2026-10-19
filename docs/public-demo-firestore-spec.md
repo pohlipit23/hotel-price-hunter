@@ -124,8 +124,8 @@ unknown; a bare free-cancellation flag does not make a booking armable.
 
 | Location | Data and authority |
 | --- | --- |
-| `roomdropBookingsV1/{code}` | Immutable normalised Original Booking, retail/currency, provenance, capture time, scenario/card metadata and content version |
-| `roomdropBookingsV1/{code}/drops/{dropId}` | Immutable captured Drop facts, capture time, booking/version binding, pricing limitations and provenance |
+| `roomdropBookingsV2/{code}` | Immutable normalised Original Booking, retail/currency, provenance, capture time, scenario/card metadata and content version |
+| `roomdropBookingsV2/{code}/drops/{dropId}` | Immutable captured Drop facts, capture time, booking/version binding, pricing limitations and provenance |
 | `roomdropPublicSessionsV1/{sha256(cookieToken)}` | Private anonymous session, guards/counters and `byCode[code]` entries containing that judge's setup, replay receipt, confirmation and context |
 
 An explicit admin-import command validates existing captures and creates records
@@ -134,6 +134,8 @@ Original Booking facts under the same code with `BOOKING_CHANGED`. Replayed Drop
 imports cannot duplicate or overwrite earlier Drops. Include only reviewed local
 photo assets, card ordering and scenario labels. The public catalogue is an
 explicit bounded allowlist; arbitrary document/code lookup is not exposed.
+The corrected catalogue (changed booking prices) is imported into `BookingsV2`;
+`roomdropBookingsV1` stays untouched so an older revision can still roll back to it.
 
 Publish a booking's display entry only once its required facts and complete
 captured Drop-set manifest validate together. A valid zero-result capture is
@@ -471,7 +473,7 @@ only reads them.
 
 ```js
 createBookingStorage({ firestore, prefix = 'roomdrop' })
-// Collections: `${prefix}BookingsV1/{code}`, `.../dropSets/{000001..}`, `.../drops/{dropId}`.
+// Collections: `${prefix}BookingsV2/{code}`, `.../dropSets/{000001..}`, `.../drops/{dropId}`.
 listCatalogue()
 // -> [{ code, order, contentVersion, dropSetVersion, card: { order, cityName, scenarioLabel, photo } }]
 //    ordered by card.order, at most 20 entries.

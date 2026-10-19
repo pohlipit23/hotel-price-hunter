@@ -5,7 +5,7 @@ const assets = new Map([
   ['/', ['booking.html', 'text/html']], ['/booking.js', ['booking.js', 'text/javascript']],
   ['/booking-live.js', ['booking-live.js', 'text/javascript']], ['/booking-live-data.js', ['booking-live-data.js', 'text/javascript']],
   ['/booking-judge.js', ['booking-judge.js', 'text/javascript']], ['/drop-watch.js', ['drop-watch.js', 'text/javascript']],
-  ['/drop-eligibility.js', ['drop-eligibility.js', 'text/javascript']],
+  ['/drop-eligibility.js', ['drop-eligibility.js', 'text/javascript']], ['/room-match.js', ['room-match.js', 'text/javascript']],
   ['/booking.css', ['booking.css', 'text/css']], ['/pricing.js', ['pricing.js', 'text/javascript']],
   ['/watch.js', ['watch.js', 'text/javascript']], ['/stay-photos.js', ['stay-photos.js', 'text/javascript']],
   ['/stay-advice.js', ['stay-advice.js', 'text/javascript']], ['/stay-advice.css', ['stay-advice.css', 'text/css']],

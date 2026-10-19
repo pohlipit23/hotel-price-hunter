@@ -55,6 +55,13 @@ test('price and room questions use only their applicable grounded reasons', asyn
   const caution = await createQuotationAdvisor({ generateContent: provider(selection({ reasonCodes: ['unknown-cancellation'] })) });
   assert.match((await caution.advise(unknown)).tradeoffs.join(' '), /not established/);
 });
+test('a supplier spelling of the booked room type and meal plan is not grounded as a different room or meals', async () => {
+  const same = comparison(); same.option.roomName = 'KING ROOM, City View'; same.option.board = 'breakfast.';
+  for (const code of ['different-room-label', 'different-board-label']) {
+    const advisor = await createQuotationAdvisor({ generateContent: provider(selection({ reasonCodes: [code] })) });
+    await assert.rejects(advisor.advise(same), { code: 'ADVICE_UNAVAILABLE' }, code);
+  }
+});
 test('untrusted model prose, money, extra fields and unsupported facts never reach the customer', async () => {
   for (const result of [selection({ summary: 'USD 9500 refunded' }), selection({ reasonCodes: ['verified-equivalent'] }),
     selection({ reasonCodes: ['lower-estimate', 'lower-estimate'] }), selection({ recommendation: 'book-now' }),

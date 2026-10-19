@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { AdviceUnavailableError } from './gemini.mjs';
 import { createStayChat } from './stay-chat.mjs';
+import { sameMealPlan, sameRoomType } from './public/room-match.js';
 
 export const QUOTATION_MODEL = 'gemini-3.8-flash';
 
@@ -20,8 +21,10 @@ function amount(value) {
 function context({ baseline, option, checkedAt }) {
   const retail = amount(baseline.quotedRetail); const estimate = amount(option.estimate);
   if (retail.currency !== estimate.currency || option.estimate.isEstimate !== true) return unavailable();
-  const differentRoom = label(baseline.room?.name) && label(option.roomName) && baseline.room.name.trim().toLowerCase() !== option.roomName.trim().toLowerCase();
-  const differentBoard = label(baseline.room?.board) && label(option.board) && baseline.room.board.trim().toLowerCase() !== option.board.trim().toLowerCase();
+  // Matched like the page's Room and Meals cues, so the chat never calls a "Same" room different.
+  const differentRoom = label(baseline.room?.name) && label(option.roomName) && baseline.room.name.trim().toLowerCase() !== option.roomName.trim().toLowerCase()
+    && !sameRoomType(baseline.room.name, option.roomName);
+  const differentBoard = label(baseline.room?.board) && label(option.board) && !sameMealPlan(baseline.room.board, option.board);
   const catalog = {
     'terms-unverified': 'Room equivalence, complete cancellation terms and final retail pricing still need verification.',
     'snapshot-only': 'These are captured source options. Availability and prices need to be checked again.',

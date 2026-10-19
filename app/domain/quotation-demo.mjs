@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { civilDate } from '../live-engine.mjs';
 import { decimalMoney } from './live-comparison.mjs';
+import { topDrops, withinSavingCap } from '../public/room-match.js';
 
 const fail = code => { const error = new Error('Quotation demo facts could not be verified.'); error.code = code; throw error; };
 const text = value => typeof value === 'string' && value.trim() && value.length <= 500 ? value : null;
@@ -77,12 +78,10 @@ export function buildQuotationDemo(baseline, observation) {
       privateReference: { gatewayRequestId: context.requestId, rateDetail: offer.rateDetail, sourceId: source.sourceId,
         supplierCode: source.supplierCode, supplierHotelId: source.supplierHotelId, contractId: offer.contractId, roomTypeId: room.roomTypeId } });
   }
-  candidates.sort((a, b) => Number(b.freeCancellation === true) - Number(a.freeCancellation === true) || a.estimate.totalMinor - b.estimate.totalMinor);
-  const lower = candidates.filter(option => option.indicativeDifferenceMinor > 0);
-  const seen = new Set(); const chosen = (lower.length ? lower : candidates).filter(option => {
-    const key = JSON.stringify([option.roomName.toLowerCase().trim(), option.board.toLowerCase().trim(), option.freeCancellation]);
-    if (seen.has(key)) return false; seen.add(key); return true;
-  }).slice(0, 3);
+  // Cheaper options only; with none, the closest dearer ones stay, ranked the same way (the cap limits savings only).
+  const plausible = candidates.filter(option => withinSavingCap(baseline, option));
+  const lower = plausible.filter(option => option.indicativeDifferenceMinor > 0);
+  const chosen = topDrops(baseline, lower.length ? lower : plausible);
   const privateReferences = Object.fromEntries(chosen.map(option => [option.optionId, option.privateReference]));
   const options = chosen.map(({ privateReference, ...option }) => option);
   const view = { schemaVersion: 1, transactionMode: 'selection-only', baseline, options, checkedAt: context.checkedAt,

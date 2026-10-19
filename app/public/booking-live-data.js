@@ -1,5 +1,6 @@
 /** Display adapter only. Estimates never become execution or refund authority. */
 import { isDisplayedDrop } from './drop-eligibility.js';
+import { compareDrops, dropMatch } from './room-match.js';
 const instant = value => typeof value === 'string' && /(?:Z|[+-]\d\d:\d\d)$/.test(value) && Number.isFinite(Date.parse(value));
 export function watchBinding(watch) {
   if (typeof watch === 'string') { try { watch = JSON.parse(watch); } catch { return null; } }
@@ -42,13 +43,8 @@ export function currentConfirmation(snapshot) {
   return receipt;
 }
 export function comparisonLabels(baseline, option) {
-  const label = value => String(value ?? '').trim().toLowerCase();
-  const flag = value => value === true ? true : value === false ? false : null;
-  return {
-    room: label(baseline.room.name) === label(option.roomName) ? 'Same' : 'Different',
-    meals: label(baseline.room.board) === label(option.board) ? 'Same' : 'Different',
-    cancellation: flag(baseline.freeCancellation) === flag(option.freeCancellation) ? 'Same' : 'Different',
-  };
+  const match = dropMatch(baseline, option); const cue = same => same ? 'Same' : 'Different';
+  return { room: cue(match.room), meals: cue(match.meals), cancellation: cue(match.cancellation) };
 }
 export function bookingView(snapshot) {
   const b = snapshot.baseline;
@@ -67,7 +63,9 @@ export function bookingView(snapshot) {
         : option.freeCancellation === false ? 'non-refundable' : 'unknown' },
       displaySaving: { available: delta > 0, minor: delta, isEstimate: true }, option };
   });
-  const ranked = offers.filter(offer => isDisplayedDrop(b, offer.option)).toSorted((a, b) => b.displaySaving.minor - a.displaySaving.minor);
+  // Best matched first, so "Best drop" is the closest to the booking, not just the biggest saving.
+  const order = compareDrops(b);
+  const ranked = offers.filter(offer => isDisplayedDrop(b, offer.option)).toSorted((x, y) => order(x.option, y.option));
   const flexible = ranked.find(offer => offer.option.freeCancellation === true && offer !== ranked[0]);
   const remaining = ranked.filter(offer => offer !== ranked[0] && offer !== flexible);
   const picks = [ranked[0], flexible, ...remaining].filter(Boolean).slice(0, 3);

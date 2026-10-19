@@ -64,11 +64,28 @@ test('foreign hotel/stay/occupancy context cannot supply quotation alternatives'
   }
 });
 
-test('lower source estimates are preferred over more expensive rooms, with flexibility retained as an explicit tradeoff', () => {
-  const data = observation(); data.rooms.push({ ...data.rooms[0], roomRef: 'higher', name: 'Higher room' }, { ...data.rooms[0], roomRef: 'cheaper', name: 'Cheaper room' });
-  data.offers.push({ ...data.offers[0], roomRef: 'higher', money: { currency: 'USD', priceMinor: 11000 } },
-    { ...data.offers[0], roomRef: 'cheaper', money: { currency: 'USD', priceMinor: 5000 }, cancellationEvidence: { freeCancellation: false } });
-  const view = publicQuotationDemo(buildQuotationDemo(quotationBaseline(quote(), 'TEST-QUOTE'), data));
-  assert.equal(view.options.length, 2); assert.ok(view.options.every(option => option.indicativeDifferenceMinor > 0));
-  assert.equal(view.options[0].freeCancellation, true); assert.equal(view.options[1].freeCancellation, false);
+// Adds one room and its offer (USD minor; the quotation is AED 350 at 3.5, booked as a refundable Original Twin with breakfast).
+const add = (data, roomRef, name, priceMinor, { board = 'Breakfast', freeCancellation = true } = {}) => {
+  data.rooms.push({ ...data.rooms[0], roomRef, name });
+  data.offers.push({ ...data.offers[0], roomRef, board: { name: board }, money: { currency: 'USD', priceMinor }, cancellationEvidence: { freeCancellation, deadline: null } });
+};
+const options = data => publicQuotationDemo(buildQuotationDemo(quotationBaseline(quote(), 'TEST-QUOTE'), data)).options;
+
+test('cheaper options rank the same room type first, then meals, then flexibility; another room type stays within the 20% cap', () => {
+  const data = observation(); // New Twin at USD 80 is AED 70 below: exactly the 20% cap
+  add(data, 'same', 'ORIGINAL TWIN (Non-smoking)', 6000); // 40% below, uncapped as the same room type
+  add(data, 'far', 'Cheaper room', 5000); // 50% below: another room type past the cap
+  add(data, 'higher', 'Higher room', 11000); // dearer than the quotation
+  add(data, 'copy', 'new twin', 8100, { board: 'Breakfast ' }); // New Twin again once trimmed, a little dearer
+  add(data, 'meals', 'Garden Twin', 8500, { board: 'Room Only' }); // refundable, other meals
+  add(data, 'final', 'New Twin', 9000, { freeCancellation: false }); // same meals, non-refundable
+  assert.deepEqual(options(data).map(option => [option.roomName, option.board, option.freeCancellation, option.indicativeDifferenceMinor]), [
+    ['ORIGINAL TWIN (Non-smoking)', 'Breakfast', true, 14000], ['New Twin', 'Breakfast', true, 7000], ['New Twin', 'Breakfast', false, 3500]]);
+});
+
+test('with no cheaper plausible option the closest dearer ones stay, ranked the same way', () => {
+  const data = observation(); data.offers[0].money.priceMinor = 11000;
+  add(data, 'same', 'Original Twin', 12000, { freeCancellation: false });
+  add(data, 'far', 'Cheaper room', 5000); // cheaper, but another room type past the cap
+  assert.deepEqual(options(data).map(option => [option.roomName, option.indicativeDifferenceMinor]), [['Original Twin', -7000], ['New Twin', -3500]]);
 });

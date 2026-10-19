@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createBookingDemoServer } from '../app/booking-demo-server.mjs';
 import { createQuotationDemoServer, createHostedQuotationDemoServer, deploymentCatalogue } from '../app/quotation-demo-server.mjs';
 import { randomUUID } from 'node:crypto';
-import { createBookingStorage, createRoomdropFirestore } from '../app/booking-storage.mjs';
+import { BOOKINGS_COLLECTION, createBookingStorage, createRoomdropFirestore } from '../app/booking-storage.mjs';
 import { main as importMain } from '../scripts/import-altovo-catalogue.mjs';
 import { launch } from '../scripts/serve-booking-demo.mjs';
 import { altovoCatalogueFixture, FIXTURE_CHECKED_AT } from './fixtures/altovo-catalogue.mjs';
@@ -313,12 +313,12 @@ test('emulator launcher seeds only through the guarded importer and a restart ag
   const importCatalogue = (args, options) => { imports.push(args); return importMain(args, options); };
   const cleanup = await createRoomdropFirestore(process.env);
   t.after(async () => {
-    for (const name of ['BookingsV1', 'PublicSessionsV1', 'PublicSessionsV1Capacity']) await cleanup.recursiveDelete(cleanup.collection(prefix + name));
+    for (const name of [BOOKINGS_COLLECTION, 'PublicSessionsV1', 'PublicSessionsV1Capacity']) await cleanup.recursiveDelete(cleanup.collection(prefix + name));
     await cleanup.terminate();
   });
   // A refused seed stops the launch: nothing listens and nothing is written.
   await assert.rejects(launch([...emulator, '--seed=../../package.json'], { env, prefix, importCatalogue }), { code: 'SEED_REFUSED', reason: 'CATALOGUE_PATH_OUTSIDE_WORKSPACE' });
-  assert.equal((await cleanup.collection(prefix + 'BookingsV1').count().get()).data().count, 0);
+  assert.equal((await cleanup.collection(prefix + BOOKINGS_COLLECTION).count().get()).data().count, 0);
   const first = await launch([...emulator, '--seed=tests/fixtures/curated-bookings.json'], { env, prefix, importCatalogue });
   t.after(() => first.close());
   assert.deepEqual(imports.at(-1), ['--catalogue=tests/fixtures/curated-bookings.json', '--execute', '--project=' + process.env.GOOGLE_CLOUD_PROJECT, '--database=(default)', '--emulator=' + env.FIRESTORE_EMULATOR_HOST]);

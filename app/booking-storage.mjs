@@ -4,10 +4,13 @@ import { ENGINE_BASIS, ENGINE_SEARCH_DEFAULTS, engineHostAllowed } from './domai
 import { decimalMoney } from './domain/live-comparison.mjs';
 
 // Shared, immutable curated catalogue records in Firestore:
-//   {prefix}BookingsV1/{code}                         Original Booking facts and card metadata
-//   {prefix}BookingsV1/{code}/dropSets/{sequence}     one captured Drop-set manifest per capture
-//   {prefix}BookingsV1/{code}/drops/{dropId}          one captured Drop
+//   {prefix}BookingsV2/{code}                         Original Booking facts and card metadata
+//   {prefix}BookingsV2/{code}/dropSets/{sequence}     one captured Drop-set manifest per capture
+//   {prefix}BookingsV2/{code}/drops/{dropId}          one captured Drop
 // Records are created only (never updated). Judges never write here; visitor state lives in sessions.
+// V2 holds the re-imported catalogue whose booking prices changed (V1 refuses changed facts); V1 stays
+// untouched so an older revision can still roll back to it.
+export const BOOKINGS_COLLECTION = 'BookingsV2';
 
 const fail = (code, message = 'Curated catalogue data could not be verified.') => { const error = new Error(message); error.code = code; throw error; };
 const sha256 = text => createHash('sha256').update(text).digest('hex');
@@ -204,7 +207,7 @@ const storageError = error => {
 
 export function createBookingStorage({ firestore, prefix = 'roomdrop' } = {}) {
   if (typeof prefix !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(prefix)) throw new Error('Invalid booking storage prefix.');
-  const collectionName = `${prefix}BookingsV1`;
+  const collectionName = prefix + BOOKINGS_COLLECTION;
   const bookings = () => firestore.collection(collectionName);
   const latestSet = reference => reference.collection('dropSets').orderBy('sequence', 'desc').limit(1);
 

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { createBookingStorage, createRoomdropFirestore, planCatalogueImport } from '../../app/booking-storage.mjs';
+import { BOOKINGS_COLLECTION, createBookingStorage, createRoomdropFirestore, planCatalogueImport } from '../../app/booking-storage.mjs';
 import { createFirestoreSessionStorage } from '../../app/quotation-session-storage.mjs';
 
 export const NOW = () => new Date('2026-10-20T00:00:00Z');
@@ -66,7 +66,7 @@ export async function emulatorCatalogue(t, input = curated()) {
   const first = await createRoomdropFirestore(process.env); const second = await createRoomdropFirestore(process.env);
   const prefix = `test-${randomUUID()}-roomdrop`;
   t.after(async () => {
-    for (const name of ['BookingsV1', 'PublicSessionsV1', 'PublicSessionsV1Capacity']) await first.recursiveDelete(first.collection(prefix + name));
+    for (const name of [BOOKINGS_COLLECTION, 'PublicSessionsV1', 'PublicSessionsV1Capacity']) await first.recursiveDelete(first.collection(prefix + name));
     await Promise.all([first.terminate(), second.terminate()]);
   });
   const report = await createBookingStorage({ firestore: first, prefix }).importBundle(input, { execute: true });

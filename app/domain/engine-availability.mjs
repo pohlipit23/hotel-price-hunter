@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { decimalMoney } from './live-comparison.mjs';
 import { isDisplayedDrop } from '../public/drop-eligibility.js';
+import { topDrops, withinSavingCap } from '../public/room-match.js';
 
 // Drops of record from the EasyGDS Core Engine availability API (owner decision, 18 October 2026):
 // one hotel's rates for the quotation's own dates and adults, mapped to the same bundle/option shape
@@ -165,14 +166,9 @@ export function engineDropBundle(baseline, rates, { checkedAt, source, host } = 
       ...cancellationFacts(offer, checkedAt), termsVerified: false, sourcePrice: { amount: majorText(total.totalMinor), currency: CURRENCY },
       estimate: { totalMinor: total.totalMinor, currency: CURRENCY, isEstimate: true, basis: ENGINE_BASIS },
       indicativeDifferenceMinor: baseline.quotedRetail.totalMinor - total.totalMinor };
-    if (isDisplayedDrop(baseline, option)) candidates.push({ option, url: plain(image) ? httpsUrl(image.url) : null, offerId: text(offer.id) });
+    if (isDisplayedDrop(baseline, option) && withinSavingCap(baseline, option)) candidates.push({ option, url: plain(image) ? httpsUrl(image.url) : null, offerId: text(offer.id) });
   }
-  candidates.sort((a, b) => b.option.indicativeDifferenceMinor - a.option.indicativeDifferenceMinor);
-  const seen = new Set();
-  const chosen = candidates.filter(({ option }) => {
-    const key = JSON.stringify([option.roomName.toLowerCase(), option.board.toLowerCase(), option.freeCancellation]);
-    if (seen.has(key)) return false; seen.add(key); return true;
-  }).slice(0, 3);
+  const chosen = topDrops(baseline, candidates, candidate => candidate.option);
   const options = chosen.map(candidate => candidate.option);
   const view = { schemaVersion: 1, transactionMode: 'selection-only', baseline, options, checkedAt,
     completeness: 'observed-options-only', customerRefund: null, reservationCreated: false };

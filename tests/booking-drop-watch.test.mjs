@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { armDropWatch, armRequest, committedWatch, publicWatch, DELIVERY_CONSENT_VERSION, DROP_WATCH_CONSENT_VERSION } from '../app/domain/booking-drop-watch.mjs';
 import { createBookingDemoServer } from '../app/booking-demo-server.mjs';
 import { createMemorySessionStorage } from '../app/quotation-session-storage.mjs';
+import { BOOKINGS_COLLECTION } from '../app/booking-storage.mjs';
 import { NOW, curated, emulatorCatalogue, integration, listen, plannedBookings, rehash, visit } from './fixtures/roomdrop-harness.mjs';
 
 const SIAM = 'AIRB000180'; const HYATT = 'AIRB000179';
@@ -385,7 +386,7 @@ test('Firestore arm: the delivery email is stored only in that judge\'s session 
   assert.deepEqual((await storage(second).sessionStorage.get(a.cookie.split('=')[1])).byCode[SIAM].watch.delivery, DELIVERY);
   const capacity = await first.collection(`${prefix}PublicSessionsV1Capacity`).doc('live').get();
   assert.doesNotMatch(JSON.stringify(capacity.data()), /@/);
-  const shared = await first.collection(`${prefix}BookingsV1`).doc(SIAM).get();
+  const shared = await first.collection(prefix + BOOKINGS_COLLECTION).doc(SIAM).get();
   assert.doesNotMatch(JSON.stringify(shared.data()), /@example\.test/);
   // Judge A's other code holds nothing of it.
   assert.equal((await (await a.get(HYATT)).json()).watch, null);
@@ -407,7 +408,7 @@ test('Firestore arm: a missing Drop document commits nothing; a valid empty capt
   const { first, prefix, storage, versions } = await emulatorCatalogue(t);
   const origin = await listen(t, createBookingDemoServer({ ...storage(first), now: NOW }));
   const v = await visit(origin);
-  await first.collection(`${prefix}BookingsV1`).doc(SIAM).collection('drops').doc('option-fixture-final-deluxe').delete();
+  await first.collection(prefix + BOOKINGS_COLLECTION).doc(SIAM).collection('drops').doc('option-fixture-final-deluxe').delete();
   assert.deepEqual(await errorOf(await v.post(SIAM, 'watch', armBody(versions[SIAM].contentVersion, 1000))), [503, 'CAPTURE_UNAVAILABLE']);
   assert.deepEqual((await storage(first).sessionStorage.get(v.cookie.split('=')[1])).byCode, {});
 

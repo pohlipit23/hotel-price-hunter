@@ -54,18 +54,28 @@ test('contract v3 captureStatus distinguishes observed-empty from unavailable an
  assert.equal(replayResult(mismatch).status, 'unavailable');
 });
 
-test('comparison badges compare the displayed room, meals and cancellation flag against the starting option',()=>{
+test('comparison badges compare the displayed room type, meal plan and cancellation flag against the starting option',()=>{
  const baseline={room:{name:'Superior Twin',board:'Breakfast'},freeCancellation:true};
- assert.deepEqual(comparisonLabels(baseline,{roomName:'Superior Twin Plus',board:'Breakfast',freeCancellation:false}),
+ assert.deepEqual(comparisonLabels(baseline,{roomName:'Deluxe Twin',board:'Breakfast',freeCancellation:false}),
   {room:'Different',meals:'Same',cancellation:'Different'});
  assert.deepEqual(comparisonLabels(baseline,{roomName:' superior twin ',board:' breakfast ',freeCancellation:true}),
   {room:'Same',meals:'Same',cancellation:'Same'});
  assert.deepEqual(comparisonLabels(baseline,{roomName:'Superior Twin',board:'Room only',freeCancellation:null}),
   {room:'Same',meals:'Different',cancellation:'Different'});
+ // Supplier spellings of the same room type and meal plan read Same; another bed type does not.
+ assert.deepEqual(comparisonLabels(baseline,{roomName:'Superior, Twin Beds, City View',board:'BREAKFAST.',freeCancellation:true}),
+  {room:'Same',meals:'Same',cancellation:'Same'});
+ assert.equal(comparisonLabels(baseline,{roomName:'Superior King',board:'Breakfast',freeCancellation:true}).room,'Different');
 });
 test('live data populates real drop cards without inventing verified refunds or room equivalence',()=>{
- const view=bookingView(bundle());assert.equal(view.booking.hotel.name,'Hotel');assert.equal(view.offers[0].displaySaving.minor,5000);assert.equal(view.offers[0].displaySaving.isEstimate,true);assert.equal(view.offers[0].equivalence,'unverified');assert.equal(view.offers[0].refundQuote,undefined);assert.equal(view.highlights[0].offer.offerId,'option-2');assert.equal(view.highlights[1].offer.offerId,'option-1');
+ const view=bookingView(bundle());assert.equal(view.booking.hotel.name,'Hotel');assert.equal(view.offers[0].displaySaving.minor,5000);assert.equal(view.offers[0].displaySaving.isEstimate,true);assert.equal(view.offers[0].equivalence,'unverified');assert.equal(view.offers[0].refundQuote,undefined);
+ // Neither room matches and both keep breakfast, so the refundable Drop leads despite the smaller saving.
+ assert.deepEqual(view.highlights.map(h=>[h.offer.offerId,h.label]),[['option-1','Best drop'],['option-2','Another drop']]);
  const unknown=bundle();unknown.options[0].estimate.currency='USD';assert.throws(()=>bookingView(unknown));
+});
+test('the Best drop is the best matched Drop: same room type, then meals, then refundable, then saving',()=>{
+ const data=bundle();data.options.push({optionId:'option-3',roomName:'ORIGINAL ROOM (city view)',board:'Room only',freeCancellation:false,estimate:{totalMinor:49000,currency:'AED',isEstimate:true},indicativeDifferenceMinor:1000});
+ assert.deepEqual(bookingView(data).highlights.map(h=>[h.offer.offerId,h.label]),[['option-3','Best drop'],['option-1','More flexibility'],['option-2','Another drop']]);
 });
 test('booking entry serves the existing interface and session-protected selection using booking routes',async t=>{
  const server=createBookingDemoServer({bundle:bundle()});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>{server.closeAllConnections();server.close(r)}));const origin='http://127.0.0.1:'+server.address().port;

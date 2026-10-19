@@ -18,28 +18,29 @@ const CHECKED_AT = '2026-10-20T00:00:00.000Z';
 const SOURCE = 'easygds-core-engine-staging-air1'; const HOST = 'air1.stg-apps.easygds.com';
 const FREE_THEN_CHARGED = [['2026-10-18T00:00:00', '2027-02-14T16:59:59', 0], ['2027-02-14T16:59:59', '2027-02-17T00:00:00', 403.29]];
 
-test('engine offers cheaper than the quotation become up to three MYR Drops ranked by saving', () => {
+test('engine offers cheaper than the quotation become up to three MYR Drops, best matched first', () => {
   const rates = engineRates('3135840', [
     engineOffer({ id: 'a', room: 'Deluxe Room', total: 1998, tiers: FREE_THEN_CHARGED, images: [{ url: 'https://cdn.example.test/deluxe.jpg' }] }),
-    engineOffer({ id: 'b', room: 'Premier Room', board: 'Room Only', total: 2100.5, nonRefundable: true, tiers: [['2026-10-18T00:00:00', '2027-02-17T00:00:00', 2100.5]],
-      images: [{ url: 'http://cdn.example.test/insecure.jpg' }] }),
+    // The biggest saving after a, but other meals rank it below every breakfast Drop.
+    engineOffer({ id: 'b', room: 'Premier Room', board: 'Room Only', total: 2100.5, nonRefundable: true, tiers: [['2026-10-18T00:00:00', '2027-02-17T00:00:00', 2100.5]] }),
     engineOffer({ id: 'c', room: 'Executive Suite', total: 2400 }),
     engineOffer({ id: 'd', room: 'Deluxe Room', total: 2050, tiers: FREE_THEN_CHARGED }),
     engineOffer({ id: 'e', room: 'Club Room', total: 2200, currency: 'USD' }),
     engineOffer({ id: 'f', room: 'Studio', total: 2300, nonRefundable: true, isNonRefundable: false }),
-    engineOffer({ id: 'g', room: 'Garden Room', total: 2250, tiers: [['2026-10-18T00:00:00', '2027-02-17T00:00:00', 500]] }),
+    engineOffer({ id: 'g', room: 'Garden Room', total: 2250, tiers: [['2026-10-18T00:00:00', '2027-02-17T00:00:00', 500]],
+      images: [{ url: 'http://cdn.example.test/insecure.jpg' }] }),
   ]);
   const { bundle, imageSources, capture } = engineDropBundle(siam(), rates, { checkedAt: CHECKED_AT, source: SOURCE, host: HOST });
   assert.deepEqual(bundle.options.map(({ optionId, ...option }) => option), [
     { roomName: 'Deluxe Room', board: 'Breakfast', freeCancellation: true, cancellationDeadline: '2027-02-14T16:59:59.000Z', termsVerified: false,
       sourcePrice: { amount: '1998.00', currency: 'MYR' }, estimate: { totalMinor: 199800, currency: 'MYR', isEstimate: true, basis: 'engine-myr-total-before-final-pricing-and-fees' },
       indicativeDifferenceMinor: 33752 },
-    { roomName: 'Premier Room', board: 'Room Only', freeCancellation: false, cancellationDeadline: null, termsVerified: false,
-      sourcePrice: { amount: '2100.50', currency: 'MYR' }, estimate: { totalMinor: 210050, currency: 'MYR', isEstimate: true, basis: 'engine-myr-total-before-final-pricing-and-fees' },
-      indicativeDifferenceMinor: 23502 },
     { roomName: 'Garden Room', board: 'Breakfast', freeCancellation: false, cancellationDeadline: null, termsVerified: false,
       sourcePrice: { amount: '2250.00', currency: 'MYR' }, estimate: { totalMinor: 225000, currency: 'MYR', isEstimate: true, basis: 'engine-myr-total-before-final-pricing-and-fees' },
       indicativeDifferenceMinor: 8552 },
+    { roomName: 'Studio', board: 'Breakfast', freeCancellation: null, cancellationDeadline: null, termsVerified: false,
+      sourcePrice: { amount: '2300.00', currency: 'MYR' }, estimate: { totalMinor: 230000, currency: 'MYR', isEstimate: true, basis: 'engine-myr-total-before-final-pricing-and-fees' },
+      indicativeDifferenceMinor: 3552 },
   ]);
   assert.ok(bundle.options.every(option => /^option-[a-f0-9]{32}$/.test(option.optionId)));
   assert.deepEqual([bundle.checkedAt, bundle.completeness, bundle.transactionMode, bundle.customerRefund, bundle.reservationCreated],
@@ -52,6 +53,20 @@ test('engine offers cheaper than the quotation become up to three MYR Drops rank
   assert.deepEqual(ENGINE_SEARCH_DEFAULTS, { occupancy: 'agency-default-adults-only', adultAge: 30, adultAgeSource: 'agency-default',
     territory: 'MY', nationality: 'not-sent', currency: 'MYR', languageCode: 'en-US', source: 'agency-default' });
   assert.doesNotMatch(JSON.stringify(bundle), /contract-fixture|source-fixture|room-type-fixture|cdn\.example/);
+});
+
+test('engine Drops put the booked room type first and keep another room type only within the 20% saving cap', () => {
+  // The Siam quotation is a refundable Executive Suite with breakfast at MYR 2335.52; 20% is MYR 467.10.
+  const rates = engineRates('3135840', [
+    engineOffer({ id: 'a', room: 'Deluxe Room', total: 1900, tiers: FREE_THEN_CHARGED }), // 18.6% below
+    engineOffer({ id: 'b', room: 'Superior Room', total: 1500, tiers: FREE_THEN_CHARGED }), // 35.8% below: past the cap
+    engineOffer({ id: 'c', room: 'Executive, Suite, King Bed', total: 1400, nonRefundable: true }), // 40% below, the same room type
+    engineOffer({ id: 'd', room: 'EXECUTIVE SUITE', board: 'Room Only', total: 2300, tiers: FREE_THEN_CHARGED }),
+  ]);
+  const { bundle, imageSources } = engineDropBundle(siam(), rates, { checkedAt: CHECKED_AT, source: SOURCE, host: HOST });
+  assert.deepEqual(bundle.options.map(option => [option.roomName, option.board, option.freeCancellation, option.indicativeDifferenceMinor]), [
+    ['Executive, Suite, King Bed', 'Breakfast', false, 93552], ['EXECUTIVE SUITE', 'Room Only', true, 3552], ['Deluxe Room', 'Breakfast', true, 43552]]);
+  assert.deepEqual(imageSources.drops.map(drop => drop.optionId), bundle.options.map(option => option.optionId));
 });
 
 const SIAM_CARD = { code: 'AIRB000180', order: 1, cityName: 'Bangkok', scenarioLabel: 'Free cancellation', photo: null };

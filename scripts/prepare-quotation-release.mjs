@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { deploymentQuotationSnapshot } from '../app/quotation-demo-server.mjs';
 
 const sourceFiles = ['package.json', 'package-lock.json', 'app/quotation-advisor.mjs', 'app/stay-chat.mjs', 'app/gemini.mjs', 'app/prompts/quotation-advice.txt', 'app/prompts/stay-chat.txt', 'app/prompts/stay-chat-opening.txt', 'app/public/drop-eligibility.js',
-  'app/quotation-cloud.mjs', 'app/quotation-demo-server.mjs', 'app/domain/quotation-demo.mjs',
+  'app/public/room-match.js', 'app/quotation-cloud.mjs', 'app/quotation-demo-server.mjs', 'app/domain/quotation-demo.mjs',
   'app/domain/live-comparison.mjs', 'app/domain/decision.mjs', 'app/domain/money.mjs', 'app/live-engine.mjs',
   'app/public/quotation.html', 'app/public/quotation.css', 'app/public/quotation.js', 'app/public/booking.css',
   'app/public/assets/roomdrop-logo.png', 'app/public/assets/roomdrop-key-icon.png', 'app/public/assets/illustrative-stays.jpg'];
