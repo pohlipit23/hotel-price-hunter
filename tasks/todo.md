@@ -986,3 +986,37 @@ approved terms, brand/photo-card structure and manual transitions remain protect
   preview after committing; the private cloud release remains unchanged.
 - [ ] Separate agent UX review requested by the user; the delivery includes a
   self-contained prompt with the exact commit, phone URL and evidence boundaries.
+
+## Drop email alerts - 19 October
+
+Judges can run a Drop from their inbox. Branch `wip/drop-mail`; provider-agnostic core only, nothing deployed.
+
+- [x] `app/drop-mail.mjs`: 32-byte base64url link tokens stored only as sha256 in
+  `roomdropDropMailV1/{hash}` (source session id, code, revision, expiry = source session
+  expiry, 3 uses, ttlAt); peppered HMAC address keys after normalisation; caps of one email
+  per arm revision, two per session (`roomdropDropMailSessionsV1`), three per address a day
+  (`roomdropDropMailLedgerV1`) and fifty a day (`roomdropDropMailCapacityV1`), all with ttlAt;
+  memory and Firestore stores; `capture` and `disabled` transports; provider or now deferral.
+  Evidence: `tests/drop-mail.test.mjs` 10/10 with the emulator on 127.0.0.1:8281.
+- [x] `app/domain/drop-mail-template.mjs`: pure on-brand Drop and honest nothing-yet email
+  (tables, inline styles, light only, absolute images, plain text, fixed replay label, only
+  the masked address as judge-derived text). Previews: `.local/drop-mail-preview/`.
+- [x] Arm hook: mail after the arm commit, 5 s transport timeout, outcome
+  scheduled|sent|failed|capped plus mailId on the watch; mail never fails the arm.
+- [x] `POST /q/CODE/inbox {token}`: exact Origin, same-origin fetch, JSON body; the arming
+  browser keeps its session, others get a one-transaction fork with only that booking,
+  capped at the source expiry. GET never opens or approves. Evidence:
+  `tests/quotation-demo-server.test.mjs` (5 Drop email tests).
+- [x] Client: `#inbox-CODE~TOKEN` stripped at once, redeemed, routed to `#drops-CODE`;
+  used or expired links land on the start page with a note. Consent and hand-off copy
+  updated, `DELIVERY_CONSENT_VERSION` bumped. Evidence: `tests/drop-mail.browser.mjs`
+  passes at 320, 768, 1024 and 1440 px (render, fresh-context redeem, approve).
+- [x] Config: `DROP_MAIL_ENABLED` (off by default), `DROP_MAIL_FROM`, `MAIL_PEPPER`,
+  `DROP_MAIL_TRANSPORT` (hosted: `disabled` only) in `validateCloudQuotationMode`.
+- [ ] Choose and implement the provider transport (Google-native or Cloudflare), with
+  scheduling at sendAt or a deferral queue, sender domain SPF/DKIM/DMARC.
+- [ ] Provision `MAIL_PEPPER` as a secret and Firestore TTL policies on `ttlAt` for the
+  four Drop mail collections.
+- [ ] v7 deploy script with the Drop email environment.
+- [ ] Live mail acceptance: arm, receive within about a minute, open on another device, approve.
+- [ ] Hide or reword the address field while Drop email is off in production.
