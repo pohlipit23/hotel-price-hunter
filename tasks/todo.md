@@ -1056,5 +1056,9 @@ Owner setup. Project `sincere-apex-511418-p0`, region `asia-southeast1`. All of 
   opens a fork) pass; dry run with STOP stops at PUSH after a green preflight.
 - [x] `tests/live-acceptance.mjs --mail=<address>`: judge A arms with that address and the check reports
   the masked address and `delivery.status`; without it no address is typed, so no email can be sent.
-- [ ] Live mail acceptance: arm, receive within about a minute, open on another device, approve.
-- [ ] Hide or reword the address field while Drop email is off in production.
+- [x] Live mail acceptance: arm, receive within about a minute, open on another device, approve.
+  Done 21 Oct: owner ran `.local/deploy-roomdrop-v7.ps1` to completion; hotel-price-hunter-00027-c6t
+  (image `sha256:213eca3f...`, mail on, secrets pinned to v1) serves 100%. The owner confirmed the
+  Drop email arrived and the link worked. Rollback: the script's `-Rollback` (00026-xgz).
+- [x] Hide or reword the address field while Drop email is off in production.
+  Superseded 21 Oct: Drop email is on in production from v7.
