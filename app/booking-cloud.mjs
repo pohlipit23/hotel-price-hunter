@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { createBookingDemoServer } from './booking-demo-server.mjs';
 import { validateCloudQuotationMode } from './quotation-demo-server.mjs';
 import { createQuotationAdvisor } from './quotation-advisor.mjs';
+import { createDropMailerFromEnvironment, createFirestoreDropMailStore } from './drop-mail.mjs';
 
 export function validateCatalogueManifest(manifest) {
   if (!manifest || Object.keys(manifest).sort().join() !== 'entries,schemaVersion' || manifest.schemaVersion !== 1
@@ -27,8 +28,9 @@ export async function createHostedStores(environment, {
   ]);
   const firestore = await createRoomdropFirestore(environment);
   try {
+    // The Drop email store shares the client, so an inbox link and its session fork commit in one transaction.
     return { bookingStorage: createBookingStorage({ firestore }), sessionStorage: createFirestoreSessionStorage({ firestore, catalogueCodes: manifest.entries.map(entry => entry.code) }),
-      close: () => firestore.terminate() };
+      mailStore: createFirestoreDropMailStore({ firestore }), close: () => firestore.terminate() };
   } catch (failure) { await firestore.terminate(); throw failure; }
 }
 async function loadCatalogue(bookingStorage) {
@@ -66,7 +68,9 @@ export async function startHostedDemo({ environment = process.env, signals = pro
     const catalogue = await catalogueLoader(stores.bookingStorage);
     if (!Array.isArray(catalogue?.entries) || !catalogue.entries.length || catalogue.entries.length > 20) throw Error('CATALOGUE_UNAVAILABLE');
     const advisor = await advisorFactory({ environment });
-    server = serverFactory({ reviewedCatalogue: catalogue, sessionStorage: stores.sessionStorage, bookingStorage: stores.bookingStorage, environment, advisor });
+    // Null unless DROP_MAIL_ENABLED is 'true' (validated above); a missing store then refuses startup.
+    const mail = createDropMailerFromEnvironment(environment, { store: stores.mailStore, hosted: true });
+    server = serverFactory({ reviewedCatalogue: catalogue, sessionStorage: stores.sessionStorage, bookingStorage: stores.bookingStorage, environment, advisor, ...(mail ? { mail } : {}) });
     await listen(server, port);
     server.on('error', () => { log('RoomDrop runtime stopped: service unavailable.'); onSignal(); });
     signals.once('SIGTERM', onSignal); signals.once('SIGINT', onSignal);

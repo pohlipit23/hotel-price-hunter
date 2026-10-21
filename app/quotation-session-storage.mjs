@@ -114,6 +114,32 @@ export function createFirestoreSessionStorage({ firestore, prefix = 'roomdrop', 
         });
       } catch (error) { throw error === refusal ? error : unavailable(error); }
     },
+    // Opens a new session from a Drop email link in one transaction: the drop mail store's claim reads and
+    // counts the link, capacity is checked, and only byCode[code] is copied from the source session, which
+    // must still be live. The copy keeps the source's expiry and gets its own cookie and CSRF token.
+    async fork(code, claim) {
+      if (typeof code !== 'string' || !CODE.test(code) || (catalogue && !catalogue.has(code))) fail('BOOKING_UNAVAILABLE');
+      const cookieValue = token(); const id = sha256(cookieValue); const csrfToken = token(); const time = now().getTime();
+      let session;
+      try {
+        await firestore.runTransaction(async transaction => {
+          const link = await claim.read(transaction);
+          if (!COOKIE.test(link?.sourceSessionId ?? '')) fail('MAIL_LINK_EXPIRED');
+          const [source, live] = await transaction.getAll(sessions().doc(link.sourceSessionId), capacity());
+          const current = source.exists ? stored(source.data()) : null; const entry = current?.byCode?.[code];
+          if (!current || current.expiresAt <= time || !plain(entry) || !entry.watch) fail('MAIL_LINK_EXPIRED');
+          const listed = live.exists && Array.isArray(live.data().sessions) ? live.data().sessions : [];
+          const remaining = listed.filter(item => item.expiresAt > time);
+          if (remaining.length >= maxSessions) fail('SESSION_CAPACITY');
+          session = { csrfToken, expiresAt: Math.min(current.expiresAt, link.expiresAt), byCode: { [code]: json(entry) } };
+          for (const item of listed) if (item.expiresAt <= time && COOKIE.test(item.id)) transaction.delete(sessions().doc(item.id));
+          transaction.set(capacity(), { sessions: [...remaining, { id, expiresAt: session.expiresAt }] });
+          transaction.create(sessions().doc(id), { ...session, ttlAt: new Date(session.expiresAt) });
+          claim.write(transaction, link);
+        });
+      } catch (error) { throw unavailable(error); }
+      return { cookieValue, session: json(session) };
+    },
   };
 }
 
@@ -148,6 +174,22 @@ export function createMemorySessionStorage({ environment = process.env, ...setti
       const { next, result } = mutate(documents.get(id), fn, catalogue);
       documents.set(id, next);
       return result;
+    },
+    // Same contract as the Firestore fork. The claim must be synchronous here (the memory drop mail store's
+    // is), so the link check, the capacity check and both writes run without yielding.
+    async fork(code, claim) {
+      if (typeof code !== 'string' || !CODE.test(code) || (catalogue && !catalogue.has(code))) fail('BOOKING_UNAVAILABLE');
+      const time = now().getTime();
+      const link = claim.read(null);
+      if (link instanceof Promise) { link.catch(() => {}); fail('SESSION_STATE_INVALID', 'Memory forks need a synchronous claim.'); }
+      const source = documents.get(link?.sourceSessionId); const entry = source?.byCode?.[code];
+      if (!source || source.expiresAt <= time || !plain(entry) || !entry.watch) fail('MAIL_LINK_EXPIRED');
+      for (const [id, session] of documents) if (session.expiresAt <= time) documents.delete(id);
+      if (documents.size >= maxSessions) fail('SESSION_CAPACITY');
+      const cookieValue = token();
+      const session = { csrfToken: token(), expiresAt: Math.min(source.expiresAt, link.expiresAt), byCode: { [code]: json(entry) } };
+      documents.set(sha256(cookieValue), session); claim.write(null, link);
+      return { cookieValue, session: json(session) };
     },
   };
 }

@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { createQuotationDemoServer, createHostedQuotationDemoServer } from './quotation-demo-server.mjs';
+import { DROP_MAIL_TASK_PATH } from './drop-mail.mjs';
 
 const assets = new Map([
   ['/', ['booking.html', 'text/html']], ['/booking.js', ['booking.js', 'text/javascript']],
@@ -17,10 +18,10 @@ const assets = new Map([
     .map(name => [`/assets/roomdrop-airb000${name}.jpg`, [`assets/roomdrop-airb000${name}.jpg`, 'image/jpeg']]),
 ]);
 // Booking API paths map one to one onto the quotation API; query strings never match and stay unavailable.
-const bookingApi = /^\/api\/booking-demo(\/(?:confirm|advice|chat|catalogue|q\/[A-Z0-9]{4,20}(?:\/(?:watch|confirm|advice|chat))?))?$/;
-export function createBookingDemoServer({ bundle, snapshot, catalogue, reviewedCatalogue, environment, now, advisor, sessionStorage, bookingStorage } = {}) {
-  const server = environment ? createHostedQuotationDemoServer({ snapshot, catalogue, reviewedCatalogue, environment, now, advisor, sessionStorage, bookingStorage })
-    : createQuotationDemoServer({ bundle, catalogue, reviewedCatalogue, now, advisor, sessionStorage, bookingStorage });
+const bookingApi = /^\/api\/booking-demo(\/(?:confirm|advice|chat|catalogue|q\/[A-Z0-9]{4,20}(?:\/(?:watch|confirm|advice|chat|inbox))?))?$/;
+export function createBookingDemoServer({ bundle, snapshot, catalogue, reviewedCatalogue, environment, now, advisor, sessionStorage, bookingStorage, mail } = {}) {
+  const server = environment ? createHostedQuotationDemoServer({ snapshot, catalogue, reviewedCatalogue, environment, now, advisor, sessionStorage, bookingStorage, mail })
+    : createQuotationDemoServer({ bundle, catalogue, reviewedCatalogue, now, advisor, sessionStorage, bookingStorage, mail });
   const mode = catalogue || bookingStorage ? 'catalogue' : 'single';
   const delegate = server.listeners('request')[0];
   server.removeListener('request', delegate);
@@ -28,6 +29,8 @@ export function createBookingDemoServer({ bundle, snapshot, catalogue, reviewedC
     const api = bookingApi.exec(req.url);
     if (api) { req.url = '/api/quotation-demo' + (api[1] ?? ''); return delegate(req, res); }
     if (req.url === '/health' || req.url === '/healthz') return delegate(req, res);
+    // The Drop email Cloud Tasks callback (app/drop-mail.mjs DROP_MAIL_TASK_PATH); the quotation server verifies the caller.
+    if (req.url === DROP_MAIL_TASK_PATH) { req.url = '/api/quotation-demo/internal/drop-mail'; return delegate(req, res); }
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
     // frame-src: only the demo video on the judge closeout (privacy-enhanced YouTube embed).
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-src https://www.youtube-nocookie.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");

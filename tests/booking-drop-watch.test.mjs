@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { armDropWatch, armRequest, committedWatch, publicWatch, DELIVERY_CONSENT_VERSION, DROP_WATCH_CONSENT_VERSION } from '../app/domain/booking-drop-watch.mjs';
+import { armDropWatch, armRequest, committedWatch, publicWatch, recordDelivery, DELIVERY_CONSENT_VERSION, DROP_WATCH_CONSENT_VERSION } from '../app/domain/booking-drop-watch.mjs';
 import { createBookingDemoServer } from '../app/booking-demo-server.mjs';
 import { createMemorySessionStorage } from '../app/quotation-session-storage.mjs';
 import { BOOKINGS_COLLECTION } from '../app/booking-storage.mjs';
@@ -176,7 +176,24 @@ test('an optional delivery email commits with the arm; the receipt shows only a 
   assert.deepEqual(publicWatch(state.byCode[SIAM].watch), receipt.watch);
   // Without an email the receipt is exactly the v3 shape: no delivery key at all.
   assert.equal(Object.hasOwn(arm(session(), 5000).watch, 'delivery'), false);
-  assert.equal(DELIVERY_CONSENT_VERSION, 'roomdrop-drop-email-consent-2026-10-18');
+  assert.equal(DELIVERY_CONSENT_VERSION, 'roomdrop-drop-email-consent-2026-10-19');
+});
+
+test('the Drop email outcome is recorded once, on its own revision, and never shows the address', () => {
+  const state = session();
+  arm(state, 5000, { extra: { deliveryEmail: JUDGE } });
+  const recorded = recordDelivery(state, { code: SIAM, booking: booking(), revision: 1, outcome: { status: 'scheduled', mailId: 'mail-1' } });
+  assert.deepEqual(state.byCode[SIAM].watch.delivery, { ...DELIVERY, status: 'scheduled', mailId: 'mail-1' });
+  assert.deepEqual(recorded.watch.delivery, { ...MASKED, status: 'scheduled' });
+  // A second outcome, an older revision or an unknown status changes nothing.
+  for (const [revision, outcome] of [[1, { status: 'failed' }], [0, { status: 'sent' }]]) {
+    recordDelivery(state, { code: SIAM, booking: booking(), revision, outcome });
+  }
+  assert.equal(state.byCode[SIAM].watch.delivery.status, 'scheduled');
+  const fresh = session(); arm(fresh, 5000, { extra: { deliveryEmail: JUDGE } });
+  recordDelivery(fresh, { code: SIAM, booking: booking(), revision: 1, outcome: { status: 'delivered-maybe' } });
+  assert.equal(fresh.byCode[SIAM].watch.delivery.status, 'pending-service');
+  assert.throws(() => recordDelivery(session(), { code: SIAM, booking: booking(), revision: 1, outcome: { status: 'sent' } }), { code: 'WATCH_REVISION_STALE' });
 });
 
 test('the delivery email is optional, at most 254 characters and a basic address', () => {

@@ -2,7 +2,7 @@
 // These are the display rules in app/public/booking-judge.js; the browser walk is tests/booking-judge.browser.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { JOURNEY, armRequestBody, armedDetail, armedSummary, cannotStart, capturedNote, cardFacts, cardPhoto, dayText, deliveryEmailField, handoffCopy, journeyStep,
+import { inboxLink, JOURNEY, armRequestBody, armedDetail, armedSummary, cannotStart, capturedNote, cardFacts, cardPhoto, dayText, deliveryEmailField, handoffCopy, journeyStep,
   minimumOptions, nightsText, offerState, roomPhoto, savedDelivery } from '../app/public/booking-judge.js';
 
 const siam = {
@@ -127,8 +127,16 @@ test('the agency confirmation page: the add-on card state, and dates without inv
 test('the hand-off after arming says the judge leaves the booking site, from the committed receipt only', () => {
   const data = { watch: { revision: 1, firstCheck: { dropOptionIds: ['a'] } } };
   assert.deepEqual(handoffCopy(data), { title: 'Drop Watch armed', lead: "You're leaving the booking site.",
-    text: 'In real life your drop arrives by email. For this demo we open the RoomDrop app now.', email: null, action: 'Open RoomDrop' });
+    text: 'In real life your drop arrives by email. For this demo we open the RoomDrop app now.', email: null, emailNote: null, action: 'Open RoomDrop' });
   assert.equal(handoffCopy({ watch: { ...data.watch, delivery: { maskedEmail: 'j***@example.test', status: 'pending-service' } } }).email, 'j***@example.test');
+  assert.equal(handoffCopy({ watch: { ...data.watch, delivery: { maskedEmail: 'j***@example.test', status: 'pending-service' } } }).emailNote, 'Saved for j***@example.test · not sent yet');
+  // Only an email the server handed over is promised.
+  const mailed = handoffCopy({ watch: { ...data.watch, delivery: { maskedEmail: 'j***@example.test', status: 'scheduled' } } });
+  assert.deepEqual([mailed.text, mailed.emailNote], ['Check your inbox in about a minute. For this demo we open the RoomDrop app now.', 'Emailing j***@example.test']);
+  for (const status of ['failed', 'capped']) {
+    const copy = handoffCopy({ watch: { ...data.watch, delivery: { maskedEmail: 'j***@example.test', status } } });
+    assert.deepEqual([copy.text.startsWith('In real life'), copy.emailNote], [true, 'Saved for j***@example.test · not sent']);
+  }
   assert.equal(handoffCopy({ watch: null }), null);
 });
 
@@ -138,4 +146,12 @@ test('the armed state is described only from the committed receipt', () => {
   assert.equal(armedDetail(data), 'Drops of MYR 50 or more · replayed check from 18 Oct 2026, 12:10 UTC');
   assert.equal(armedDetail({ ...data, watch: { ...data.watch, minimumSavingMinor: 1000 } }), 'Any drop of MYR 10 or more · replayed check from 18 Oct 2026, 12:10 UTC');
   assert.equal(armedDetail({ ...data, watch: null }), null);
+});
+
+test('a Drop email link parses only as #inbox-CODE~TOKEN with a 43-character base64url token', () => {
+  const token = 'A_b-'.repeat(10) + 'xyz';
+  assert.deepEqual(inboxLink('#inbox-AIRB000180~' + token), { code: 'AIRB000180', token });
+  for (const hash of ['#inbox-AIRB000180~' + token + 'x', '#inbox-airb000180~' + token, '#inbox-AIRB000180-' + token, '#drops-AIRB000180', '', undefined, '#inbox-AIRB000180~' + token.slice(1) + '=']) {
+    assert.equal(inboxLink(hash), null, String(hash));
+  }
 });

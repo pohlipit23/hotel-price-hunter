@@ -986,3 +986,79 @@ approved terms, brand/photo-card structure and manual transitions remain protect
   preview after committing; the private cloud release remains unchanged.
 - [ ] Separate agent UX review requested by the user; the delivery includes a
   self-contained prompt with the exact commit, phone URL and evidence boundaries.
+
+## Drop email alerts - 19 October
+
+Judges can run a Drop from their inbox. Branch `wip/drop-mail`; provider-agnostic core only, nothing deployed.
+
+- [x] `app/drop-mail.mjs`: 32-byte base64url link tokens stored only as sha256 in
+  `roomdropDropMailV1/{hash}` (source session id, code, revision, expiry = source session
+  expiry, 3 uses, ttlAt); peppered HMAC address keys after normalisation; caps of one email
+  per arm revision, two per session (`roomdropDropMailSessionsV1`), three per address a day
+  (`roomdropDropMailLedgerV1`) and fifty a day (`roomdropDropMailCapacityV1`), all with ttlAt;
+  memory and Firestore stores; `capture` and `disabled` transports; provider or now deferral.
+  Evidence: `tests/drop-mail.test.mjs` 10/10 with the emulator on 127.0.0.1:8281.
+- [x] `app/domain/drop-mail-template.mjs`: pure on-brand Drop and honest nothing-yet email
+  (tables, inline styles, light only, absolute images, plain text, fixed replay label, only
+  the masked address as judge-derived text). Previews: `.local/drop-mail-preview/`.
+- [x] Arm hook: mail after the arm commit, 5 s transport timeout, outcome
+  scheduled|sent|failed|capped plus mailId on the watch; mail never fails the arm.
+- [x] `POST /q/CODE/inbox {token}`: exact Origin, same-origin fetch, JSON body; the arming
+  browser keeps its session, others get a one-transaction fork with only that booking,
+  capped at the source expiry. GET never opens or approves. Evidence:
+  `tests/quotation-demo-server.test.mjs` (5 Drop email tests).
+- [x] Client: `#inbox-CODE~TOKEN` stripped at once, redeemed, routed to `#drops-CODE`;
+  used or expired links land on the start page with a note. Consent and hand-off copy
+  updated, `DELIVERY_CONSENT_VERSION` bumped. Evidence: `tests/drop-mail.browser.mjs`
+  passes at 320, 768, 1024 and 1440 px (render, fresh-context redeem, approve).
+- [x] Config: `DROP_MAIL_ENABLED` (off by default), `DROP_MAIL_FROM`, `MAIL_PEPPER`,
+  `DROP_MAIL_TRANSPORT` (hosted: `disabled` only) in `validateCloudQuotationMode`.
+- [x] Provider chosen: Cloudflare Email Service from `roomdrop@mail.09-09-09.com`, delayed by
+  Google Cloud Tasks. `cloudflare` transport (REST send, bearer token, 5 s timeout), `cloud-tasks`
+  deferral (task named by mailId at now + 60 s, OIDC to `/internal/drop-mail/send`, which checks
+  audience, issuer and invoker before sending once) and `inline` deferral for local runs.
+  Env: `DROP_MAIL_TRANSPORT=cloudflare`, `DROP_MAIL_DEFERRAL=cloud-tasks`, `CLOUDFLARE_ACCOUNT_ID`,
+  `CLOUDFLARE_EMAIL_TOKEN`, `DROP_MAIL_TASKS_QUEUE`, `DROP_MAIL_TASKS_INVOKER`. Evidence:
+  `tests/drop-mail-providers.test.mjs` 5/5 with stubbed fetch, tokens and ID token checks.
+
+Owner setup. Project `sincere-apex-511418-p0`, region `asia-southeast1`. All of it verified read-only on
+19 Oct by the v7 preflight (snapshots in `.local/deploy-preflight/v7/`).
+
+- [x] Cloudflare: in the dashboard, Email Service > Sending, onboard only the subdomain
+  `mail.09-09-09.com` and add the DNS records it lists (SPF, DKIM, DMARC on `mail.`).
+  Email Sending is beta on the Workers Paid plan.
+  Done 19 Oct by the owner: `cf-bounce.mail.09-09-09.com` MX and SPF and
+  `_dmarc.mail.09-09-09.com` resolve (zone on Cloudflare DNS).
+- [x] Cloudflare: create an account API token with only the email sending permission for this
+  account (a 403 with code 10102 means it lacks it) and note the 32-character account ID.
+  Partial 19 Oct: the owner created a token (`/user/tokens/verify` returns active); the token
+  cannot read accounts or zones, so the account ID is still needed from the dashboard.
+  Done 19 Oct: account ID `767552e0d28f29e846d07a6d05a2f51d`; the owner verified the token can call the send endpoint.
+- [x] Enable APIs: `gcloud services enable cloudtasks.googleapis.com secretmanager.googleapis.com --project sincere-apex-511418-p0`
+- [x] Secrets (typed, no trailing newline): `$f = New-TemporaryFile; Read-Host -MaskInput 'Cloudflare token' | Set-Content $f -NoNewline; gcloud secrets create roomdrop-cloudflare-email-token --data-file $f --replication-policy automatic --project sincere-apex-511418-p0; Remove-Item $f`
+  and (works in Windows PowerShell 5.1 too) `$b = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); $f = New-TemporaryFile; [Convert]::ToBase64String($b) | Set-Content $f -NoNewline; gcloud secrets versions add roomdrop-mail-pepper --data-file $f --project sincere-apex-511418-p0; Remove-Item $f`
+  Done 19 Oct: both secrets have version 1 ENABLED with secretAccessor for the runtime account.
+- [x] Queue: `gcloud tasks queues create roomdrop-drop-mail --location asia-southeast1 --max-attempts 5 --max-dispatches-per-second 5 --project sincere-apex-511418-p0`
+- [x] Invoker service account: `gcloud iam service-accounts create roomdrop-tasks --display-name "RoomDrop Drop email tasks" --project sincere-apex-511418-p0`
+- [x] IAM: `$sa = gcloud run services describe hotel-price-hunter --region asia-southeast1 --project sincere-apex-511418-p0 --format "value(spec.template.spec.serviceAccountName)"; $inv = 'roomdrop-tasks@sincere-apex-511418-p0.iam.gserviceaccount.com'; gcloud run services add-iam-policy-binding hotel-price-hunter --region asia-southeast1 --member "serviceAccount:$inv" --role roles/run.invoker --project sincere-apex-511418-p0; gcloud tasks queues add-iam-policy-binding roomdrop-drop-mail --location asia-southeast1 --member "serviceAccount:$sa" --role roles/cloudtasks.enqueuer --project sincere-apex-511418-p0; gcloud iam service-accounts add-iam-policy-binding $inv --member "serviceAccount:$sa" --role roles/iam.serviceAccountUser --project sincere-apex-511418-p0; foreach ($s in 'roomdrop-cloudflare-email-token', 'roomdrop-mail-pepper') { gcloud secrets add-iam-policy-binding $s --member "serviceAccount:$sa" --role roles/secretmanager.secretAccessor --project sincere-apex-511418-p0 }`
+  (if the describe prints nothing, the service runs as the default compute account; use that).
+- [x] Firestore TTL on `ttlAt`: `foreach ($c in 'roomdropDropMailV1', 'roomdropDropMailSessionsV1', 'roomdropDropMailLedgerV1', 'roomdropDropMailCapacityV1', 'roomdropDropMailSentV1') { gcloud firestore fields ttls update ttlAt --collection-group $c --enable-ttl --async --project sincere-apex-511418-p0 }`
+  Done: all five mail groups and `roomdropPublicSessionsV1` show ACTIVE (19 Oct).
+- [x] v7 deploy script with the Drop email environment: `.local/deploy-roomdrop-v7.ps1` (owner-run;
+  gates PUSH, DEPLOY, SWITCH, SMOKE; no import, the v6c pins stay latest). Read-only preflight checks the
+  source pin, secrets, queue, invoker, grants, TTL ACTIVE and the 00026-xgz baseline; DEPLOY adds the seven
+  `DROP_MAIL_*`/`CLOUDFLARE_ACCOUNT_ID` variables and `CLOUDFLARE_EMAIL_TOKEN`/`MAIL_PEPPER` pinned to
+  version 1, then checks the revision's own Ready condition; SWITCH moves traffic by name; SMOKE runs the
+  v6d HTTP checks plus `tests/live-acceptance.mjs --mail=<typed address>`. Source `de6bea8`, image
+  `sha256:7f9e7570...84d4`, amd64 manifest `sha256:213eca3f...3b53`. Evidence 19 Oct: `node --test`
+  451 pass 0 fail; emulator browser test, `v6c-image-smoke.mjs` and the new `v7-mail-smoke.mjs` (prod mail
+  env in the image, stubbed Cloud Tasks and Cloudflare: scheduled, OIDC callback sends once, inbox link
+  opens a fork) pass; dry run with STOP stops at PUSH after a green preflight.
+- [x] `tests/live-acceptance.mjs --mail=<address>`: judge A arms with that address and the check reports
+  the masked address and `delivery.status`; without it no address is typed, so no email can be sent.
+- [x] Live mail acceptance: arm, receive within about a minute, open on another device, approve.
+  Done 21 Oct: owner ran `.local/deploy-roomdrop-v7.ps1` to completion; hotel-price-hunter-00027-c6t
+  (image `sha256:213eca3f...`, mail on, secrets pinned to v1) serves 100%. The owner confirmed the
+  Drop email arrived and the link worked. Rollback: the script's `-Rollback` (00026-xgz).
+- [x] Hide or reword the address field while Drop email is off in production.
+  Superseded 21 Oct: Drop email is on in production from v7.

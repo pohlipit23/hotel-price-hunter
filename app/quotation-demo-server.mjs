@@ -7,10 +7,11 @@ import { isDisplayedDrop } from './public/drop-eligibility.js';
 import { compareDrops } from './public/room-match.js';
 import { agencyMinimumSavingMinor, watchTag } from './public/drop-watch.js';
 import { watchBlocker } from './domain/altovo-quotation.mjs';
-import { armDropWatch, armRequest, committedWatch } from './domain/booking-drop-watch.mjs';
+import { armDropWatch, armRequest, committedWatch, recordDelivery, storedWatch } from './domain/booking-drop-watch.mjs';
 import { createMemorySessionStorage } from './quotation-session-storage.mjs';
 import { publicPostWatchState } from './quotation-session-actions.mjs';
 import { createPostWatchHandler } from './quotation-post-watch.mjs';
+import { dropMailSettings, hashMailToken } from './drop-mail.mjs';
 
 export function validateLocalQuotationMode(env = process.env) {
   if (env.NODE_ENV === 'production' || env.K_SERVICE || env.CLOUD_RUN_JOB || (env.BIND_HOST && env.BIND_HOST !== '127.0.0.1')) {
@@ -27,6 +28,8 @@ export function validateCloudQuotationMode(environment) {
     || (advice ? environment.GEMINI_MODEL !== QUOTATION_MODEL || environment.GOOGLE_CLOUD_LOCATION !== 'global' : environment.GEMINI_MODEL || environment.GOOGLE_CLOUD_LOCATION)) {
     throw new Error('Hosted quotation mode requires the exact private customer Cloud Run profile.');
   }
+  // Drop email stays off unless DROP_MAIL_ENABLED is 'true' with a complete, hosted-safe configuration.
+  try { dropMailSettings(environment, { hosted: true }); } catch { throw new Error('Hosted quotation mode requires the exact private customer Cloud Run profile.'); }
 }
 function validateDeploymentSnapshot(snapshot) {
   const allowed = ['schemaVersion', 'snapshotVersion', 'transactionMode', 'baseline', 'options', 'checkedAt', 'completeness', 'customerRefund', 'reservationCreated'];
@@ -63,14 +66,14 @@ export function deploymentCatalogue(privateCatalogue) {
 const selectionOnlyBundle = snapshot => ({ ...snapshot, privateReferences: Object.fromEntries(snapshot.options.map(option => [option.optionId, { selectionOnly: true }])) });
 // `bookingStorage` + `sessionStorage` (app/booking-storage.mjs, app/quotation-session-storage.mjs) serve the
 // Firestore-backed judge catalogue; hosted mode requires Firestore sessions and never falls back to memory.
-export function createHostedQuotationDemoServer({ snapshot, catalogue, reviewedCatalogue, bookingStorage, sessionStorage, environment = process.env, now, advisor } = {}) {
+export function createHostedQuotationDemoServer({ snapshot, catalogue, reviewedCatalogue, bookingStorage, sessionStorage, environment = process.env, now, advisor, mail = null } = {}) {
   validateCloudQuotationMode(environment);
   if ([snapshot, catalogue, bookingStorage].filter(value => value != null).length !== 1) throw new Error('Provide exactly one hosted snapshot, catalogue or booking storage.');
   if (bookingStorage) {
     if (sessionStorage?.mode !== 'firestore') throw new Error('Hosted booking storage requires durable Firestore sessions.');
-    return createQuotationServer({ store: { bookings: bookingStorage, sessions: sessionStorage }, reviewedCatalogue, now, advisor, cloudOrigin: environment.APP_ORIGIN });
+    return createQuotationServer({ store: { bookings: bookingStorage, sessions: sessionStorage }, reviewedCatalogue, now, advisor, cloudOrigin: environment.APP_ORIGIN, mail });
   }
-  if (sessionStorage != null) throw new Error('Session storage is only used with booking storage.');
+  if (sessionStorage != null || mail != null) throw new Error('Session storage and Drop email are only used with booking storage.');
   if (catalogue) {
     validateDeploymentCatalogue(catalogue);
     // The packaged file catalogue keeps its existing process-local sessions until F9a replaces it with Firestore.
@@ -92,12 +95,13 @@ const assets = new Map([
 ]);
 // `catalogue` is the private catalogue file shape: { schemaVersion: 1, entries: [{ code, bundle, capture? }] }.
 // `bookingStorage` serves the Firestore catalogue instead; local runs may pair it with memory sessions.
-export function createQuotationDemoServer({ bundle, catalogue, reviewedCatalogue, bookingStorage, sessionStorage, now = () => new Date(), advisor } = {}) {
+// `mail` (app/drop-mail.mjs createDropMailer) emails each armed watch; it needs booking storage and a session store with fork.
+export function createQuotationDemoServer({ bundle, catalogue, reviewedCatalogue, bookingStorage, sessionStorage, now = () => new Date(), advisor, mail = null } = {}) {
   if (bookingStorage != null) {
     if (bundle != null || catalogue != null) throw new Error('Provide exactly one quotation snapshot, catalogue or booking storage.');
-    return createQuotationServer({ store: { bookings: bookingStorage, sessions: sessionStorage ?? createMemorySessionStorage({ now }) }, reviewedCatalogue, now, advisor });
+    return createQuotationServer({ store: { bookings: bookingStorage, sessions: sessionStorage ?? createMemorySessionStorage({ now }) }, reviewedCatalogue, now, advisor, mail });
   }
-  if (sessionStorage != null) throw new Error('Session storage is only used with booking storage.');
+  if (sessionStorage != null || mail != null) throw new Error('Session storage and Drop email are only used with booking storage.');
   if (catalogue == null) return createQuotationServer({ bundle, now, advisor });
   if (bundle != null || catalogue.schemaVersion !== 1 || !Array.isArray(catalogue.entries) || !catalogue.entries.length || catalogue.entries.length > 20
     || catalogue.entries.some(entry => !CATALOGUE_CODE.test(entry?.code ?? '') || entry.bundle?.baseline?.quotationCode !== entry.code)
@@ -127,14 +131,15 @@ function fileCatalogueStore(entries, { now, processLocal = false }) {
   return { bookings, sessions };
 }
 // Storage and arm refusals the routes report; anything else is a bounded 503 with no detail.
-const REFUSALS = { INVALID_WATCH: 400, WATCH_CONSENT_REQUIRED: 400, MINIMUM_SAVING_INVALID: 400, DELIVERY_EMAIL_INVALID: 400, DEMO_SESSION_REQUIRED: 403, BOOKING_UNAVAILABLE: 404,
+const REFUSALS = { MAIL_LINK_EXPIRED: 410, MAIL_LINK_USED: 410, INVALID_WATCH: 400, WATCH_CONSENT_REQUIRED: 400, MINIMUM_SAVING_INVALID: 400, DELIVERY_EMAIL_INVALID: 400, DEMO_SESSION_REQUIRED: 403, BOOKING_UNAVAILABLE: 404,
   SNAPSHOT_CHANGED: 409, WATCH_REVISION_STALE: 409, WATCH_CANNOT_START: 409, CAPTURE_UNAVAILABLE: 503, CATALOGUE_UNAVAILABLE: 503 };
 const refusal = code => Object.assign(new Error('The booking demo is unavailable.'), { code });
-function createQuotationServer({ bundle: single, store = null, reviewedCatalogue, now = () => new Date(), cloudOrigin = null, advisor = { available: false, status: 'unconfigured' } }) {
+function createQuotationServer({ bundle: single, store = null, reviewedCatalogue, now = () => new Date(), cloudOrigin = null, advisor = { available: false, status: 'unconfigured' }, mail = null }) {
   if (store ? typeof store.bookings?.listCatalogue !== 'function' || typeof store.bookings.getBooking !== 'function'
     || ['create', 'get', 'transact'].some(name => typeof store.sessions?.[name] !== 'function') : !validBundle(single)) {
     throw new Error('A prepared private quotation demo snapshot is required.');
   }
+  if (mail && (!store || typeof store.sessions.fork !== 'function' || typeof mail.deliver !== 'function')) throw new Error('Drop email needs booking storage and a session store that can fork.');
   // The legacy single-snapshot surface keeps its sessions here. All catalogue state uses store.sessions.
   const sessions = new Map();
   let adviceWindow = 0; let adviceCount = 0; let advicePending = 0;
@@ -156,6 +161,18 @@ function createQuotationServer({ bundle: single, store = null, reviewedCatalogue
       return record ? { ...record.bundle, contentVersion: record.contentVersion, dropSetVersion: record.dropSetVersion } : null;
     } }) : null;
   const json = (res, status, data) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); };
+  const sessionId = cookie => createHash('sha256').update(cookie).digest('hex');
+  // After the arm commits: email this revision once and record the outcome on the watch. Any failure here
+  // (storage, template, transport) leaves the committed receipt exactly as it was; the arm never fails for mail.
+  const mailDrop = async ({ cookie, code, booking, card, origin, receipt }) => {
+    try {
+      const session = await store.sessions.get(cookie); const watch = storedWatch(session, code, booking);
+      if (!watch || watch.revision !== receipt.watch?.revision || watch.delivery?.status !== 'pending-service') return receipt;
+      const outcome = await mail.deliver({ sessionId: sessionId(cookie), expiresAt: session.expiresAt, code, watch, booking, card, origin });
+      if (!outcome) return receipt;
+      return await store.sessions.transact(cookie, draft => recordDelivery(draft, { code, booking, revision: watch.revision, outcome }));
+    } catch { return receipt; }
+  };
   const server = createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
@@ -170,9 +187,48 @@ function createQuotationServer({ bundle: single, store = null, reviewedCatalogue
       if (['/health', '/healthz'].includes(url.pathname) && req.method === 'GET') return json(res, 200, store
         ? { status: 'ok', surface: 'quotation-demo', mode: 'selection-only', model, catalogueSize }
         : { status: 'ok', surface: 'quotation-demo', mode: 'selection-only', model, snapshotVersion: single.snapshotVersion, optionCount: single.options.length });
+      // The Cloud Tasks callback for a queued Drop email (cloud-tasks deferral only). Not a judge route: the caller must
+      // present Google's OIDC token for the configured invoker. No session is read or written here.
+      if (url.pathname === '/api/quotation-demo/internal/drop-mail') {
+        if (!mail?.verifyTask || req.method !== 'POST') return error(404, 'ROUTE_UNAVAILABLE');
+        if (!(await mail.verifyTask(req.headers.authorization))) return error(401, 'TASK_UNAUTHORIZED');
+        if (!(req.headers['content-type'] ?? '').startsWith('application/json')) return error(400, 'INVALID_MAIL_TASK');
+        const chunks = []; let size = 0;
+        for await (const chunk of req) { size += chunk.length; if (size > 262_144) return error(413, 'INVALID_MAIL_TASK'); chunks.push(chunk); }
+        let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return error(400, 'INVALID_MAIL_TASK'); }
+        // A refused task is final (400); a provider failure is 503 so Cloud Tasks retries it.
+        try { return json(res, 200, { status: await mail.deliverTask(body) }); }
+        catch (failure) { return failure?.code === 'INVALID_MAIL_TASK' ? error(400, 'INVALID_MAIL_TASK') : error(503, 'MAIL_UNAVAILABLE'); }
+      }
       const cookie = /(?:^|;\s*)roomdrop_quote=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie ?? '')?.[1];
       // Catalogue mode: every booking is addressed by its catalogue code in the path, never by query.
-      const route = store ? /^\/api\/quotation-demo\/q\/([A-Z0-9]{4,20})(?:\/(watch|confirm|advice|chat))?$/.exec(url.pathname) : null;
+      const route = store ? /^\/api\/quotation-demo\/q\/([A-Z0-9]{4,20})(?:\/(watch|confirm|advice|chat|inbox))?$/.exec(url.pathname) : null;
+      const setCookie = (id, maxAge = 3600) => res.setHeader('Set-Cookie', `roomdrop_quote=${id}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${cloudOrigin ? '; Secure' : ''}`);
+      // The Drop email's link (#inbox-CODE~TOKEN) is redeemed only here, by a POST from the page itself. No session
+      // or CSRF token exists yet, so the exact Origin and a same-origin fetch stand in for them. It opens this
+      // booking's Drops in this browser; approving still takes the judge's own confirm. GET changes nothing.
+      if (route?.[2] === 'inbox') {
+        if (!mail || req.method !== 'POST') return error(404, 'ROUTE_UNAVAILABLE');
+        if (req.headers.origin !== origin || req.headers['sec-fetch-site'] !== 'same-origin') return error(403, 'DEMO_SESSION_REQUIRED');
+        if (!(req.headers['content-type'] ?? '').startsWith('application/json')) return error(400, 'INVALID_MAIL_LINK');
+        const chunks = []; let size = 0;
+        for await (const chunk of req) { size += chunk.length; if (size > 512) return error(413, 'INVALID_MAIL_LINK'); chunks.push(chunk); }
+        let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return error(400, 'INVALID_MAIL_LINK'); }
+        const hash = body && typeof body === 'object' && !Array.isArray(body) && Object.keys(body).join() === 'token' ? hashMailToken(body.token) : null;
+        if (!hash) return error(400, 'INVALID_MAIL_LINK');
+        const code = route[1];
+        if (!(await loadManifest()).has(code)) return error(404, 'BOOKING_UNAVAILABLE');
+        const link = await mail.store.peek(hash); const time = now().getTime();
+        if (!link || link.code !== code || !(link.expiresAt > time)) return error(410, 'MAIL_LINK_EXPIRED');
+        // The browser that armed the watch already holds its session: nothing to open, no use counted.
+        if (cookie && sessionId(cookie) === link.sourceSessionId && await store.sessions.get(cookie)) return json(res, 200, { status: 'current', code });
+        if (link.uses >= link.maxUses) return error(410, 'MAIL_LINK_USED');
+        let forked;
+        try { forked = await store.sessions.fork(code, mail.store.claim(hash, code)); }
+        catch (failure) { if (failure?.code === 'SESSION_CAPACITY') return error(503, 'DEMO_SESSION_CAPACITY'); throw failure; }
+        setCookie(forked.cookieValue, Math.max(1, Math.floor((forked.session.expiresAt - time) / 1000)));
+        return json(res, 200, { status: 'opened', code });
+      }
       if (postWatch && req.method === 'POST' && ['confirm', 'advice', 'chat'].includes(route?.[2]))
         return postWatch({ req, res, cookie, code: route[1], action: route[2], origin, json, error });
       const catalogueRead = store && req.method === 'GET' && (url.pathname === '/api/quotation-demo/catalogue' || Boolean(route && !route[2]));
@@ -190,7 +246,6 @@ function createQuotationServer({ bundle: single, store = null, reviewedCatalogue
       const loadBooking = async code => (booking = await store.bookings.getBooking(code));
       const openSession = async () => {
         if (session) return true;
-        const setCookie = id => res.setHeader('Set-Cookie', `roomdrop_quote=${id}; Path=/; HttpOnly; SameSite=Strict; Max-Age=3600${cloudOrigin ? '; Secure' : ''}`);
         if (store) {
           let created;
           try { created = await store.sessions.create(); } catch (failure) { if (failure?.code === 'SESSION_CAPACITY') return false; throw failure; }
@@ -242,8 +297,10 @@ function createQuotationServer({ bundle: single, store = null, reviewedCatalogue
         if (route?.[2] === 'watch') {
           // The booking and its current Drop set are read before the transaction; the arm, the version
           // checks and the captured first-check replay then commit together, and only then is the receipt sent.
+          // With Drop email on, the email for this revision is handed over first (bounded; see mailDrop).
           const request = armRequest(body, bundle.baseline.quotedRetail.currency); const at = now();
-          return json(res, 200, await store.sessions.transact(cookie, draft => armDropWatch(draft, { code: route[1], booking, request, at })));
+          const receipt = await store.sessions.transact(cookie, draft => armDropWatch(draft, { code: route[1], booking, request, at }));
+          return json(res, 200, mail ? await mailDrop({ cookie, code: route[1], booking, card: cards.get(route[1]), origin, receipt }) : receipt);
         }
         // An armed Drop Watch narrows the Drops this booking may discuss or confirm to the ones it found.
         const watched = route ? scope.watch?.firstCheck.dropOptionIds ?? null : null;

@@ -9,8 +9,12 @@ import { codeScope } from '../quotation-session-storage.mjs';
 
 // Names the consent wording the judge accepted; bump it whenever that wording changes.
 export const DROP_WATCH_CONSENT_VERSION = 'roomdrop-drop-watch-consent-2026-10-18';
-// Names the email consent line ("Use this email only to send my drop...") shown beside the address field.
-export const DELIVERY_CONSENT_VERSION = 'roomdrop-drop-email-consent-2026-10-18';
+// Names the email consent line ("Email me this one Drop. One message, never shared, deleted within 24h.")
+// shown beside the address field.
+export const DELIVERY_CONSENT_VERSION = 'roomdrop-drop-email-consent-2026-10-19';
+// What the Drop email did for one arm revision (app/drop-mail.mjs). 'pending-service' is the stored address
+// before any send, and stays when Drop email is switched off.
+export const DELIVERY_STATUSES = Object.freeze(['pending-service', 'scheduled', 'sent', 'failed', 'capped']);
 const REQUEST_KEYS = ['snapshotVersion', 'consent', 'minimumSavingMinor', 'expectedRevision', 'deliveryEmail'];
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 const DROP_ID = /^[a-zA-Z0-9-]{1,100}$/;
@@ -33,7 +37,7 @@ const receipt = watch => ({ watch: publicWatch(watch), dropOptionIds: [...watch.
 // Validates the arm request body. The minimum is in the booking currency's minor units, at
 // least the agency's 10.00. expectedRevision is optional: absent (null here) skips the stale check;
 // present, it must name the session's current revision (0 for a first arm). deliveryEmail is optional:
-// absent keeps the saved address (if any), null removes it, a string sets it. No email is sent.
+// absent keeps the saved address (if any), null removes it, a string sets it. Sending is app/drop-mail.mjs's job.
 export function armRequest(body, currency) {
   if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => !REQUEST_KEYS.includes(key))
     || (Object.hasOwn(body, 'expectedRevision') && (!Number.isSafeInteger(body.expectedRevision) || body.expectedRevision < 0))) fail('INVALID_WATCH');
@@ -46,7 +50,7 @@ export function armRequest(body, currency) {
 }
 
 // This session's stored watch for the booking's current versions, or null, including the delivery address.
-function storedWatch(session, code, { contentVersion, dropSetVersion }) {
+export function storedWatch(session, code, { contentVersion, dropSetVersion }) {
   const entry = session?.byCode?.[code];
   return entry && entry.contentVersion === contentVersion && entry.dropSetVersion === dropSetVersion ? entry.watch ?? null : null;
 }
@@ -92,9 +96,21 @@ export function armDropWatch(session, { code, booking, request, at }) {
     currency: bundle.baseline.quotedRetail.currency, minimumSavingMinor, armedAt,
     firstCheck: { mode: 'captured-replay', replayed: true, status: 'completed', captureStatus: booking.capture.status,
       replayedAt: armedAt, checkedAt: capturedAt, capturedAt: [capturedAt], thresholdMinor: minimumSavingMinor, dropOptionIds },
-    // Stored for a later email service; nothing is sent. It lives only as long as this session.
+    // The address for the Drop email, sent after this commit when Drop email is on. It lives only as long as this session.
     ...(email ? { delivery: { channel: 'email', email, consentVersion: DELIVERY_CONSENT_VERSION, status: 'pending-service' } } : {}),
   };
   codeScope(session, code, { contentVersion, dropSetVersion }).watch = watch;
+  return receipt(watch);
+}
+
+// Records the Drop email outcome ({ status, mailId? }) on this revision's committed watch, once, inside a
+// session transaction. A newer revision or an outcome already recorded is left alone. Returns the receipt as stored.
+export function recordDelivery(session, { code, booking, revision, outcome }) {
+  const watch = storedWatch(session, code, booking);
+  if (!watch) fail('WATCH_REVISION_STALE');
+  if (watch.revision === revision && watch.delivery?.status === 'pending-service' && DELIVERY_STATUSES.includes(outcome?.status)) {
+    watch.delivery.status = outcome.status;
+    if (typeof outcome.mailId === 'string') watch.delivery.mailId = outcome.mailId;
+  }
   return receipt(watch);
 }
